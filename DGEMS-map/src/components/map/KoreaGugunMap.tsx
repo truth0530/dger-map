@@ -7,6 +7,8 @@ import type { HospitalSevereData } from "@/lib/hooks/useSevereData";
 import type { BedType } from "@/lib/constants/bedTypes";
 import { BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
+import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
+import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifier";
 
 // 시도명 → SVG 파일명 매핑
 const SIDO_TO_SVG_FILE: Record<string, string> = {
@@ -116,8 +118,12 @@ export function KoreaGugunMap({
   const [isLoading, setIsLoading] = useState(true);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [svgDimensions, setSvgDimensions] = useState<{ width: number; height: number }>({ width: 800, height: 800 });
+  const [showEmergencyMessages, setShowEmergencyMessages] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // 응급 메시지 훅
+  const { messages: emergencyMessages, loading: messageLoading, fetchMessages } = useEmergencyMessages();
   const svgRef = useRef<SVGSVGElement>(null);
 
   // SVG 파일 로드
@@ -242,6 +248,15 @@ export function KoreaGugunMap({
       (d) => d.소속기관코드 === hospital.code && d.질환명 === selectedDisease
     );
   }, [diseaseData, selectedDisease]);
+
+  // 병원 호버 시 응급 메시지 가져오기
+  useEffect(() => {
+    if (hoveredHospitalCode && !emergencyMessages.has(hoveredHospitalCode)) {
+      fetchMessages(hoveredHospitalCode);
+    }
+    // 호버 변경 시 응급 메시지 표시 상태 초기화
+    setShowEmergencyMessages(false);
+  }, [hoveredHospitalCode, fetchMessages, emergencyMessages]);
 
   // 마우스 이동 핸들러
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -590,6 +605,96 @@ export function KoreaGugunMap({
                     </div>
                   </div>
                 )}
+
+                {/* 응급 메시지 섹션 */}
+                {(() => {
+                  const msgData = emergencyMessages.get(hoveredHospital.code);
+                  const isLoading = messageLoading.get(hoveredHospital.code);
+
+                  // 중증질환 메시지
+                  if (msgData && msgData.allDiseases.length > 0) {
+                    return (
+                      <div className="bg-red-500/10 rounded-lg p-2 border border-red-500/20">
+                        <div className="text-[10px] text-red-400 mb-1.5 font-medium flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          중증질환 메시지
+                        </div>
+                        <div className="space-y-1">
+                          {msgData.allDiseases.slice(0, 3).map((disease, idx) => (
+                            <div key={idx} className="text-[9px]">
+                              <span className="text-red-300 font-medium">{disease.displayName.replace(/\[.*?\]\s*/, '')}:</span>
+                              <span className="text-gray-400 ml-1">{disease.content}</span>
+                            </div>
+                          ))}
+                          {msgData.allDiseases.length > 3 && (
+                            <div className="text-[9px] text-gray-500">+{msgData.allDiseases.length - 3}개 메시지</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* 응급실 메시지 섹션 */}
+                {(() => {
+                  const msgData = emergencyMessages.get(hoveredHospital.code);
+                  const isLoading = messageLoading.get(hoveredHospital.code);
+
+                  if (isLoading) {
+                    return (
+                      <div className="text-[10px] text-gray-500 text-center py-1">
+                        메시지 로딩 중...
+                      </div>
+                    );
+                  }
+
+                  if (msgData && msgData.emergency.length > 0) {
+                    return (
+                      <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20">
+                        <div className="text-[10px] text-green-400 mb-1.5 font-medium flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          응급실 운영 정보
+                          <button
+                            className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 hover:bg-green-500/30 pointer-events-auto"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowEmergencyMessages(!showEmergencyMessages);
+                            }}
+                          >
+                            {showEmergencyMessages ? '접기' : `${msgData.emergency.length}개 보기`}
+                          </button>
+                        </div>
+                        {showEmergencyMessages && (
+                          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                            {msgData.emergency.map((item, idx) => {
+                              const parsed = parseMessage(item.msg, item.symTypCod);
+                              const colors = getStatusColorClasses(parsed.status.color);
+                              return (
+                                <div key={idx} className="text-[9px] bg-gray-800/50 rounded p-1.5">
+                                  <div className="flex items-center gap-1 flex-wrap mb-0.5">
+                                    <span className="px-1 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                                      {parsed.department}
+                                    </span>
+                                    <span className={`px-1 py-0.5 rounded ${colors.bg} ${colors.text}`}>
+                                      {parsed.status.label}
+                                    </span>
+                                  </div>
+                                  <div className="text-gray-400">{parsed.details}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* 진료정보 미등록 */}
                 {!hoveredHospital.hasDiseaseData && !bedInfo && availableDiseases.length === 0 && (
