@@ -501,34 +501,48 @@ export function KoreaGugunMap({
               )}
 
               {/* 병상 정보 */}
-              {bedDataMap && selectedBedTypes && (() => {
+              {bedDataMap && selectedBedTypes && selectedBedTypes.size > 0 && (() => {
                 const bedInfo = bedDataMap.get(hoveredHospital.code);
-                if (!bedInfo) return null;
 
                 return (
                   <div className="border-t border-gray-700 pt-2 mt-2">
-                    <div className="text-xs text-gray-500 mb-1">병상 현황</div>
-                    <div className="grid grid-cols-2 gap-1">
-                      {Array.from(selectedBedTypes).map((bedType) => {
-                        const config = BED_TYPE_CONFIG[bedType];
-                        const available = bedInfo[config.availableKey] as number || 0;
-                        const total = bedInfo[config.totalKey] as number || 0;
-                        const occupancy = Math.max(0, total - available);
-
-                        return (
-                          <div key={bedType} className="bg-gray-700/50 rounded px-2 py-1">
-                            <div className="text-[10px] text-gray-400">{config.label}</div>
-                            <div className="text-xs">
-                              <span className={available > 0 ? "text-cyan-400" : "text-red-400"}>
-                                {available}
-                              </span>
-                              <span className="text-gray-500">/{total}</span>
-                              <span className="text-gray-500 ml-1">({occupancy}명)</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                      <span>병상 현황</span>
+                      {bedInfo?.hvidate && (
+                        <span className="text-[9px] text-gray-600">
+                          {bedInfo.hvidate.substring(8, 10)}:{bedInfo.hvidate.substring(10, 12)}
+                        </span>
+                      )}
                     </div>
+                    {bedInfo ? (
+                      <div className="grid grid-cols-2 gap-1">
+                        {Array.from(selectedBedTypes).map((bedType) => {
+                          const config = BED_TYPE_CONFIG[bedType];
+                          const available = bedInfo[config.availableKey] as number ?? 0;
+                          const total = bedInfo[config.totalKey] as number ?? 0;
+                          const occupancy = Math.max(0, total - available);
+
+                          return (
+                            <div key={bedType} className="bg-gray-700/50 rounded px-2 py-1">
+                              <div className="text-[10px] text-gray-400">{config.label}</div>
+                              <div className="text-xs">
+                                <span className={available > 0 ? "text-cyan-400 font-medium" : "text-red-400 font-medium"}>
+                                  {available}
+                                </span>
+                                <span className="text-gray-500">/{total}</span>
+                                {total > 0 && (
+                                  <span className="text-gray-500 ml-1">({occupancy}명)</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-gray-500 bg-gray-700/30 rounded px-2 py-1.5 text-center">
+                        실시간 병상 데이터 없음
+                      </div>
+                    )}
                   </div>
                 );
               })()}
