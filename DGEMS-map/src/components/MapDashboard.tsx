@@ -14,6 +14,7 @@ import type { DayOfWeek, AvailabilityStatus, Hospital } from "@/types";
 import { KoreaSidoMap } from "@/components/map/KoreaSidoMap";
 import { KoreaGugunMap } from "@/components/map/KoreaGugunMap";
 import { useBedData, HospitalBedData } from "@/lib/hooks/useBedData";
+import { useSevereData, HospitalSevereData } from "@/lib/hooks/useSevereData";
 import { mapSidoName } from "@/lib/utils/regionMapping";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 
@@ -70,13 +71,16 @@ export function MapDashboard() {
 
   // 병상 데이터 훅
   const { data: bedData, fetchBedData, loading: bedLoading } = useBedData();
+  // 중증질환 데이터 훅
+  const { data: severeData, fetchSevereData, loading: severeLoading } = useSevereData();
 
-  // 지역 변경 시 병상 데이터 로드
+  // 지역 변경 시 병상 및 중증질환 데이터 로드
   useEffect(() => {
     const regionToFetch = selectedRegion === "all" ? "대구" : selectedRegion;
     const mappedRegion = mapSidoName(regionToFetch);
     fetchBedData(mappedRegion);
-  }, [selectedRegion, fetchBedData]);
+    fetchSevereData(mappedRegion);
+  }, [selectedRegion, fetchBedData, fetchSevereData]);
 
   // 병상 데이터를 병원 코드로 매핑
   const bedDataMap = useMemo(() => {
@@ -86,6 +90,15 @@ export function MapDashboard() {
     });
     return map;
   }, [bedData]);
+
+  // 중증질환 데이터를 병원 코드로 매핑
+  const severeDataMap = useMemo(() => {
+    const map = new Map<string, HospitalSevereData>();
+    severeData.forEach((severe) => {
+      map.set(severe.hpid, severe);
+    });
+    return map;
+  }, [severeData]);
 
   const stats = useMemo(() => {
     if (!selectedDisease) return null;
@@ -490,6 +503,7 @@ export function MapDashboard() {
               onHospitalHover={handleHospitalHover}
               bedDataMap={bedDataMap}
               selectedBedTypes={selectedBedTypes}
+              severeDataMap={severeDataMap}
             />
           ) : (
             <KoreaGugunMap
@@ -505,6 +519,7 @@ export function MapDashboard() {
               onHospitalHover={handleHospitalHover}
               bedDataMap={bedDataMap}
               selectedBedTypes={selectedBedTypes}
+              severeDataMap={severeDataMap}
             />
           )}
         </main>

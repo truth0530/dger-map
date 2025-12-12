@@ -3,8 +3,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { Hospital, HospitalDiseaseData, DayOfWeek, AvailabilityStatus } from "@/types";
 import type { HospitalBedData } from "@/lib/hooks/useBedData";
+import type { HospitalSevereData } from "@/lib/hooks/useSevereData";
 import type { BedType } from "@/lib/constants/bedTypes";
 import { BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
+import { SEVERE_TYPES } from "@/lib/constants/dger";
 
 // 시도명 → SVG 파일명 매핑
 const SIDO_TO_SVG_FILE: Record<string, string> = {
@@ -69,6 +71,7 @@ interface KoreaGugunMapProps {
   onHospitalHover: (code: string | null) => void;
   bedDataMap?: Map<string, HospitalBedData>;
   selectedBedTypes?: Set<BedType>;
+  severeDataMap?: Map<string, HospitalSevereData>;
 }
 
 // 가용성 상태별 색상
@@ -102,6 +105,7 @@ export function KoreaGugunMap({
   onHospitalHover,
   bedDataMap,
   selectedBedTypes,
+  severeDataMap,
 }: KoreaGugunMapProps) {
   const [svgPaths, setSvgPaths] = useState<PathInfo[]>([]);
   const [viewBox, setViewBox] = useState<string>("0 0 800 800");
@@ -541,6 +545,46 @@ export function KoreaGugunMap({
                     ) : (
                       <div className="text-[10px] text-gray-500 bg-gray-700/30 rounded px-2 py-1.5 text-center">
                         실시간 병상 데이터 없음
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* 중증질환 메시지 */}
+              {severeDataMap && (() => {
+                const severeInfo = severeDataMap.get(hoveredHospital.code);
+                if (!severeInfo) return null;
+
+                // 가용한 중증질환 목록 추출
+                const availableDiseases = SEVERE_TYPES.filter(type => {
+                  const status = (severeInfo.severeStatus[type.key] || '').trim().toUpperCase();
+                  return status === 'Y';
+                });
+
+                const unavailableDiseases = SEVERE_TYPES.filter(type => {
+                  const status = (severeInfo.severeStatus[type.key] || '').trim().toUpperCase();
+                  return status === 'N' || status === '불가능';
+                });
+
+                if (availableDiseases.length === 0 && unavailableDiseases.length === 0) return null;
+
+                return (
+                  <div className="border-t border-gray-700 pt-2 mt-2">
+                    <div className="text-xs text-gray-500 mb-1">중증질환 진료</div>
+                    {availableDiseases.length > 0 && (
+                      <div className="mb-1">
+                        <div className="text-[10px] text-green-400 mb-0.5">가능 ({availableDiseases.length})</div>
+                        <div className="flex flex-wrap gap-0.5">
+                          {availableDiseases.slice(0, 6).map(type => (
+                            <span key={type.key} className="text-[9px] bg-green-500/20 text-green-300 px-1 py-0.5 rounded">
+                              {type.label.replace(/\[.*?\]\s*/, '')}
+                            </span>
+                          ))}
+                          {availableDiseases.length > 6 && (
+                            <span className="text-[9px] text-gray-500">+{availableDiseases.length - 6}</span>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
