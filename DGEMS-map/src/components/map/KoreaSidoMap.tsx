@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { Hospital, HospitalDiseaseData, DayOfWeek, AvailabilityStatus } from "@/types";
+import type { HospitalBedData } from "@/lib/hooks/useBedData";
+import type { BedType } from "@/lib/constants/bedTypes";
+import { BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 
 // 전국 좌표 범위 (위도/경도 → SVG viewBox 변환용)
 // SVG viewBox: 0 0 800 759
@@ -30,6 +33,8 @@ interface KoreaSidoMapProps {
   onRegionSelect: (region: string) => void;
   hoveredHospitalCode?: string | null;
   onHospitalHover?: (code: string | null) => void;
+  bedDataMap?: Map<string, HospitalBedData>;
+  selectedBedTypes?: Set<BedType>;
 }
 
 // 가용성 상태별 색상
@@ -123,6 +128,8 @@ export function KoreaSidoMap({
   onRegionSelect,
   hoveredHospitalCode,
   onHospitalHover,
+  bedDataMap,
+  selectedBedTypes,
 }: KoreaSidoMapProps) {
   const [svgPaths, setSvgPaths] = useState<PathInfo[]>([]);
   const [viewBox, setViewBox] = useState<string>("0 0 800 800");
@@ -555,6 +562,39 @@ export function KoreaSidoMap({
                 진료정보 미등록 기관
               </div>
             )}
+
+            {/* 병상 정보 */}
+            {bedDataMap && selectedBedTypes && (() => {
+              const bedInfo = bedDataMap.get(hoveredHospital.code);
+              if (!bedInfo) return null;
+
+              return (
+                <div className="border-t border-gray-700 pt-2 mt-2">
+                  <div className="text-xs text-gray-500 mb-1">병상 현황</div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {Array.from(selectedBedTypes).map((bedType) => {
+                      const config = BED_TYPE_CONFIG[bedType];
+                      const available = bedInfo[config.availableKey] as number || 0;
+                      const total = bedInfo[config.totalKey] as number || 0;
+                      const occupancy = Math.max(0, total - available);
+
+                      return (
+                        <div key={bedType} className="bg-gray-700/50 rounded px-2 py-1">
+                          <div className="text-[10px] text-gray-400">{config.label}</div>
+                          <div className="text-xs">
+                            <span className={available > 0 ? "text-cyan-400" : "text-red-400"}>
+                              {available}
+                            </span>
+                            <span className="text-gray-500">/{total}</span>
+                            <span className="text-gray-500 ml-1">({occupancy}명)</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
         );

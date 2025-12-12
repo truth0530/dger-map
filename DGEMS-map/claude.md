@@ -1,11 +1,11 @@
-# DGEMS-map 프로젝트 계획서
+# dger-map 프로젝트 계획서
 
 ## 1. 프로젝트 개요
 
 | 항목 | 내용 |
 |------|------|
-| 프로젝트명 | DGEMS-map |
-| 프로젝트 경로 | C:\project\DGEMS-map\ |
+| 프로젝트명 | dger-map |
+| 프로젝트 경로 | C:\project\dger-map\ |
 | 목적 | 44개 중증응급질환의 요일별 제공가능 정보를 한국 지도에 시각화 |
 | UI 참조 | AEDpics 프로젝트의 지도 탭 UI/디자인 복제 |
 | 기술 스택 | Next.js 14, React 18, TypeScript, Tailwind CSS |
@@ -67,7 +67,7 @@
 ## 4. 신규 프로젝트 디렉토리 구조
 
 ```
-C:\project\DGEMS-map\
+C:\project\dger-map\
 ├── README.md
 ├── claude.md                    # 이 파일
 ├── package.json

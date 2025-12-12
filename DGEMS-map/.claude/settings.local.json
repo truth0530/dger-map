@@ -25,7 +25,20 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(cmd /c \"taskkill /PID 35788 /F\")",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: 중증응급질환 진료 현황 대시보드 초기 구현\n\n- Next.js 14 + TypeScript + Tailwind CSS 기반 프로젝트 설정\n- 전국 시도별/구군별 SVG 지도 컴포넌트 구현\n- 44개 중증응급질환 요일별 진료 가능 현황 시각화\n- 대구 지역 19개 병원 데이터 연동\n- 3단 레이아웃: 좌측 필터/범례, 중앙 지도, 우측 병원 목록\n- 기관종류별 마커 모양 구분 (권역/지역센터/기관)\n- 가용성 상태별 색상 표시 (24시간/주간/야간/불가)\n- 병원 호버 시 툴팁 및 지도 마커 하이라이트\n- SVG 좌표 변환 회귀 분석 기반 정밀 매핑\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(powershell:*)",
+      "Bash(xargs ls:*)",
+      "Bash(ls:*)",
+      "Bash(gh repo list:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh api:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(npx vercel:*)",
+      "Bash(curl:*)",
+      "Bash(API_KEY=\"y4Ptc9ZehAbGB5UXVyIbakE%2FXqMrr7PWd3IV3n5uKCe%2Fs6W6G5jNTT4iHh8i5TXktC%2FHw5wBCs%2FGqhM8EhBEcQ%3D%3D\":*)"
     ]
   }
 }

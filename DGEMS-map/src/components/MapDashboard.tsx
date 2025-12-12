@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   Select,
   SelectContent,
@@ -13,6 +13,9 @@ import { DAYS_OF_WEEK } from "@/lib/constants";
 import type { DayOfWeek, AvailabilityStatus, Hospital } from "@/types";
 import { KoreaSidoMap } from "@/components/map/KoreaSidoMap";
 import { KoreaGugunMap } from "@/components/map/KoreaGugunMap";
+import { useBedData, HospitalBedData } from "@/lib/hooks/useBedData";
+import { mapSidoName } from "@/lib/utils/regionMapping";
+import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 
 type EmergencyClassification = "권역응급의료센터" | "지역응급의료센터" | "지역응급의료기관";
 
@@ -56,6 +59,7 @@ export function MapDashboard() {
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [hoveredHospitalCode, setHoveredHospitalCode] = useState<string | null>(null);
   const [showDetailMap, setShowDetailMap] = useState(false);  // 상세 지도 표시 여부
+  const [selectedBedTypes, setSelectedBedTypes] = useState<Set<BedType>>(new Set(['general']));
 
   const hospitalListRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +67,25 @@ export function MapDashboard() {
   const diseases = getDiseases();
   const allData = getAllData();
   const meta = getMeta();
+
+  // 병상 데이터 훅
+  const { data: bedData, fetchBedData, loading: bedLoading } = useBedData();
+
+  // 지역 변경 시 병상 데이터 로드
+  useEffect(() => {
+    const regionToFetch = selectedRegion === "all" ? "대구" : selectedRegion;
+    const mappedRegion = mapSidoName(regionToFetch);
+    fetchBedData(mappedRegion);
+  }, [selectedRegion, fetchBedData]);
+
+  // 병상 데이터를 병원 코드로 매핑
+  const bedDataMap = useMemo(() => {
+    const map = new Map<string, HospitalBedData>();
+    bedData.forEach((bed) => {
+      map.set(bed.hpid, bed);
+    });
+    return map;
+  }, [bedData]);
 
   const stats = useMemo(() => {
     if (!selectedDisease) return null;
@@ -135,6 +158,20 @@ export function MapDashboard() {
       prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls]
     );
   };
+
+  const toggleBedType = useCallback((type: BedType) => {
+    setSelectedBedTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        if (next.size > 1) {
+          next.delete(type);
+        }
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  }, []);
 
   // 병원별 해당 질환 가용성 상태
   const getHospitalStatus = (hospital: Hospital): AvailabilityStatus | null => {
@@ -237,7 +274,7 @@ export function MapDashboard() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* 좌측 사이드바: 필터 + 범례 */}
-        <aside className="w-52 bg-gray-900 border-r border-gray-800 flex flex-col p-3 space-y-3">
+        <aside className="w-52 bg-gray-900 border-r border-gray-800 flex flex-col p-3 space-y-2 overflow-y-auto">
           {/* 지역 & 요일 선택 */}
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -314,6 +351,29 @@ export function MapDashboard() {
                 질환 선택 시 통계 표시
               </div>
             )}
+          </div>
+
+          {/* 병상 유형 필터 */}
+          <div className="bg-gray-800 rounded-lg p-2 border border-gray-700">
+            <div className="text-[10px] text-gray-400 mb-1.5 flex items-center justify-between">
+              <span>병상 유형</span>
+              {bedLoading && <span className="text-orange-400">로딩중...</span>}
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {(Object.entries(BED_TYPE_CONFIG) as [BedType, typeof BED_TYPE_CONFIG[BedType]][]).map(([type, config]) => (
+                <button
+                  key={type}
+                  onClick={() => toggleBedType(type)}
+                  className={`flex items-center justify-center text-[10px] px-1.5 py-1 rounded transition-all ${
+                    selectedBedTypes.has(type)
+                      ? "bg-cyan-500/30 text-cyan-300 border border-cyan-500/50"
+                      : "bg-gray-700/50 text-gray-500 border border-gray-600 hover:border-gray-500"
+                  }`}
+                >
+                  {config.shortLabel}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* 범례: 기관종류 */}
@@ -428,6 +488,8 @@ export function MapDashboard() {
               onRegionSelect={handleRegionSelect}
               hoveredHospitalCode={hoveredHospitalCode}
               onHospitalHover={handleHospitalHover}
+              bedDataMap={bedDataMap}
+              selectedBedTypes={selectedBedTypes}
             />
           ) : (
             <KoreaGugunMap
@@ -441,6 +503,8 @@ export function MapDashboard() {
               onBackToNational={handleBackToNational}
               hoveredHospitalCode={hoveredHospitalCode}
               onHospitalHover={handleHospitalHover}
+              bedDataMap={bedDataMap}
+              selectedBedTypes={selectedBedTypes}
             />
           )}
         </main>
