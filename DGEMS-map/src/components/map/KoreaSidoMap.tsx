@@ -10,12 +10,12 @@ import { SEVERE_TYPES } from "@/lib/constants/dger";
 
 // 전국 좌표 범위 (위도/경도 → SVG viewBox 변환용)
 // SVG viewBox: 0 0 800 759
-// 정밀 회귀 분석 기반 경계값 - SVG path와 실제 지리 좌표 정밀 매핑
+// 서울(37.56, 127.0) → SVG(251, 163), 부산(35.18, 129.08) → SVG(469, 490) 기준 역계산
 const KOREA_BOUNDS = {
-  minLat: 33.23,
-  maxLat: 38.55,
-  minLng: 124.59,
-  maxLng: 131.64,
+  minLat: 33.0,
+  maxLat: 38.9,
+  minLng: 124.6,
+  maxLng: 131.9,
 };
 
 interface PathInfo {
@@ -23,6 +23,40 @@ interface PathInfo {
   d: string;
   fillRule?: string;
 }
+
+interface BBox {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+// SVG path d 속성에서 bounding box 계산
+function parseBoundingBox(d: string): BBox {
+  const numbers = d.match(/[-+]?[0-9]*\.?[0-9]+/g)?.map(Number) || [];
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+  for (let i = 0; i < numbers.length - 1; i += 2) {
+    const x = numbers[i];
+    const y = numbers[i + 1];
+    if (!isNaN(x) && !isNaN(y)) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  return { minX, maxX, minY, maxY };
+}
+
+// 시도별 하드코딩된 bounding box (fallback용)
+const FALLBACK_BBOXES: Record<string, BBox> = {
+  "제주특별자치도": { minX: 161, maxX: 252, minY: 697, maxY: 748 },
+  "서울특별시": { minX: 236, maxX: 282, minY: 139, maxY: 190 },
+  "부산광역시": { minX: 463, maxX: 502, minY: 481, maxY: 545 },
+  "강원특별자치도": { minX: 290, maxX: 450, minY: 80, maxY: 230 },
+};
 
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
 
@@ -145,6 +179,7 @@ export function KoreaSidoMap({
   const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [svgDimensions, setSvgDimensions] = useState<{ width: number; height: number }>({ width: 800, height: 800 });
+  const [regionBBoxes, setRegionBBoxes] = useState<Record<string, BBox>>({});
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -192,6 +227,17 @@ export function KoreaSidoMap({
         });
 
         setSvgPaths(pathInfos);
+
+        // 각 시도별 bounding box 계산
+        const bboxes: Record<string, BBox> = {};
+        pathInfos.forEach((pathInfo) => {
+          const regionName = PATH_ID_TO_REGION[pathInfo.id];
+          if (regionName) {
+            bboxes[regionName] = parseBoundingBox(pathInfo.d);
+          }
+        });
+        console.log("[KoreaSidoMap] Region BBoxes:", bboxes);
+        setRegionBBoxes(bboxes);
       } catch (err) {
         console.error("[KoreaSidoMap] SVG 로드 실패:", err);
       } finally {
@@ -240,6 +286,58 @@ export function KoreaSidoMap({
 
     return { x, y };
   }, [svgDimensions]);
+
+  // 병원 좌표를 시도 경계 내로 제한
+  const constrainToRegion = useCallback((pos: { x: number; y: number }, region: string | undefined, hospitalCode?: string): { x: number; y: number } => {
+    if (!region) return pos;
+
+    const bbox = regionBBoxes[region] || FALLBACK_BBOXES[region];
+    if (!bbox) return pos;
+    const padding = 15; // 경계 안쪽으로 약간의 여유
+
+    // 안전한 범위 계산
+    const safeMinX = bbox.minX + padding;
+    const safeMaxX = bbox.maxX - padding;
+    const safeMinY = bbox.minY + padding;
+    const safeMaxY = bbox.maxY - padding;
+
+    // 좌표가 안전 범위를 벗어나는지 확인
+    const isOutside = pos.x < safeMinX || pos.x > safeMaxX ||
+                      pos.y < safeMinY || pos.y > safeMaxY;
+
+    if (isOutside) {
+      // 병원 코드 기반으로 일관된 오프셋 생성
+      let hash = 0;
+      if (hospitalCode) {
+        for (let i = 0; i < hospitalCode.length; i++) {
+          hash = ((hash << 5) - hash) + hospitalCode.charCodeAt(i);
+          hash = hash & hash;
+        }
+      }
+      const offsetX = (Math.abs(hash) % 100) / 100;
+      const offsetY = (Math.abs(hash >> 8) % 100) / 100;
+
+      const safeWidth = safeMaxX - safeMinX;
+      const safeHeight = safeMaxY - safeMinY;
+
+      // 경계 내로 클램핑하면서 오프셋 적용
+      let newX = Math.max(safeMinX, Math.min(safeMaxX, pos.x));
+      let newY = Math.max(safeMinY, Math.min(safeMaxY, pos.y));
+
+      // X가 범위 밖이었으면 오프셋 적용
+      if (pos.x < safeMinX || pos.x > safeMaxX) {
+        newX = safeMinX + offsetX * safeWidth;
+      }
+      // Y가 범위 밖이었으면 오프셋 적용
+      if (pos.y < safeMinY || pos.y > safeMaxY) {
+        newY = safeMinY + offsetY * safeHeight;
+      }
+
+      return { x: newX, y: newY };
+    }
+
+    return pos;
+  }, [regionBBoxes]);
 
   // 병원 가용성 상태 가져오기
   const getHospitalStatus = useCallback((hospital: Hospital): AvailabilityStatus | null => {
@@ -493,7 +591,8 @@ export function KoreaSidoMap({
         {filteredHospitals.map((hospital) => {
           if (!hospital.lat || !hospital.lng) return null;
 
-          const pos = latLngToSvg(hospital.lat, hospital.lng);
+          const rawPos = latLngToSvg(hospital.lat, hospital.lng);
+          const pos = constrainToRegion(rawPos, hospital.region, hospital.code);
           const status = getHospitalStatus(hospital);
           const isHovered = hoveredHospitalCode === hospital.code;
           const color = getMarkerColor(hospital);
@@ -527,150 +626,145 @@ export function KoreaSidoMap({
         })}
       </svg>
 
-      {/* 병원 호버 툴팁 */}
+      {/* 병원 호버 툴팁 - 개선된 디자인 */}
       {hoveredHospital && (() => {
-        // 마우스 위치가 있으면 사용, 없으면 병원 좌표 기반으로 계산
         const pos = tooltipPos || getHospitalTooltipPos(hoveredHospital);
         if (!pos) return null;
+
+        const bedInfo = bedDataMap?.get(hoveredHospital.code);
+        const severeInfo = severeDataMap?.get(hoveredHospital.code);
+        const diseaseStatus = getHospitalStatus(hoveredHospital);
+
+        // 가용한 중증질환 목록
+        const availableDiseases = severeInfo ? SEVERE_TYPES.filter(type => {
+          const status = (severeInfo.severeStatus[type.key] || '').trim().toUpperCase();
+          return status === 'Y';
+        }) : [];
 
         return (
           <div
             className="absolute z-50 pointer-events-none"
             style={{
-              left: Math.min(pos.x + 15, (mapContainerRef.current?.clientWidth || 300) - 280),
+              left: Math.min(pos.x + 15, (mapContainerRef.current?.clientWidth || 300) - 320),
               top: Math.max(pos.y - 10, 10),
               transform: pos.y < 150 ? 'translateY(0)' : 'translateY(-100%)',
             }}
           >
-          <div className="bg-gray-800/95 backdrop-blur-sm rounded-lg p-3 border border-gray-600 shadow-xl min-w-[240px] max-w-[280px]">
-            <div className="font-bold text-white text-sm mb-1">{hoveredHospital.name}</div>
-
-            {hoveredHospital.classification && (
-              <div className="text-xs text-orange-400 mb-1">{hoveredHospital.classification}</div>
-            )}
-
-            {hoveredHospital.region && (
-              <div className="text-xs text-gray-400 mb-2">
-                {hoveredHospital.region} {hoveredHospital.district}
-              </div>
-            )}
-
-            {selectedDisease && hoveredHospital.hasDiseaseData && (
-              <div className="border-t border-gray-700 pt-2 mt-2">
-                <div className="text-xs text-gray-500 mb-1">{selectedDisease}</div>
-                {(() => {
-                  const status = getHospitalStatus(hoveredHospital);
-                  return (
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="px-2 py-0.5 rounded text-xs font-medium"
-                        style={{
-                          backgroundColor: status ? `${STATUS_COLORS[status]}30` : '#37415130',
-                          color: status ? STATUS_COLORS[status] : '#9ca3af',
-                        }}
-                      >
-                        {selectedDay}요일: {status || "정보없음"}
-                      </span>
+            <div className="bg-gray-900/98 backdrop-blur-md rounded-xl shadow-2xl border border-gray-700/50 overflow-hidden min-w-[300px] max-w-[340px]">
+              {/* 헤더 영역 */}
+              <div className="bg-gradient-to-r from-gray-800 to-gray-800/80 px-3 py-2.5 border-b border-gray-700/50">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-white text-sm leading-tight truncate">{hoveredHospital.name}</div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {hoveredHospital.classification && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-medium">
+                          {hoveredHospital.classification.replace('응급의료', '')}
+                        </span>
+                      )}
+                      {hoveredHospital.region && (
+                        <span className="text-[10px] text-gray-500">
+                          {hoveredHospital.district || hoveredHospital.region}
+                        </span>
+                      )}
                     </div>
-                  );
-                })()}
+                  </div>
+                  {/* 업데이트 시간 */}
+                  {bedInfo?.hvidate && (
+                    <div className="text-[9px] text-gray-500 bg-gray-700/50 px-1.5 py-0.5 rounded">
+                      {bedInfo.hvidate.substring(8, 10)}:{bedInfo.hvidate.substring(10, 12)}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
 
-            {!hoveredHospital.hasDiseaseData && (
-              <div className="text-xs text-gray-500 border-t border-gray-700 pt-2 mt-2">
-                진료정보 미등록 기관
-              </div>
-            )}
+              {/* 컨텐츠 영역 */}
+              <div className="p-3 space-y-2.5">
+                {/* 질환 가용성 (44개 질환) */}
+                {selectedDisease && hoveredHospital.hasDiseaseData && diseaseStatus && (
+                  <div className="flex items-center justify-between bg-gray-800/50 rounded-lg px-2.5 py-2">
+                    <span className="text-[11px] text-gray-400 truncate flex-1 mr-2">{selectedDisease}</span>
+                    <span
+                      className="text-[11px] font-semibold px-2 py-0.5 rounded"
+                      style={{
+                        backgroundColor: `${STATUS_COLORS[diseaseStatus]}25`,
+                        color: STATUS_COLORS[diseaseStatus],
+                      }}
+                    >
+                      {selectedDay}요일 {diseaseStatus}
+                    </span>
+                  </div>
+                )}
 
-            {/* 병상 정보 */}
-            {bedDataMap && selectedBedTypes && selectedBedTypes.size > 0 && (() => {
-              const bedInfo = bedDataMap.get(hoveredHospital.code);
+                {/* 병상 현황 - 컴팩트 그리드 */}
+                {bedDataMap && selectedBedTypes && selectedBedTypes.size > 0 && (
+                  <div>
+                    <div className="text-[10px] text-gray-500 mb-1.5 font-medium flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      병상 현황
+                    </div>
+                    {bedInfo ? (
+                      <div className="grid grid-cols-4 gap-1">
+                        {Array.from(selectedBedTypes).map((bedType) => {
+                          const config = BED_TYPE_CONFIG[bedType];
+                          const available = bedInfo[config.availableKey] as number ?? 0;
+                          const total = bedInfo[config.totalKey] as number ?? 0;
 
-              return (
-                <div className="border-t border-gray-700 pt-2 mt-2">
-                  <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
-                    <span>병상 현황</span>
-                    {bedInfo?.hvidate && (
-                      <span className="text-[9px] text-gray-600">
-                        {bedInfo.hvidate.substring(8, 10)}:{bedInfo.hvidate.substring(10, 12)}
-                      </span>
+                          return (
+                            <div key={bedType} className="bg-gray-800/60 rounded-md px-1.5 py-1.5 text-center">
+                              <div className="text-[9px] text-gray-500 truncate">{config.shortLabel}</div>
+                              <div className="text-[13px] font-bold mt-0.5">
+                                <span className={available > 0 ? "text-cyan-400" : "text-red-400"}>
+                                  {available}
+                                </span>
+                                <span className="text-gray-600 text-[10px]">/{total}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-gray-500 bg-gray-800/40 rounded-lg py-2 text-center">
+                        실시간 데이터 없음
+                      </div>
                     )}
                   </div>
-                  {bedInfo ? (
-                    <div className="grid grid-cols-2 gap-1">
-                      {Array.from(selectedBedTypes).map((bedType) => {
-                        const config = BED_TYPE_CONFIG[bedType];
-                        const available = bedInfo[config.availableKey] as number ?? 0;
-                        const total = bedInfo[config.totalKey] as number ?? 0;
-                        const occupancy = Math.max(0, total - available);
+                )}
 
-                        return (
-                          <div key={bedType} className="bg-gray-700/50 rounded px-2 py-1">
-                            <div className="text-[10px] text-gray-400">{config.label}</div>
-                            <div className="text-xs">
-                              <span className={available > 0 ? "text-cyan-400 font-medium" : "text-red-400 font-medium"}>
-                                {available}
-                              </span>
-                              <span className="text-gray-500">/{total}</span>
-                              {total > 0 && (
-                                <span className="text-gray-500 ml-1">({occupancy}명)</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                {/* 중증질환 진료 가능 */}
+                {availableDiseases.length > 0 && (
+                  <div>
+                    <div className="text-[10px] text-gray-500 mb-1.5 font-medium flex items-center gap-1">
+                      <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      중증질환 진료 가능
+                      <span className="text-green-400 ml-auto">{availableDiseases.length}개</span>
                     </div>
-                  ) : (
-                    <div className="text-[10px] text-gray-500 bg-gray-700/30 rounded px-2 py-1.5 text-center">
-                      실시간 병상 데이터 없음
+                    <div className="flex flex-wrap gap-1">
+                      {availableDiseases.slice(0, 8).map(type => (
+                        <span key={type.key} className="text-[9px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded-md border border-green-500/20">
+                          {type.label.replace(/\[.*?\]\s*/, '')}
+                        </span>
+                      ))}
+                      {availableDiseases.length > 8 && (
+                        <span className="text-[9px] text-gray-500 px-1.5 py-0.5">+{availableDiseases.length - 8}</span>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })()}
+                  </div>
+                )}
 
-            {/* 중증질환 메시지 */}
-            {severeDataMap && (() => {
-              const severeInfo = severeDataMap.get(hoveredHospital.code);
-              if (!severeInfo) return null;
-
-              // 가용한 중증질환 목록 추출
-              const availableDiseases = SEVERE_TYPES.filter(type => {
-                const status = (severeInfo.severeStatus[type.key] || '').trim().toUpperCase();
-                return status === 'Y';
-              });
-
-              const unavailableDiseases = SEVERE_TYPES.filter(type => {
-                const status = (severeInfo.severeStatus[type.key] || '').trim().toUpperCase();
-                return status === 'N' || status === '불가능';
-              });
-
-              if (availableDiseases.length === 0 && unavailableDiseases.length === 0) return null;
-
-              return (
-                <div className="border-t border-gray-700 pt-2 mt-2">
-                  <div className="text-xs text-gray-500 mb-1">중증질환 진료</div>
-                  {availableDiseases.length > 0 && (
-                    <div className="mb-1">
-                      <div className="text-[10px] text-green-400 mb-0.5">가능 ({availableDiseases.length})</div>
-                      <div className="flex flex-wrap gap-0.5">
-                        {availableDiseases.slice(0, 6).map(type => (
-                          <span key={type.key} className="text-[9px] bg-green-500/20 text-green-300 px-1 py-0.5 rounded">
-                            {type.label.replace(/\[.*?\]\s*/, '')}
-                          </span>
-                        ))}
-                        {availableDiseases.length > 6 && (
-                          <span className="text-[9px] text-gray-500">+{availableDiseases.length - 6}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+                {/* 진료정보 미등록 */}
+                {!hoveredHospital.hasDiseaseData && !bedInfo && availableDiseases.length === 0 && (
+                  <div className="text-[10px] text-gray-500 text-center py-1">
+                    등록된 진료정보가 없습니다
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
         );
       })()}
 
