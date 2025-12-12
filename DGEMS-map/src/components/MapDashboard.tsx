@@ -17,8 +17,10 @@ import { useBedData, HospitalBedData } from "@/lib/hooks/useBedData";
 import { useSevereData, HospitalSevereData } from "@/lib/hooks/useSevereData";
 import { mapSidoName } from "@/lib/utils/regionMapping";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
+import { SEVERE_TYPES } from "@/lib/constants/dger";
 
 type EmergencyClassification = "권역응급의료센터" | "지역응급의료센터" | "지역응급의료기관";
+type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
 
 const REGIONS = [
   { value: "all", label: "전국" },
@@ -61,6 +63,7 @@ export function MapDashboard() {
   const [hoveredHospitalCode, setHoveredHospitalCode] = useState<string | null>(null);
   const [showDetailMap, setShowDetailMap] = useState(false);  // 상세 지도 표시 여부
   const [selectedBedTypes, setSelectedBedTypes] = useState<Set<BedType>>(new Set(['general']));
+  const [selectedSevereType, setSelectedSevereType] = useState<SevereTypeKey | null>(null);  // 선택된 27개 중증질환
 
   const hospitalListRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +116,23 @@ export function MapDashboard() {
     });
     return result;
   }, [allData, selectedDisease, selectedDay]);
+
+  // 선택된 27개 중증질환 통계
+  const severeStats = useMemo(() => {
+    if (!selectedSevereType) return null;
+    let available = 0;
+    let unavailable = 0;
+    let noInfo = 0;
+
+    severeData.forEach((hospital) => {
+      const status = (hospital.severeStatus[selectedSevereType] || '').trim().toUpperCase();
+      if (status === 'Y') available++;
+      else if (status === 'N' || status === '불가능') unavailable++;
+      else noInfo++;
+    });
+
+    return { available, unavailable, noInfo, total: severeData.length };
+  }, [severeData, selectedSevereType]);
 
   // 선택된 지역의 병원 목록 (사이드바용)
   const filteredHospitals = useMemo(() => {
@@ -389,6 +409,50 @@ export function MapDashboard() {
             </div>
           </div>
 
+          {/* 27개 중증질환 필터 (실시간 API) */}
+          <div className="bg-gray-800 rounded-lg p-2 border border-gray-700">
+            <div className="text-[10px] text-gray-400 mb-1.5 flex items-center justify-between">
+              <span>중증질환 (실시간)</span>
+              {severeLoading && <span className="text-orange-400">로딩중...</span>}
+            </div>
+            <Select
+              value={selectedSevereType || "none"}
+              onValueChange={(v) => setSelectedSevereType(v === "none" ? null : v as SevereTypeKey)}
+            >
+              <SelectTrigger className="h-7 text-xs bg-gray-700 border-gray-600 text-white mb-1.5">
+                <SelectValue placeholder="중증질환 선택..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
+                <SelectItem value="none" className="text-xs text-gray-400 hover:bg-gray-700">전체 (선택안함)</SelectItem>
+                {SEVERE_TYPES.map((type) => (
+                  <SelectItem key={type.key} value={type.key} className="text-xs text-white hover:bg-gray-700">
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {severeStats ? (
+              <div className="grid grid-cols-3 gap-1 text-center">
+                <div className="bg-gray-900 rounded p-1 border border-gray-700">
+                  <div className="text-sm font-bold text-green-400">{severeStats.available}</div>
+                  <div className="text-[9px] text-gray-500">가능</div>
+                </div>
+                <div className="bg-gray-900 rounded p-1 border border-gray-700">
+                  <div className="text-sm font-bold text-red-400">{severeStats.unavailable}</div>
+                  <div className="text-[9px] text-gray-500">불가</div>
+                </div>
+                <div className="bg-gray-900 rounded p-1 border border-gray-700">
+                  <div className="text-sm font-bold text-gray-500">{severeStats.noInfo}</div>
+                  <div className="text-[9px] text-gray-500">정보없음</div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-[10px] text-gray-500 text-center py-1">
+                질환 선택 시 통계 표시
+              </div>
+            )}
+          </div>
+
           {/* 범례: 기관종류 */}
           <div className="bg-gray-800 rounded-lg p-2 border border-gray-700">
             <div className="text-[10px] text-gray-400 mb-1.5">기관종류 (모양)</div>
@@ -504,6 +568,7 @@ export function MapDashboard() {
               bedDataMap={bedDataMap}
               selectedBedTypes={selectedBedTypes}
               severeDataMap={severeDataMap}
+              selectedSevereType={selectedSevereType}
             />
           ) : (
             <KoreaGugunMap
@@ -520,6 +585,7 @@ export function MapDashboard() {
               bedDataMap={bedDataMap}
               selectedBedTypes={selectedBedTypes}
               severeDataMap={severeDataMap}
+              selectedSevereType={selectedSevereType}
             />
           )}
         </main>

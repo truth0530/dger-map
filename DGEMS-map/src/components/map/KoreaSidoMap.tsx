@@ -24,6 +24,8 @@ interface PathInfo {
   fillRule?: string;
 }
 
+type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
+
 interface KoreaSidoMapProps {
   hospitals: Hospital[];
   diseaseData: HospitalDiseaseData[];
@@ -38,6 +40,7 @@ interface KoreaSidoMapProps {
   bedDataMap?: Map<string, HospitalBedData>;
   selectedBedTypes?: Set<BedType>;
   severeDataMap?: Map<string, HospitalSevereData>;
+  selectedSevereType?: SevereTypeKey | null;
 }
 
 // 가용성 상태별 색상
@@ -134,6 +137,7 @@ export function KoreaSidoMap({
   bedDataMap,
   selectedBedTypes,
   severeDataMap,
+  selectedSevereType,
 }: KoreaSidoMapProps) {
   const [svgPaths, setSvgPaths] = useState<PathInfo[]>([]);
   const [viewBox, setViewBox] = useState<string>("0 0 800 800");
@@ -319,6 +323,18 @@ export function KoreaSidoMap({
 
   // 마커 색상 가져오기 (가용성 기반)
   const getMarkerColor = (hospital: Hospital): string => {
+    // 27개 중증질환이 선택된 경우 해당 상태에 따른 색상
+    if (selectedSevereType && severeDataMap) {
+      const severeInfo = severeDataMap.get(hospital.code);
+      if (severeInfo) {
+        const severeStatus = (severeInfo.severeStatus[selectedSevereType] || '').trim().toUpperCase();
+        if (severeStatus === 'Y') return "#22c55e";  // 녹색 - 가능
+        if (severeStatus === 'N' || severeStatus === '불가능') return "#ef4444";  // 빨강 - 불가
+      }
+      return "#6b7280";  // 회색 - 정보없음
+    }
+
+    // 기존 44개 질환 가용성 기반 색상
     const status = getHospitalStatus(hospital);
     if (status) {
       return STATUS_COLORS[status];
