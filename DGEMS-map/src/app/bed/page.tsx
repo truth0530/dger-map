@@ -3,12 +3,28 @@
 /**
  * 병상 현황 페이지
  * 원본: dger-api/public/index.html
+ *
+ * 개선사항:
+ * - 병원 정렬 (센터급 우선, 재실인원 내림차순)
+ * - 병원명 약어 지원
+ * - 날짜 상대 표시 (n분 전)
+ * - 병상 필드 통합 처리
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useBedData, HospitalBedData } from '@/lib/hooks/useBedData';
 import { REGIONS } from '@/lib/constants/dger';
 import { mapSidoName } from '@/lib/utils/regionMapping';
+import {
+  sortHospitals,
+  shortenHospitalName,
+  isCenterHospital,
+  calculateTotalOccupancy,
+  getBedStatusType,
+  getBedStatusClasses,
+  HospitalBedFields
+} from '@/lib/utils/hospitalUtils';
+import { formatDateRelative, formatUpdateTime } from '@/lib/utils/dateUtils';
 
 type BedType = 'general' | 'cohort' | 'erNegative' | 'erGeneral' | 'pediatric' | 'pediatricNegative' | 'pediatricGeneral';
 
@@ -80,17 +96,45 @@ export default function BedPage() {
   const filteredData = useMemo(() => {
     let filtered = data;
 
-    // 검색어 필터
+    // 검색어 필터 (약어도 검색 가능)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(h => h.dutyName.toLowerCase().includes(term));
+      filtered = filtered.filter(h => {
+        const fullName = h.dutyName.toLowerCase();
+        const shortName = shortenHospitalName(h.dutyName).toLowerCase();
+        return fullName.includes(term) || shortName.includes(term);
+      });
     }
 
     // 센터급만 필터
     if (showCenterOnly) {
-      const centerTypes = ['권역응급의료센터', '지역응급의료센터', '전문응급의료센터'];
-      filtered = filtered.filter(h => centerTypes.includes(h.dutyEmclsName));
+      filtered = filtered.filter(h => isCenterHospital({ dutyEmclsName: h.dutyEmclsName }));
     }
+
+    // 정렬: 센터급 우선, 재실인원 내림차순
+    filtered = sortHospitals(filtered.map(h => ({
+      ...h,
+      // HospitalBedFields 호환을 위해 필드 매핑
+      hvs01: h.hvs01,
+      hvec: h.hvec,
+      HVS59: h.HVS59,
+      hv27: h.hv27,
+      HVS03: h.HVS03,
+      hv29: h.hv29,
+      HVS04: h.HVS04,
+      hv30: h.hv30,
+      HVS02: h.HVS02,
+      hv28: h.hv28,
+      HVS48: h.HVS48,
+      hv15: h.hv15,
+      HVS49: h.HVS49,
+      hv16: h.hv16,
+      // 통합 필드 (있으면)
+      HVS46: (h as unknown as HospitalBedFields).HVS46,
+      hv13: (h as unknown as HospitalBedFields).hv13,
+      HVS47: (h as unknown as HospitalBedFields).HVS47,
+      hv14: (h as unknown as HospitalBedFields).hv14
+    })));
 
     return filtered;
   }, [data, searchTerm, showCenterOnly]);
@@ -175,11 +219,14 @@ export default function BedPage() {
           </button>
 
           {/* 마지막 업데이트 시간 */}
-          {lastUpdate && (
-            <span className="text-xs text-gray-500 ml-auto">
-              {lastUpdate.toLocaleTimeString('ko-KR')} 기준
-            </span>
-          )}
+          {lastUpdate && (() => {
+            const updateInfo = formatUpdateTime(lastUpdate.toISOString());
+            return (
+              <span className={`text-xs ml-auto ${updateInfo.color}`}>
+                {updateInfo.text} ({lastUpdate.toLocaleTimeString('ko-KR')})
+              </span>
+            );
+          })()}
         </div>
 
         {/* 요약 정보 */}
@@ -267,41 +314,48 @@ interface HospitalRowProps {
 }
 
 function HospitalRow({ hospital, selectedBedTypes }: HospitalRowProps) {
-  const centerTypes = ['권역응급의료센터', '지역응급의료센터', '전문응급의료센터'];
-  const isCenter = centerTypes.includes(hospital.dutyEmclsName);
+  const isCenter = isCenterHospital({ dutyEmclsName: hospital.dutyEmclsName });
+  const shortName = shortenHospitalName(hospital.dutyName);
+  const showShortName = shortName !== hospital.dutyName;
 
-  const getStatusColor = (available: number, total: number) => {
-    if (total === 0) return 'text-gray-400';
-    const rate = (available / total) * 100;
-    if (rate <= 5) return 'text-red-600 font-bold';
-    if (rate <= 40) return 'text-amber-600 font-bold';
-    return 'text-green-600 font-bold';
-  };
+  // 재실인원 (통합 필드 처리)
+  const totalOccupancy = calculateTotalOccupancy(hospital as unknown as HospitalBedFields);
 
   return (
     <tr className={`border-t border-gray-200 hover:bg-gray-50 ${isCenter ? 'bg-amber-50 hover:bg-amber-100' : ''}`}>
       <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">
-        {hospital.dutyName}
+        <div className="flex flex-col">
+          <span className="font-medium">{showShortName ? shortName : hospital.dutyName}</span>
+          {showShortName && (
+            <span className="text-xs text-gray-400">{hospital.dutyName}</span>
+          )}
+        </div>
       </td>
       <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">
-        {hospital.dutyEmclsName}
+        <span className={`inline-block px-2 py-0.5 rounded text-xs ${
+          isCenter ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
+        }`}>
+          {hospital.dutyEmclsName}
+        </span>
       </td>
       {Array.from(selectedBedTypes).map(type => {
         const config = BED_TYPE_CONFIG[type];
         const available = hospital[config.availableKey] as number;
         const total = hospital[config.totalKey] as number;
+        const status = getBedStatusType(available, total);
+        const statusClasses = getBedStatusClasses(status);
 
         return (
           <td key={type} className="px-3 py-2 text-center whitespace-nowrap">
-            <span className={`text-sm ${getStatusColor(available, total)}`}>
+            <span className={`inline-block px-2 py-0.5 rounded text-sm font-medium ${statusClasses.bg} ${statusClasses.text}`}>
               {available}
             </span>
-            <span className="text-gray-400 text-xs">/{total}</span>
+            <span className="text-gray-400 text-xs ml-1">/{total}</span>
           </td>
         );
       })}
       <td className="px-3 py-2 text-center text-sm font-medium text-gray-900 whitespace-nowrap">
-        {hospital.occupancy}명
+        {totalOccupancy > 0 ? `${totalOccupancy}명` : hospital.occupancy > 0 ? `${hospital.occupancy}명` : '-'}
       </td>
       <td className="px-3 py-2 text-center whitespace-nowrap">
         <OccupancyBattery rate={hospital.occupancyRate} />
