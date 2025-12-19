@@ -142,6 +142,15 @@ export default function MapLibreMap({
     return el;
   }, [getMarkerColor, getMarkerSize]);
 
+  // 병상 상태 색상 결정
+  const getBedStatusColor = (available: number, total: number): string => {
+    if (total === 0) return '#6b7280';
+    const rate = available / total;
+    if (rate > 0.3) return '#4ade80';
+    if (rate > 0) return '#fbbf24';
+    return '#f87171';
+  };
+
   // 팝업 내용 생성 (다크 모드)
   const createPopupContent = useCallback((hospital: Hospital): string => {
     const bedData = bedDataMap?.get(hospital.code);
@@ -162,16 +171,49 @@ export default function MapLibreMap({
 
     // 병상 정보
     if (bedData) {
-      const hvecColor = bedData.hvec > 5 ? '#4ade80' : bedData.hvec > 0 ? '#fbbf24' : '#f87171';
+      // 점유율 계산
+      const occupancyRate = bedData.occupancyRate ?? 0;
+      const occupancyColor = occupancyRate > 80 ? '#f87171' : occupancyRate > 50 ? '#fbbf24' : '#4ade80';
+
       content += `
         <div class="popup-section">
-          <div class="popup-row">
-            <span class="popup-label">응급실</span>
-            <span class="popup-value"><span style="color:${hvecColor};font-weight:600">${bedData.hvec ?? '-'}</span> / ${bedData.hvs01 ?? '-'}</span>
+          <div class="popup-section-title">병상 현황</div>
+          <div class="popup-grid">
+            <div class="popup-bed-item">
+              <span class="popup-bed-label">응급실</span>
+              <span class="popup-bed-value" style="color:${getBedStatusColor(bedData.hvec, bedData.hvs01)}">${bedData.hvec ?? 0}</span>
+              <span class="popup-bed-total">/ ${bedData.hvs01 ?? 0}</span>
+            </div>
+            <div class="popup-bed-item">
+              <span class="popup-bed-label">코호트</span>
+              <span class="popup-bed-value" style="color:${getBedStatusColor(bedData.hv27, bedData.HVS59)}">${bedData.hv27 ?? 0}</span>
+              <span class="popup-bed-total">/ ${bedData.HVS59 ?? 0}</span>
+            </div>
+            ${bedData.HVS02 > 0 ? `
+            <div class="popup-bed-item">
+              <span class="popup-bed-label">소아</span>
+              <span class="popup-bed-value" style="color:${getBedStatusColor(bedData.hv28, bedData.HVS02)}">${bedData.hv28 ?? 0}</span>
+              <span class="popup-bed-total">/ ${bedData.HVS02 ?? 0}</span>
+            </div>` : ''}
+            ${bedData.HVS03 > 0 ? `
+            <div class="popup-bed-item">
+              <span class="popup-bed-label">음압</span>
+              <span class="popup-bed-value" style="color:${getBedStatusColor(bedData.hv29, bedData.HVS03)}">${bedData.hv29 ?? 0}</span>
+              <span class="popup-bed-total">/ ${bedData.HVS03 ?? 0}</span>
+            </div>` : ''}
+            ${bedData.HVS04 > 0 ? `
+            <div class="popup-bed-item">
+              <span class="popup-bed-label">일반격리</span>
+              <span class="popup-bed-value" style="color:${getBedStatusColor(bedData.hv30, bedData.HVS04)}">${bedData.hv30 ?? 0}</span>
+              <span class="popup-bed-total">/ ${bedData.HVS04 ?? 0}</span>
+            </div>` : ''}
           </div>
-          <div class="popup-row">
-            <span class="popup-label">중환자</span>
-            <span class="popup-value">${bedData.hv27 ?? '-'} / ${bedData.HVS59 ?? '-'}</span>
+          <div class="popup-occupancy">
+            <span class="popup-occupancy-label">점유율</span>
+            <div class="popup-occupancy-bar">
+              <div class="popup-occupancy-fill" style="width:${occupancyRate}%;background:${occupancyColor}"></div>
+            </div>
+            <span class="popup-occupancy-value" style="color:${occupancyColor}">${occupancyRate}%</span>
           </div>
         </div>
       `;
@@ -186,6 +228,12 @@ export default function MapLibreMap({
           ${isAvailable ? '● 진료 가능' : '○ 진료 불가'}
         </div>
       `;
+    }
+
+    // 업데이트 시간
+    if (bedData?.hvidate) {
+      const updateTime = bedData.hvidate.slice(8, 10) + ':' + bedData.hvidate.slice(10, 12);
+      content += `<div class="popup-update">업데이트 ${updateTime}</div>`;
     }
 
     content += '</div>';
@@ -409,8 +457,8 @@ export default function MapLibreMap({
         /* 팝업 내용 */
         .popup-content {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          min-width: 180px;
-          max-width: 240px;
+          min-width: 220px;
+          max-width: 280px;
         }
         .popup-header {
           display: flex;
@@ -475,6 +523,87 @@ export default function MapLibreMap({
         .popup-status.unavailable {
           color: #f87171;
           background: rgba(248,113,113,0.1);
+        }
+
+        /* 병상 섹션 */
+        .popup-section-title {
+          font-size: 10px;
+          font-weight: 600;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 8px;
+        }
+        .popup-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 6px;
+        }
+        .popup-bed-item {
+          display: flex;
+          align-items: baseline;
+          gap: 4px;
+          background: rgba(255,255,255,0.03);
+          padding: 6px 8px;
+          border-radius: 6px;
+        }
+        .popup-bed-label {
+          font-size: 10px;
+          color: #9ca3af;
+          min-width: 32px;
+        }
+        .popup-bed-value {
+          font-size: 14px;
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+        }
+        .popup-bed-total {
+          font-size: 10px;
+          color: #6b7280;
+          font-variant-numeric: tabular-nums;
+        }
+
+        /* 점유율 바 */
+        .popup-occupancy {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .popup-occupancy-label {
+          font-size: 10px;
+          color: #9ca3af;
+          min-width: 32px;
+        }
+        .popup-occupancy-bar {
+          flex: 1;
+          height: 6px;
+          background: rgba(255,255,255,0.1);
+          border-radius: 3px;
+          overflow: hidden;
+        }
+        .popup-occupancy-fill {
+          height: 100%;
+          border-radius: 3px;
+          transition: width 0.3s ease;
+        }
+        .popup-occupancy-value {
+          font-size: 12px;
+          font-weight: 600;
+          font-variant-numeric: tabular-nums;
+          min-width: 36px;
+          text-align: right;
+        }
+
+        /* 업데이트 시간 */
+        .popup-update {
+          font-size: 10px;
+          color: #6b7280;
+          text-align: right;
+          padding: 6px 12px 8px;
+          border-top: 1px solid rgba(255,255,255,0.05);
         }
 
         /* 지도 컨트롤 */
