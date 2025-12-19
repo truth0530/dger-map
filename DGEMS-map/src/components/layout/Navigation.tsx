@@ -11,7 +11,9 @@ import { usePathname } from 'next/navigation';
 const NAV_ITEMS = [
   { href: '/', label: '지도', description: '중증응급질환 지도 시각화' },
   { href: '/bed', label: '병상현황', description: '응급실 병상 현황' },
-  { href: '/severe', label: '중증질환', description: '27개 중증질환 수용현황' }
+  { href: '/severe', label: '중증질환', description: '27개 중증질환 수용현황' },
+  { href: '/messages', label: '응급메시지', description: '병원별 응급 메시지 조회' },
+  { href: '/feedback', label: '피드백', description: '릴리즈 노트 및 피드백' }
 ];
 
 export default function Navigation() {
