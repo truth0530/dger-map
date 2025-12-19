@@ -23,7 +23,7 @@ export default function RootLayout({
     <html lang="ko">
       <body className={`${notoSansKR.variable} font-sans antialiased`}>
         <Navigation />
-        <main className="min-h-[calc(100vh-56px)]">
+        <main id="main-content" className="min-h-[calc(100vh-56px)]" role="main">
           {children}
         </main>
       </body>
