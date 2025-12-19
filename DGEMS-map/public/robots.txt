@@ -1,0 +1,6 @@
+# DGER Robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://dger-map.vercel.app/sitemap.xml

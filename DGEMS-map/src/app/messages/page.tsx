@@ -6,9 +6,10 @@
  * 원본: dger-api/public/systommsg.html
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { REGIONS, SEVERE_TYPES } from '@/lib/constants/dger';
 import { parseMessage, getStatusColorClasses } from '@/lib/utils/messageClassifier';
+import { mapSidoName } from '@/lib/utils/regionMapping';
 
 interface HospitalMessage {
   hpid: string;
@@ -47,10 +48,13 @@ export default function MessagesPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [hospitals, setHospitals] = useState<HospitalMessage[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // 초기 로딩 true
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [expandedHospitals, setExpandedHospitals] = useState<Set<string>>(new Set());
+  const [loadProgress, setLoadProgress] = useState({ current: 0, total: 0 });
+  const isMountedRef = useRef(true);
 
   // 병원 목록 조회
   const fetchHospitalList = useCallback(async () => {

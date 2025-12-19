@@ -1,0 +1,22 @@
+{
+  "name": "DGER - 중증응급질환 대시보드",
+  "short_name": "DGER",
+  "description": "중증응급질환 진료 현황 및 병상 정보 대시보드",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a3a82",
+  "theme_color": "#0a3a82",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
