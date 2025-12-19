@@ -299,9 +299,12 @@ export default function MapLibreMap({
     });
   }, [filteredHospitals, isLoaded, createMarkerElement, createPopupContent, onHospitalHover, onHospitalClick]);
 
-  // 외부 호버 상태 변경 시 마커 스타일만 업데이트 (요소 교체 없음)
+  // 외부 호버 상태 변경 시 마커 스타일 + 팝업 표시
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !map.current) return;
+
+    // 기존 팝업 제거
+    popupRef.current?.remove();
 
     markersRef.current.forEach((marker, code) => {
       const hospital = filteredHospitals.find(h => h.code === code);
@@ -311,10 +314,8 @@ export default function MapLibreMap({
       const el = marker.getElement();
       const color = getMarkerColor(hospital);
       const size = getMarkerSize(hospital, isHovered);
-      const config = CLASSIFICATION_MARKERS[hospital.classification || '지역응급의료기관']
-        || CLASSIFICATION_MARKERS['지역응급의료기관'];
 
-      // 스타일만 업데이트
+      // 스타일 업데이트
       el.style.width = `${size}px`;
       el.style.height = `${size}px`;
       el.style.backgroundColor = color;
@@ -322,12 +323,30 @@ export default function MapLibreMap({
       if (isHovered) {
         el.style.boxShadow = '0 0 0 4px rgba(255,255,255,0.5), 0 4px 8px rgba(0,0,0,0.4)';
         el.style.zIndex = '100';
+
+        // 팝업 표시 (사이드바에서 호버한 경우)
+        if (hospital.lng && hospital.lat) {
+          popupRef.current = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 15,
+            className: 'maplibre-popup-custom',
+          })
+            .setLngLat([hospital.lng, hospital.lat])
+            .setHTML(createPopupContent(hospital))
+            .addTo(map.current!);
+        }
       } else {
         el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
         el.style.zIndex = '';
       }
     });
-  }, [hoveredHospitalCode, filteredHospitals, getMarkerColor, getMarkerSize, isLoaded]);
+
+    // 호버 해제 시 팝업 제거
+    if (!hoveredHospitalCode) {
+      popupRef.current?.remove();
+    }
+  }, [hoveredHospitalCode, filteredHospitals, getMarkerColor, getMarkerSize, isLoaded, createPopupContent]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
