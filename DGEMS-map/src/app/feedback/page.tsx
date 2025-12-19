@@ -122,19 +122,19 @@ export default function FeedbackPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <a
-              href="https://dger.kr"
+              href="https://www.e-gen.or.kr/egen/search_hospital.do"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 transition-colors"
             >
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                 <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>
               <div>
-                <p className="font-medium text-gray-800">dger.kr</p>
-                <p className="text-xs text-gray-500">메인 서비스</p>
+                <p className="font-medium text-gray-800">응급의료포털</p>
+                <p className="text-xs text-gray-500">응급실 검색</p>
               </div>
             </a>
             <a

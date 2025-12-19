@@ -80,13 +80,13 @@ export default function Navigation() {
             {/* 외부 링크 */}
             <div className="flex items-center gap-2">
               <a
-                href="https://dger.kr"
+                href="https://e-gen.or.kr"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-white/60 hover:text-white/80 transition-colors"
-                aria-label="dger.kr 웹사이트 (새 탭에서 열림)"
+                aria-label="응급의료포털 (새 탭에서 열림)"
               >
-                dger.kr
+                응급의료포털
               </a>
             </div>
           </div>
