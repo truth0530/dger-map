@@ -13,6 +13,17 @@ import { DAYS_OF_WEEK } from "@/lib/constants";
 import type { DayOfWeek, AvailabilityStatus, Hospital } from "@/types";
 import { KoreaSidoMap } from "@/components/map/KoreaSidoMap";
 import { KoreaGugunMap } from "@/components/map/KoreaGugunMap";
+import dynamic from "next/dynamic";
+
+// MapLibre는 클라이언트에서만 로드 (SSR 비활성화)
+const MapLibreMap = dynamic(() => import("@/components/maplibre/MapLibreMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-gray-900">
+      <div className="text-gray-400 text-sm">지도 로딩 중...</div>
+    </div>
+  ),
+});
 import { useBedData, HospitalBedData } from "@/lib/hooks/useBedData";
 import { useSevereData, HospitalSevereData } from "@/lib/hooks/useSevereData";
 import { mapSidoName } from "@/lib/utils/regionMapping";
@@ -21,6 +32,9 @@ import { SEVERE_TYPES } from "@/lib/constants/dger";
 
 // 모바일 사이드바 상태
 type MobilePanelType = "filter" | "list" | null;
+
+// 지도 모드 타입
+type MapModeType = "svg" | "maplibre";
 
 type EmergencyClassification = "권역응급의료센터" | "지역응급의료센터" | "지역응급의료기관";
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
@@ -69,6 +83,7 @@ export function MapDashboard() {
   const [selectedSevereType, setSelectedSevereType] = useState<SevereTypeKey | null>(null);  // 선택된 27개 중증질환
   const [searchQuery, setSearchQuery] = useState<string>("");  // 병원명 검색어
   const [mobilePanel, setMobilePanel] = useState<MobilePanelType>(null);  // 모바일 패널 상태
+  const [mapMode, setMapMode] = useState<MapModeType>("maplibre");  // 지도 모드 (기본: MapLibre)
 
   const hospitalListRef = useRef<HTMLDivElement>(null);
 
@@ -349,6 +364,31 @@ export function MapDashboard() {
       <header className="bg-gray-900 border-b border-gray-800 px-3 md:px-4 py-2">
         <div className="flex items-center justify-between">
           <h1 className="text-sm md:text-lg font-bold text-white truncate">중증응급질환 진료 현황</h1>
+
+          {/* 지도 모드 토글 - 데스크탑 */}
+          <div className="hidden md:flex items-center gap-1 bg-gray-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setMapMode("maplibre")}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                mapMode === "maplibre"
+                  ? "bg-cyan-600 text-white"
+                  : "text-gray-400 hover:text-gray-300"
+              }`}
+            >
+              실시간 지도
+            </button>
+            <button
+              onClick={() => setMapMode("svg")}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                mapMode === "svg"
+                  ? "bg-cyan-600 text-white"
+                  : "text-gray-400 hover:text-gray-300"
+              }`}
+            >
+              레거시
+            </button>
+          </div>
+
           <span className="text-[10px] md:text-xs text-gray-500 hidden sm:block">
             전국 {meta.totalHospitals}개 응급의료기관 | 대구 {meta.daeguHospitals}개 진료정보
           </span>
@@ -590,7 +630,18 @@ export function MapDashboard() {
 
         {/* Map */}
         <main className="flex-1 relative">
-          {!showDetailMap ? (
+          {mapMode === "maplibre" ? (
+            <MapLibreMap
+              hospitals={filteredHospitals}
+              bedDataMap={bedDataMap}
+              severeDataMap={severeDataMap}
+              selectedRegion={selectedRegion}
+              selectedSevereType={selectedSevereType}
+              selectedClassifications={selectedClassifications}
+              hoveredHospitalCode={hoveredHospitalCode}
+              onHospitalHover={handleHospitalHover}
+            />
+          ) : !showDetailMap ? (
             <KoreaSidoMap
               hospitals={hospitals}
               diseaseData={allData}
