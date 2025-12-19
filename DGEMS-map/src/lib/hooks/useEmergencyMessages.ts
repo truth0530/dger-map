@@ -43,7 +43,12 @@ function parseXmlItems(xmlText: string): EmergencyMessage[] {
 // 메시지 분류
 function classifyMessages(items: EmergencyMessage[]): ClassifiedMessages {
   const emergency: Array<{ msg: string; symTypCod: string }> = [];
-  const diseaseMessages: Array<{ displayName: string; content: string; symTypCod: string }> = [];
+  const diseaseMessages: Array<{
+    category: string;
+    subcategory: string;
+    displayName: string;
+    content: string;
+  }> = [];
 
   items.forEach((item) => {
     const { msg, symTypCod } = item;
@@ -55,10 +60,16 @@ function classifyMessages(items: EmergencyMessage[]): ClassifiedMessages {
       const severeType = SEVERE_TYPES.find((t) => t.key === `MKioskTy${diseaseNum}`);
 
       if (severeType) {
+        // [카테고리] 세부명 형식 파싱
+        const labelMatch = severeType.label.match(/\[([^\]]+)\]\s*(.*)/);
+        const category = labelMatch ? `[${labelMatch[1]}]` : '[기타]';
+        const subcategory = labelMatch ? labelMatch[2] : severeType.label;
+
         diseaseMessages.push({
+          category,
+          subcategory,
           displayName: severeType.label,
-          content: msg,
-          symTypCod
+          content: msg
         });
       } else {
         // 알 수 없는 코드는 응급실 메시지로 처리

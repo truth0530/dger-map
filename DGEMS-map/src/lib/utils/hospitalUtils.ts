@@ -67,13 +67,39 @@ export function shortenHospitalName(name: string): string {
   return HOSPITAL_NAME_MAPPING[name] || name;
 }
 
-// ===== 기관 종별 구분 =====
-// 권역응급의료센터: HVS05
-// 지역응급의료센터: HVS06
-// 전문응급의료센터: HVS07
-// 지역응급의료기관: HVS08
+// ===== 기관 종별 구분 (HPBD 코드 기반) =====
+// HVS05: 권역응급의료센터
+// HVS06: 지역응급의료센터
+// HVS07: 전문응급의료센터 (소아, 화상 등 특화)
+// HVS08: 지역응급의료기관
 
 export type HospitalLevel = '권역응급의료센터' | '지역응급의료센터' | '전문응급의료센터' | '지역응급의료기관' | '기타';
+
+// HPBD 코드 → 등급 매핑
+export const HPBD_CODE_MAP: Record<string, HospitalLevel> = {
+  'HVS05': '권역응급의료센터',
+  'HVS06': '지역응급의료센터',
+  'HVS07': '전문응급의료센터',
+  'HVS08': '지역응급의료기관'
+};
+
+// 등급별 우선순위 가중치
+export const HOSPITAL_LEVEL_PRIORITY: Record<HospitalLevel, number> = {
+  '권역응급의료센터': 100,
+  '지역응급의료센터': 80,
+  '전문응급의료센터': 60,
+  '지역응급의료기관': 40,
+  '기타': 0
+};
+
+// 등급별 배지 스타일
+export const HOSPITAL_LEVEL_BADGE: Record<HospitalLevel, { bg: string; text: string; short: string }> = {
+  '권역응급의료센터': { bg: 'bg-red-100', text: 'text-red-700', short: '권역' },
+  '지역응급의료센터': { bg: 'bg-orange-100', text: 'text-orange-700', short: '지역센터' },
+  '전문응급의료센터': { bg: 'bg-purple-100', text: 'text-purple-700', short: '전문' },
+  '지역응급의료기관': { bg: 'bg-blue-100', text: 'text-blue-700', short: '기관' },
+  '기타': { bg: 'bg-gray-100', text: 'text-gray-600', short: '기타' }
+};
 
 /**
  * 병원 등급 판별
@@ -360,4 +386,113 @@ export function getBedStatusClasses(status: BedStatusType): { bg: string; text: 
     default:
       return { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-300' };
   }
+}
+
+/**
+ * 병원 우선순위 점수 계산 (등급 + 재실인원 기반)
+ */
+export function calculateHospitalPriority(hospital: HospitalBedFields & Parameters<typeof getHospitalLevel>[0]): number {
+  const level = getHospitalLevel(hospital);
+  const levelPriority = HOSPITAL_LEVEL_PRIORITY[level];
+  const occupancy = calculateTotalOccupancy(hospital);
+
+  // 등급 점수 * 100 + 재실인원 (등급이 주요 정렬 기준)
+  return levelPriority * 100 + occupancy;
+}
+
+/**
+ * 병원 등급 배지 정보 가져오기
+ */
+export function getHospitalLevelBadge(hospital: Parameters<typeof getHospitalLevel>[0]): {
+  level: HospitalLevel;
+  bg: string;
+  text: string;
+  short: string;
+} {
+  const level = getHospitalLevel(hospital);
+  const badge = HOSPITAL_LEVEL_BADGE[level];
+  return { level, ...badge };
+}
+
+/**
+ * HPBD 코드로 등급 가져오기
+ */
+export function getHospitalLevelByCode(code: string): HospitalLevel {
+  return HPBD_CODE_MAP[code] || '기타';
+}
+
+/**
+ * 병원 정보 요약 생성
+ */
+export function getHospitalSummary(hospital: HospitalBedFields & Parameters<typeof getHospitalLevel>[0]): {
+  name: string;
+  shortName: string;
+  level: HospitalLevel;
+  levelShort: string;
+  occupancy: number;
+  priority: number;
+} {
+  const name = hospital.name || hospital.dutyName || '-';
+  const shortName = shortenHospitalName(name);
+  const level = getHospitalLevel(hospital);
+  const levelShort = HOSPITAL_LEVEL_BADGE[level].short;
+  const occupancy = calculateTotalOccupancy(hospital);
+  const priority = calculateHospitalPriority(hospital);
+
+  return {
+    name,
+    shortName,
+    level,
+    levelShort,
+    occupancy,
+    priority
+  };
+}
+
+/**
+ * 병원 목록 필터링 (등급별)
+ */
+export function filterHospitalsByLevel<T extends Parameters<typeof getHospitalLevel>[0]>(
+  hospitals: T[],
+  levels: HospitalLevel[]
+): T[] {
+  return hospitals.filter(h => levels.includes(getHospitalLevel(h)));
+}
+
+/**
+ * 센터급 병원만 필터링
+ */
+export function filterCenterHospitals<T extends Parameters<typeof getHospitalLevel>[0]>(
+  hospitals: T[]
+): T[] {
+  return filterHospitalsByLevel(hospitals, ['권역응급의료센터', '지역응급의료센터', '전문응급의료센터']);
+}
+
+/**
+ * 기관급 병원만 필터링
+ */
+export function filterInstitutionHospitals<T extends Parameters<typeof getHospitalLevel>[0]>(
+  hospitals: T[]
+): T[] {
+  return filterHospitalsByLevel(hospitals, ['지역응급의료기관']);
+}
+
+/**
+ * 병원 등급별 통계 생성
+ */
+export function getHospitalLevelStats(hospitals: Parameters<typeof getHospitalLevel>[0][]): Record<HospitalLevel, number> {
+  const stats: Record<HospitalLevel, number> = {
+    '권역응급의료센터': 0,
+    '지역응급의료센터': 0,
+    '전문응급의료센터': 0,
+    '지역응급의료기관': 0,
+    '기타': 0
+  };
+
+  for (const hospital of hospitals) {
+    const level = getHospitalLevel(hospital);
+    stats[level]++;
+  }
+
+  return stats;
 }
