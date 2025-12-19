@@ -142,32 +142,36 @@ export default function MapLibreMap({
     return el;
   }, [getMarkerColor, getMarkerSize]);
 
-  // 팝업 내용 생성
+  // 팝업 내용 생성 (다크 모드)
   const createPopupContent = useCallback((hospital: Hospital): string => {
     const bedData = bedDataMap?.get(hospital.code);
     const severeData = severeDataMap?.get(hospital.code);
 
+    // 기관분류 약어
+    const classShort = hospital.classification === '권역응급의료센터' ? '권역'
+      : hospital.classification === '지역응급의료센터' ? '센터'
+      : hospital.classification === '지역응급의료기관' ? '기관' : '';
+
     let content = `
-      <div style="min-width: 200px; font-family: system-ui, sans-serif;">
-        <div style="font-weight: 600; font-size: 14px; color: #1f2937; margin-bottom: 4px;">
-          ${hospital.name}
-        </div>
-        <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-          <span style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px; margin-right: 4px;">
-            ${hospital.classification || '응급의료기관'}
-          </span>
-          ${hospital.region || ''}
+      <div class="popup-content">
+        <div class="popup-header">
+          <span class="popup-badge">${classShort}</span>
+          <span class="popup-name">${hospital.name}</span>
         </div>
     `;
 
     // 병상 정보
     if (bedData) {
+      const hvecColor = bedData.hvec > 5 ? '#4ade80' : bedData.hvec > 0 ? '#fbbf24' : '#f87171';
       content += `
-        <div style="background: #f3f4f6; padding: 8px; border-radius: 6px; margin-bottom: 8px;">
-          <div style="font-size: 11px; font-weight: 500; color: #374151; margin-bottom: 4px;">응급실 현황</div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px;">
-            <div>응급실: <strong style="color: ${bedData.hvec > 0 ? '#22c55e' : '#ef4444'}">${bedData.hvec ?? '-'}</strong>/${bedData.hvs01 ?? '-'}</div>
-            <div>중환자: <strong>${bedData.hv27 ?? '-'}</strong>/${bedData.HVS59 ?? '-'}</div>
+        <div class="popup-section">
+          <div class="popup-row">
+            <span class="popup-label">응급실</span>
+            <span class="popup-value"><span style="color:${hvecColor};font-weight:600">${bedData.hvec ?? '-'}</span> / ${bedData.hvs01 ?? '-'}</span>
+          </div>
+          <div class="popup-row">
+            <span class="popup-label">중환자</span>
+            <span class="popup-value">${bedData.hv27 ?? '-'} / ${bedData.HVS59 ?? '-'}</span>
           </div>
         </div>
       `;
@@ -176,12 +180,10 @@ export default function MapLibreMap({
     // 중증질환 정보
     if (severeData && selectedSevereType) {
       const status = severeData.severeStatus?.[selectedSevereType];
-      const statusText = status === 'Y' ? '가능' : status === 'N' ? '불가' : '정보없음';
-      const statusColor = status === 'Y' ? '#22c55e' : status === 'N' ? '#ef4444' : '#6b7280';
-
+      const isAvailable = status === 'Y';
       content += `
-        <div style="font-size: 12px; color: ${statusColor}; font-weight: 500;">
-          중증질환 진료: ${statusText}
+        <div class="popup-status ${isAvailable ? 'available' : 'unavailable'}">
+          ${isAvailable ? '● 진료 가능' : '○ 진료 불가'}
         </div>
       `;
     }
@@ -346,44 +348,133 @@ export default function MapLibreMap({
       )}
 
       {/* 범례 */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-3 text-xs">
-        <div className="font-semibold mb-2 text-gray-700">기관분류</div>
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rotate-45 border border-white shadow-sm" />
-            <span>권역응급의료센터</span>
+      <div className="absolute bottom-4 left-4 z-10 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/50 p-3 text-xs">
+        <div className="font-medium mb-2 text-gray-400 text-[10px] uppercase tracking-wide">기관분류</div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-3 h-3 bg-emerald-500 rotate-45 border-2 border-white/80 shadow-sm" />
+            <span className="text-gray-300">권역센터</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 bg-blue-500 rounded-sm border border-white shadow-sm" />
-            <span>지역응급의료센터</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm border-2 border-white/80 shadow-sm" />
+            <span className="text-gray-300">지역센터</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full border border-white shadow-sm" />
-            <span>지역응급의료기관</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full border border-white/80 shadow-sm" />
+            <span className="text-gray-300">지역기관</span>
           </div>
         </div>
       </div>
 
       {/* 병원 수 표시 */}
-      <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 text-sm">
-        <span className="text-gray-600">표시된 병원: </span>
-        <span className="font-bold text-blue-600">{filteredHospitals.length}</span>
-        <span className="text-gray-600">개</span>
+      <div className="absolute top-4 left-4 z-10 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/50 px-3 py-2">
+        <span className="text-gray-400 text-xs">병원 </span>
+        <span className="font-semibold text-emerald-400 text-sm">{filteredHospitals.length}</span>
       </div>
 
       {/* 스타일 */}
       <style jsx global>{`
+        /* 팝업 컨테이너 */
         .maplibre-popup-custom .maplibregl-popup-content {
           padding: 0;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          background: #1f2937;
+          border-radius: 10px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2);
+          border: 1px solid rgba(255,255,255,0.1);
+          overflow: hidden;
         }
         .maplibre-popup-custom .maplibregl-popup-tip {
-          border-top-color: white;
+          border-top-color: #1f2937;
         }
+
+        /* 팝업 내용 */
+        .popup-content {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          min-width: 180px;
+          max-width: 240px;
+        }
+        .popup-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 12px;
+          background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .popup-badge {
+          font-size: 10px;
+          font-weight: 600;
+          color: #94a3b8;
+          background: rgba(148,163,184,0.15);
+          padding: 2px 6px;
+          border-radius: 4px;
+          white-space: nowrap;
+        }
+        .popup-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: #f1f5f9;
+          line-height: 1.3;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+        }
+        .popup-section {
+          padding: 10px 12px;
+        }
+        .popup-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 4px 0;
+        }
+        .popup-row:not(:last-child) {
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .popup-label {
+          font-size: 11px;
+          color: #9ca3af;
+        }
+        .popup-value {
+          font-size: 12px;
+          color: #e5e7eb;
+          font-variant-numeric: tabular-nums;
+        }
+        .popup-status {
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 500;
+          text-align: center;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .popup-status.available {
+          color: #4ade80;
+          background: rgba(74,222,128,0.1);
+        }
+        .popup-status.unavailable {
+          color: #f87171;
+          background: rgba(248,113,113,0.1);
+        }
+
+        /* 지도 컨트롤 */
         .maplibregl-ctrl-group {
-          background: rgba(255,255,255,0.9) !important;
-          backdrop-filter: blur(4px);
+          background: rgba(31,41,55,0.95) !important;
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(255,255,255,0.1) !important;
+          border-radius: 8px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+        }
+        .maplibregl-ctrl-group button {
+          width: 32px !important;
+          height: 32px !important;
+        }
+        .maplibregl-ctrl-group button + button {
+          border-top: 1px solid rgba(255,255,255,0.1) !important;
+        }
+        .maplibregl-ctrl-icon {
+          filter: invert(1) brightness(0.8);
         }
       `}</style>
     </div>
