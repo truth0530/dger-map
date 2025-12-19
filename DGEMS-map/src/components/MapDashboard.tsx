@@ -629,7 +629,7 @@ export function MapDashboard() {
         </aside>
 
         {/* Map */}
-        <main className="flex-1 relative">
+        <main className="flex-1 relative min-h-0" style={{ minHeight: 0 }}>
           {mapMode === "maplibre" ? (
             <MapLibreMap
               hospitals={filteredHospitals}

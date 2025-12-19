@@ -245,7 +245,7 @@ export default function MapLibreMap({
     });
   }, [selectedRegion, isLoaded]);
 
-  // 마커 업데이트
+  // 마커 업데이트 (병원 목록 변경 시에만)
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
@@ -257,8 +257,7 @@ export default function MapLibreMap({
     filteredHospitals.forEach(hospital => {
       if (!hospital.lat || !hospital.lng) return;
 
-      const isHovered = hospital.code === hoveredHospitalCode;
-      const el = createMarkerElement(hospital, isHovered);
+      const el = createMarkerElement(hospital, false); // 초기 생성 시 호버 상태 없음
 
       // 호버 이벤트
       el.addEventListener('mouseenter', () => {
@@ -296,9 +295,9 @@ export default function MapLibreMap({
 
       markersRef.current.set(hospital.code, marker);
     });
-  }, [filteredHospitals, isLoaded, hoveredHospitalCode, createMarkerElement, createPopupContent, onHospitalHover, onHospitalClick]);
+  }, [filteredHospitals, isLoaded, createMarkerElement, createPopupContent, onHospitalHover, onHospitalClick]);
 
-  // 외부 호버 상태 변경 시 마커 업데이트
+  // 외부 호버 상태 변경 시 마커 스타일만 업데이트 (요소 교체 없음)
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -307,28 +306,30 @@ export default function MapLibreMap({
       if (!hospital) return;
 
       const isHovered = code === hoveredHospitalCode;
-      const newEl = createMarkerElement(hospital, isHovered);
+      const el = marker.getElement();
+      const color = getMarkerColor(hospital);
+      const size = getMarkerSize(hospital, isHovered);
+      const config = CLASSIFICATION_MARKERS[hospital.classification || '지역응급의료기관']
+        || CLASSIFICATION_MARKERS['지역응급의료기관'];
 
-      // 이벤트 재연결
-      newEl.addEventListener('mouseenter', () => {
-        onHospitalHover?.(hospital.code);
-      });
-      newEl.addEventListener('mouseleave', () => {
-        onHospitalHover?.(null);
-      });
-      newEl.addEventListener('click', () => {
-        onHospitalClick?.(hospital);
-      });
+      // 스타일만 업데이트
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+      el.style.backgroundColor = color;
 
-      // 마커 요소 교체
-      const oldEl = marker.getElement();
-      oldEl.replaceWith(newEl);
+      if (isHovered) {
+        el.style.boxShadow = '0 0 0 4px rgba(255,255,255,0.5), 0 4px 8px rgba(0,0,0,0.4)';
+        el.style.zIndex = '100';
+      } else {
+        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        el.style.zIndex = '';
+      }
     });
-  }, [hoveredHospitalCode, filteredHospitals, createMarkerElement, onHospitalHover, onHospitalClick, isLoaded]);
+  }, [hoveredHospitalCode, filteredHospitals, getMarkerColor, getMarkerSize, isLoaded]);
 
   return (
-    <div className="relative w-full h-full">
-      <div ref={mapContainer} className="w-full h-full" />
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+      <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />
 
       {/* 로딩 표시 */}
       {!isLoaded && (
@@ -345,7 +346,7 @@ export default function MapLibreMap({
       )}
 
       {/* 범례 */}
-      <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-3 text-xs">
+      <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-3 text-xs">
         <div className="font-semibold mb-2 text-gray-700">기관분류</div>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
@@ -364,7 +365,7 @@ export default function MapLibreMap({
       </div>
 
       {/* 병원 수 표시 */}
-      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 text-sm">
+      <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 text-sm">
         <span className="text-gray-600">표시된 병원: </span>
         <span className="font-bold text-blue-600">{filteredHospitals.length}</span>
         <span className="text-gray-600">개</span>
