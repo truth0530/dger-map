@@ -25,6 +25,21 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
 
+  // 테마 적용 함수 (useEffect 외부에 정의)
+  const applyTheme = (newTheme: Theme) => {
+    const html = document.documentElement;
+
+    if (newTheme === 'dark') {
+      html.classList.add('dark');
+      html.classList.remove('light');
+    } else {
+      html.classList.remove('dark');
+      html.classList.add('light');
+    }
+
+    localStorage.setItem('theme', newTheme);
+  };
+
   // 초기 테마 로드
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as Theme | null;
@@ -35,21 +50,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     applyTheme(initialTheme);
     setMounted(true);
   }, []);
-
-  // 테마 적용
-  const applyTheme = (newTheme: Theme) => {
-    const html = document.documentElement;
-
-    if (newTheme === 'dark') {
-      html.classList.add('dark');
-      html.style.colorScheme = 'dark';
-    } else {
-      html.classList.remove('dark');
-      html.style.colorScheme = 'light';
-    }
-
-    localStorage.setItem('theme', newTheme);
-  };
 
   // 테마 토글
   const toggleTheme = () => {

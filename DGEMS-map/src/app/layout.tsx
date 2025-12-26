@@ -29,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" className="dark">
       <body className={`${notoSansKR.variable} font-sans antialiased`}>
         <Providers>
           <Navigation />
