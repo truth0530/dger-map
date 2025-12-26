@@ -151,23 +151,72 @@ export default function MapLibreMap({
     return '#f87171';
   };
 
+  // 기관분류 설명
+  const getClassificationInfo = (classification?: string): { name: string; desc: string } => {
+    switch (classification) {
+      case '권역응급의료센터':
+        return { name: '권역센터', desc: '광역 권역의 응급의료 허브' };
+      case '지역응급의료센터':
+        return { name: '지역센터', desc: '지역 응급의료 중심기관' };
+      case '지역응급의료기관':
+        return { name: '지역기관', desc: '지역 응급의료 시설' };
+      default:
+        return { name: '기관', desc: '응급의료기관' };
+    }
+  };
+
   // 팝업 내용 생성 (다크 모드)
   const createPopupContent = useCallback((hospital: Hospital): string => {
     const bedData = bedDataMap?.get(hospital.code);
     const severeData = severeDataMap?.get(hospital.code);
-
-    // 기관분류 약어
-    const classShort = hospital.classification === '권역응급의료센터' ? '권역'
-      : hospital.classification === '지역응급의료센터' ? '센터'
-      : hospital.classification === '지역응급의료기관' ? '기관' : '';
+    const classInfo = getClassificationInfo(hospital.classification);
 
     let content = `
       <div class="popup-content">
         <div class="popup-header">
-          <span class="popup-badge">${classShort}</span>
+          <span class="popup-badge" title="${classInfo.desc}">${classInfo.name}</span>
           <span class="popup-name">${hospital.name}</span>
         </div>
     `;
+
+    // 위치 정보 (주소, 전화, 좌표)
+    content += `
+      <div class="popup-info-section">
+    `;
+
+    // 주소
+    if (bedData?.dutyAddr) {
+      content += `
+        <div class="popup-info-row">
+          <span class="popup-info-icon">📍</span>
+          <span class="popup-info-text">${bedData.dutyAddr}</span>
+        </div>
+      `;
+    }
+
+    // 전화번호
+    if (bedData?.dutyTel3) {
+      content += `
+        <div class="popup-info-row">
+          <span class="popup-info-icon">📞</span>
+          <span class="popup-info-text popup-tel">${bedData.dutyTel3}</span>
+        </div>
+      `;
+    }
+
+    // 좌표
+    if (hospital.lat && hospital.lng) {
+      const lat = hospital.lat.toFixed(4);
+      const lng = hospital.lng.toFixed(4);
+      content += `
+        <div class="popup-info-row">
+          <span class="popup-info-icon">🧭</span>
+          <span class="popup-info-text popup-coords">${lat}, ${lng}</span>
+        </div>
+      `;
+    }
+
+    content += `</div>`;
 
     // 병상 정보
     if (bedData) {
@@ -206,6 +255,18 @@ export default function MapLibreMap({
               <span class="popup-bed-label">일반격리</span>
               <span class="popup-bed-value" style="color:${getBedStatusColor(bedData.hv30, bedData.HVS04)}">${bedData.hv30 ?? 0}</span>
               <span class="popup-bed-total">/ ${bedData.HVS04 ?? 0}</span>
+            </div>` : ''}
+            ${bedData.HVS48 > 0 ? `
+            <div class="popup-bed-item">
+              <span class="popup-bed-label">소아음압</span>
+              <span class="popup-bed-value" style="color:${getBedStatusColor(bedData.hv15, bedData.HVS48)}">${bedData.hv15 ?? 0}</span>
+              <span class="popup-bed-total">/ ${bedData.HVS48 ?? 0}</span>
+            </div>` : ''}
+            ${bedData.HVS49 > 0 ? `
+            <div class="popup-bed-item">
+              <span class="popup-bed-label">소아격리</span>
+              <span class="popup-bed-value" style="color:${getBedStatusColor(bedData.hv16, bedData.HVS49)}">${bedData.hv16 ?? 0}</span>
+              <span class="popup-bed-total">/ ${bedData.HVS49 ?? 0}</span>
             </div>` : ''}
           </div>
           <div class="popup-occupancy">
@@ -457,8 +518,23 @@ export default function MapLibreMap({
         /* 팝업 내용 */
         .popup-content {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          min-width: 220px;
-          max-width: 280px;
+          min-width: 240px;
+          max-width: 300px;
+          max-height: 500px;
+          overflow-y: auto;
+        }
+        .popup-content::-webkit-scrollbar {
+          width: 4px;
+        }
+        .popup-content::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .popup-content::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 2px;
+        }
+        .popup-content::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.4);
         }
         .popup-header {
           display: flex;
@@ -473,9 +549,10 @@ export default function MapLibreMap({
           font-weight: 600;
           color: #94a3b8;
           background: rgba(148,163,184,0.15);
-          padding: 2px 6px;
+          padding: 3px 8px;
           border-radius: 4px;
           white-space: nowrap;
+          cursor: help;
         }
         .popup-name {
           font-size: 13px;
@@ -487,6 +564,43 @@ export default function MapLibreMap({
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
+        }
+
+        /* 위치 정보 섹션 */
+        .popup-info-section {
+          padding: 8px 12px;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          background: rgba(255,255,255,0.02);
+        }
+        .popup-info-row {
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
+          margin-bottom: 6px;
+          font-size: 11px;
+          line-height: 1.4;
+        }
+        .popup-info-row:last-child {
+          margin-bottom: 0;
+        }
+        .popup-info-icon {
+          font-size: 12px;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+        .popup-info-text {
+          color: #d1d5db;
+          flex: 1;
+          word-break: break-word;
+        }
+        .popup-tel {
+          font-family: 'Courier New', monospace;
+          letter-spacing: 0.5px;
+        }
+        .popup-coords {
+          font-family: 'Courier New', monospace;
+          font-size: 10px;
+          color: #9ca3af;
         }
         .popup-section {
           padding: 10px 12px;
