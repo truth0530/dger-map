@@ -229,3 +229,83 @@ html.light .bg-gray-800 {
 html.light .text-white\/80 {
   @apply text-gray-600;
 }
+
+html.light .bg-gray-950 {
+  @apply bg-white;
+}
+
+html.light .bg-gray-800\/50 {
+  @apply bg-gray-100/50;
+}
+
+html.light .bg-gray-700\/80 {
+  @apply bg-gray-200/80;
+}
+
+html.light .text-gray-600 {
+  @apply text-gray-500;
+}
+
+html.light .text-gray-500 {
+  @apply text-gray-600;
+}
+
+html.light .border-gray-700 {
+  @apply border-gray-300;
+}
+
+html.light .bg-emerald-500 {
+  @apply bg-emerald-500;
+}
+
+html.light .bg-green-500 {
+  @apply bg-green-500;
+}
+
+html.light .bg-blue-500 {
+  @apply bg-blue-500;
+}
+
+html.light .bg-purple-500 {
+  @apply bg-purple-500;
+}
+
+html.light .bg-red-500 {
+  @apply bg-red-500;
+}
+
+html.light .text-green-400 {
+  @apply text-green-600;
+}
+
+html.light .text-blue-400 {
+  @apply text-blue-600;
+}
+
+html.light .text-purple-400 {
+  @apply text-purple-600;
+}
+
+html.light .text-orange-400 {
+  @apply text-orange-600;
+}
+
+html.light .text-red-400 {
+  @apply text-red-600;
+}
+
+html.light .hover\:bg-gray-700:hover {
+  @apply hover:bg-gray-200;
+}
+
+html.light .hover\:bg-gray-700\/80:hover {
+  @apply hover:bg-gray-200/80;
+}
+
+html.light .focus\:ring-white\/20:focus {
+  @apply focus:ring-gray-400/20;
+}
+
+html.light .hover\:bg-white\/10:hover {
+  @apply hover:bg-gray-200/20;
+}

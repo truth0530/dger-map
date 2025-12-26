@@ -1,0 +1,485 @@
+{
+  "timestamp": "2025-12-19T08:54:23.412Z",
+  "summary": {
+    "dgems": {
+      "totalPages": 5,
+      "avgLoadTime": 1615,
+      "totalErrors": 9
+    },
+    "dgerApi": {
+      "totalPages": 4,
+      "avgLoadTime": 2356,
+      "totalErrors": 0
+    }
+  },
+  "pageComparison": {
+    "home": {
+      "dgems": {
+        "url": "https://dger-map.vercel.app/",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 2665,
+        "elementCounts": {
+          "buttons": 17,
+          "links": 5,
+          "tables": 0,
+          "inputs": 0,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()",
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 31,
+        "apiCalls": [
+          "https://dger-map.vercel.app/api/bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://dger-map.vercel.app/api/bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://dger-map.vercel.app/api/severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1"
+        ]
+      },
+      "dgerApi": {
+        "url": "https://dger.kr/",
+        "title": "DGER - 중증응급질환",
+        "loadTime": 2971,
+        "elementCounts": {
+          "buttons": 24,
+          "links": 8,
+          "tables": 1,
+          "inputs": 6,
+          "images": 0
+        },
+        "errors": [],
+        "networkRequests": 41,
+        "apiCalls": [
+          "https://www.dger.kr/api/get-bed-info?region=%EB%8C%80%EA%B5%AC",
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300034",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300004",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300076",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300001",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300006",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300003",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300110",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300011",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300045",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300038",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300018",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300009",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300005",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300010",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300007",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300081",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300008",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1303386",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300002"
+        ]
+      }
+    },
+    "bed": {
+      "dgems": {
+        "url": "https://dger-map.vercel.app/bed",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 1871,
+        "elementCounts": {
+          "buttons": 9,
+          "links": 5,
+          "tables": 1,
+          "inputs": 2,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()",
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 30,
+        "apiCalls": [
+          "https://dger-map.vercel.app/api/bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://dger-map.vercel.app/api/severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1"
+        ]
+      }
+    },
+    "severe": {
+      "dgems": {
+        "url": "https://dger-map.vercel.app/severe",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 1817,
+        "elementCounts": {
+          "buttons": 83,
+          "links": 5,
+          "tables": 0,
+          "inputs": 1,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()",
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 30,
+        "apiCalls": [
+          "https://dger-map.vercel.app/api/severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1"
+        ]
+      },
+      "dgerApi": {
+        "url": "https://dger.kr/27severe.html",
+        "title": "DGER - 중증응급질환 대시보드",
+        "loadTime": 1714,
+        "elementCounts": {
+          "buttons": 2,
+          "links": 8,
+          "tables": 0,
+          "inputs": 1,
+          "images": 0
+        },
+        "errors": [],
+        "networkRequests": 32,
+        "apiCalls": [
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300034",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300004",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300076",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300001",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300006",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300003",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300110",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300011",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300045",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300038",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300018",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300009",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300005",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300010",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300007",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300081",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300008",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1303386",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300002"
+        ]
+      }
+    },
+    "messages": {
+      "dgems": {
+        "url": "https://dger-map.vercel.app/messages",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 1086,
+        "elementCounts": {
+          "buttons": 0,
+          "links": 5,
+          "tables": 0,
+          "inputs": 0,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()",
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 30,
+        "apiCalls": []
+      },
+      "dgerApi": {
+        "url": "https://dger.kr/systommsg.html",
+        "title": "DGER - 불가능 메시지",
+        "loadTime": 3959,
+        "elementCounts": {
+          "buttons": 1,
+          "links": 7,
+          "tables": 1,
+          "inputs": 7,
+          "images": 0
+        },
+        "errors": [],
+        "networkRequests": 52,
+        "apiCalls": [
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300034",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300004",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300076",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300001",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300006",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300003",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300110",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300011",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300045",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300038",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300018",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300009",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300005",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300010",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300007",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300081",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300008",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1303386",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300002"
+        ]
+      }
+    },
+    "feedback": {
+      "dgems": {
+        "url": "https://dger-map.vercel.app/feedback",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 635,
+        "elementCounts": {
+          "buttons": 0,
+          "links": 5,
+          "tables": 0,
+          "inputs": 0,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 30,
+        "apiCalls": []
+      },
+      "dgerApi": {
+        "url": "https://dger.kr/feed.html",
+        "title": "DGER - 피드백 및 릴리즈 노트",
+        "loadTime": 780,
+        "elementCounts": {
+          "buttons": 2,
+          "links": 7,
+          "tables": 0,
+          "inputs": 0,
+          "images": 0
+        },
+        "errors": [],
+        "networkRequests": 27,
+        "apiCalls": []
+      }
+    }
+  },
+  "details": {
+    "dgems": {
+      "home": {
+        "url": "https://dger-map.vercel.app/",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 2665,
+        "elementCounts": {
+          "buttons": 17,
+          "links": 5,
+          "tables": 0,
+          "inputs": 0,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()",
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 31,
+        "apiCalls": [
+          "https://dger-map.vercel.app/api/bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://dger-map.vercel.app/api/bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://dger-map.vercel.app/api/severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1"
+        ]
+      },
+      "bed": {
+        "url": "https://dger-map.vercel.app/bed",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 1871,
+        "elementCounts": {
+          "buttons": 9,
+          "links": 5,
+          "tables": 1,
+          "inputs": 2,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()",
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 30,
+        "apiCalls": [
+          "https://dger-map.vercel.app/api/bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://dger-map.vercel.app/api/severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1"
+        ]
+      },
+      "severe": {
+        "url": "https://dger-map.vercel.app/severe",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 1817,
+        "elementCounts": {
+          "buttons": 83,
+          "links": 5,
+          "tables": 0,
+          "inputs": 1,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()",
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 30,
+        "apiCalls": [
+          "https://dger-map.vercel.app/api/severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1"
+        ]
+      },
+      "messages": {
+        "url": "https://dger-map.vercel.app/messages",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 1086,
+        "elementCounts": {
+          "buttons": 0,
+          "links": 5,
+          "tables": 0,
+          "inputs": 0,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()",
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 30,
+        "apiCalls": []
+      },
+      "feedback": {
+        "url": "https://dger-map.vercel.app/feedback",
+        "title": "DGER | 중증응급질환 대시보드",
+        "loadTime": 635,
+        "elementCounts": {
+          "buttons": 0,
+          "links": 5,
+          "tables": 0,
+          "inputs": 0,
+          "images": 0
+        },
+        "errors": [
+          "Failed to load resource: the server responded with a status of 404 ()"
+        ],
+        "networkRequests": 30,
+        "apiCalls": []
+      }
+    },
+    "dgerApi": {
+      "home": {
+        "url": "https://dger.kr/",
+        "title": "DGER - 중증응급질환",
+        "loadTime": 2971,
+        "elementCounts": {
+          "buttons": 24,
+          "links": 8,
+          "tables": 1,
+          "inputs": 6,
+          "images": 0
+        },
+        "errors": [],
+        "networkRequests": 41,
+        "apiCalls": [
+          "https://www.dger.kr/api/get-bed-info?region=%EB%8C%80%EA%B5%AC",
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300034",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300004",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300076",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300001",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300006",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300003",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300110",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300011",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300045",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300038",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300018",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300009",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300005",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300010",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300007",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300081",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300008",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1303386",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300002"
+        ]
+      },
+      "severe": {
+        "url": "https://dger.kr/27severe.html",
+        "title": "DGER - 중증응급질환 대시보드",
+        "loadTime": 1714,
+        "elementCounts": {
+          "buttons": 2,
+          "links": 8,
+          "tables": 0,
+          "inputs": 1,
+          "images": 0
+        },
+        "errors": [],
+        "networkRequests": 32,
+        "apiCalls": [
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-bed-info?region=%EB%8C%80%EA%B5%AC%EA%B4%91%EC%97%AD%EC%8B%9C",
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300034",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300004",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300076",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300001",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300006",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300003",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300110",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300011",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300045",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300038",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300018",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300009",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300005",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300010",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300007",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300081",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300008",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1303386",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300002"
+        ]
+      },
+      "messages": {
+        "url": "https://dger.kr/systommsg.html",
+        "title": "DGER - 불가능 메시지",
+        "loadTime": 3959,
+        "elementCounts": {
+          "buttons": 1,
+          "links": 7,
+          "tables": 1,
+          "inputs": 7,
+          "images": 0
+        },
+        "errors": [],
+        "networkRequests": 52,
+        "apiCalls": [
+          "https://www.dger.kr/api/get-severe-diseases?STAGE1=%EB%8C%80%EA%B5%AC&numOfRows=1000&pageNo=1",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300034",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300004",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300076",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300001",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300006",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300003",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300110",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300011",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300045",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300038",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300018",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300009",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300005",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300010",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300007",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300081",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300008",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1303386",
+          "https://www.dger.kr/api/get-emergency-messages?hpid=A1300002"
+        ]
+      },
+      "feedback": {
+        "url": "https://dger.kr/feed.html",
+        "title": "DGER - 피드백 및 릴리즈 노트",
+        "loadTime": 780,
+        "elementCounts": {
+          "buttons": 2,
+          "links": 7,
+          "tables": 0,
+          "inputs": 0,
+          "images": 0
+        },
+        "errors": [],
+        "networkRequests": 27,
+        "apiCalls": []
+      }
+    }
+  }
+}

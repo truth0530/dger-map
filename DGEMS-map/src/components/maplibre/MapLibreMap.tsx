@@ -43,6 +43,16 @@ export default function MapLibreMap({
   const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [mapStyle, setMapStyle] = useState<'datavizDark' | 'voyager'>('datavizDark');
+
+  // 지도 스타일 변경 핸들러
+  const handleStyleChange = useCallback((newStyle: 'datavizDark' | 'voyager') => {
+    if (map.current && newStyle !== mapStyle) {
+      setMapStyle(newStyle);
+      const styleUrl = getStyleUrl(newStyle);
+      map.current.setStyle(styleUrl);
+    }
+  }, [mapStyle]);
 
   // 필터링된 병원 목록
   const filteredHospitals = useMemo(() => {
@@ -115,27 +125,36 @@ export default function MapLibreMap({
       el.style.width = `${size}px`;
       el.style.height = `${size}px`;
       el.style.backgroundColor = color;
-      el.style.border = `${config.strokeWidth}px solid white`;
       el.style.transform = 'rotate(45deg)';
       el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
     } else if (config.shape === 'square') {
       el.style.width = `${size}px`;
       el.style.height = `${size}px`;
       el.style.backgroundColor = color;
-      el.style.border = `${config.strokeWidth}px solid white`;
       el.style.borderRadius = '2px';
       el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-    } else {
+    } else if (config.shape === 'triangle') {
+      // CSS 클립패스를 사용한 삼각형 마커
       el.style.width = `${size}px`;
       el.style.height = `${size}px`;
       el.style.backgroundColor = color;
-      el.style.border = `${config.strokeWidth}px solid white`;
+      el.style.clipPath = 'polygon(50% 0%, 100% 100%, 0% 100%)';
+      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+    } else {
+      // circle (기본)
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+      el.style.backgroundColor = color;
       el.style.borderRadius = '50%';
       el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
     }
 
     if (isHovered) {
-      el.style.boxShadow = '0 0 0 4px rgba(255,255,255,0.5), 0 4px 8px rgba(0,0,0,0.4)';
+      if (config.shape === 'triangle') {
+        el.style.filter = 'drop-shadow(0 0 0 4px rgba(255,255,255,0.5)) drop-shadow(0 4px 8px rgba(0,0,0,0.4))';
+      } else {
+        el.style.boxShadow = '0 0 0 4px rgba(255,255,255,0.5), 0 4px 8px rgba(0,0,0,0.4)';
+      }
       el.style.zIndex = '100';
     }
 
@@ -305,7 +324,7 @@ export default function MapLibreMap({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    const styleUrl = getStyleUrl('dark');
+    const styleUrl = getStyleUrl(mapStyle);
     const initialView = getRegionView(selectedRegion);
 
     map.current = new maplibregl.Map({
@@ -317,16 +336,35 @@ export default function MapLibreMap({
       maxBounds: MAPTILER_CONFIG.korea.bounds,
     });
 
-    // 네비게이션 컨트롤 추가
-    map.current.addControl(
-      new maplibregl.NavigationControl({ showCompass: false }),
-      'top-right'
-    );
-
-    // 전체화면 컨트롤 추가
-    map.current.addControl(new maplibregl.FullscreenControl(), 'top-right');
+    // 주: 지도 컨트롤은 커스텀 UI에서 구현되므로 기본 컨트롤은 추가하지 않음
+    // - 네비게이션 컨트롤 (줌 +/-)
+    // - 전체화면 컨트롤
+    // - 둘 다 하단 JSX에서 커스텀으로 구현됨
 
     map.current.on('load', () => {
+      // 행정경계 레이어 강화 (시도/구군 구분)
+      // Maptiler 기본 스타일에는 이미 행정경계 레이어가 포함되어 있으므로,
+      // 해당 레이어의 스타일을 강화하여 시도/구군 경계를 더 뚜렷하게 표시
+      const layers = map.current!.getStyle().layers || [];
+
+      // 행정경계 레이어 찾기 및 강조
+      layers.forEach(layer => {
+        // 국가 경계, 시도 경계, 구군 경계 등의 레이어 강화
+        if (layer.id && (
+          layer.id.includes('boundary') ||
+          layer.id.includes('admin') ||
+          layer.id.includes('border')
+        )) {
+          try {
+            // 경계선 가시성 증대
+            map.current!.setPaintProperty(layer.id, 'line-opacity', 0.8);
+            map.current!.setPaintProperty(layer.id, 'line-width', 1.5);
+          } catch (e) {
+            // 레이어가 없거나 속성이 없는 경우 무시
+          }
+        }
+      });
+
       setIsLoaded(true);
     });
 
@@ -475,21 +513,125 @@ export default function MapLibreMap({
         </div>
       )}
 
+      {/* 지도 컨트롤 그룹 (스타일 토글 + 줌 + 전체화면) */}
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-gray-800/90 rounded-lg shadow-lg border border-gray-700/50 p-1.5">
+        {/* 스타일 토글 버튼 */}
+        <div className="relative group">
+          <button
+            onClick={() => handleStyleChange(mapStyle === 'datavizDark' ? 'voyager' : 'datavizDark')}
+            className="w-9 h-9 rounded-md hover:bg-gray-700/80 transition-all flex items-center justify-center text-white"
+          >
+            {/* 달 모양 아이콘 고정 */}
+            <svg className="w-4 h-4 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+            </svg>
+          </button>
+
+          {/* 마우스 오버시 표시되는 텍스트 */}
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            {mapStyle === 'datavizDark' ? 'Voyager로 변경' : 'DataViz로 변경'}
+          </div>
+        </div>
+
+        {/* 구분선 */}
+        <div className="w-px h-5 bg-gray-700/50" />
+
+        {/* 줌 인 버튼 */}
+        <button
+          onClick={() => map.current?.zoomIn()}
+          className="w-9 h-9 rounded-md hover:bg-gray-700/80 transition-all flex items-center justify-center text-white font-bold"
+          title="확대"
+        >
+          +
+        </button>
+
+        {/* 줌 아웃 버튼 */}
+        <button
+          onClick={() => map.current?.zoomOut()}
+          className="w-9 h-9 rounded-md hover:bg-gray-700/80 transition-all flex items-center justify-center text-white font-bold"
+          title="축소"
+        >
+          −
+        </button>
+
+        {/* 구분선 */}
+        <div className="w-px h-5 bg-gray-700/50" />
+
+        {/* 전체화면 버튼 */}
+        <button
+          onClick={() => {
+            if (!mapContainer.current) return;
+
+            const elem = mapContainer.current;
+            const isFullscreen = document.fullscreenElement || (document as any).webkitFullscreenElement;
+
+            try {
+              if (isFullscreen) {
+                if (document.exitFullscreen) {
+                  document.exitFullscreen();
+                } else if ((document as any).webkitExitFullscreen) {
+                  (document as any).webkitExitFullscreen();
+                }
+              } else {
+                if (elem.requestFullscreen) {
+                  elem.requestFullscreen();
+                } else if ((elem as any).webkitRequestFullscreen) {
+                  (elem as any).webkitRequestFullscreen();
+                } else if ((elem as any).mozRequestFullScreen) {
+                  (elem as any).mozRequestFullScreen();
+                } else if ((elem as any).msRequestFullscreen) {
+                  (elem as any).msRequestFullscreen();
+                }
+              }
+            } catch (e) {
+              console.warn('전체화면 요청 실패:', e);
+            }
+          }}
+          className="w-9 h-9 rounded-md hover:bg-gray-700/80 transition-all flex items-center justify-center text-white text-lg font-bold"
+          title="전체화면"
+        >
+          ⛶
+        </button>
+      </div>
+
       {/* 범례 */}
-      <div className="absolute bottom-4 left-4 z-10 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/50 p-2 text-xs max-w-[160px] w-auto">
-        <div className="font-medium mb-1.5 text-gray-400 text-[9px] uppercase tracking-wide">기관분류</div>
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 flex-nowrap">
-            <div className="w-2.5 h-2.5 flex-shrink-0 bg-emerald-500 rotate-45 border-1.5 border-white/80 shadow-sm" />
-            <span className="text-gray-300 text-[10px] whitespace-nowrap">권역센터</span>
+      <div className="absolute bottom-20 left-4 z-10 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/50 p-3 text-xs w-fit max-w-xs max-h-64 overflow-y-auto">
+        <div className="font-semibold mb-2.5 text-gray-300 text-[11px] uppercase tracking-wider">기관분류 범례</div>
+
+        {/* 기관 유형 */}
+        <div className="mb-3">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div className="w-3 h-3 flex-shrink-0 bg-emerald-500 shadow-sm" style={{minWidth: '12px'}} />
+              <span className="text-gray-300 text-[10px] whitespace-nowrap">권역응급의료센터</span>
+            </div>
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div className="w-3 h-3 flex-shrink-0 bg-emerald-500 rounded-full shadow-sm" style={{minWidth: '12px'}} />
+              <span className="text-gray-300 text-[10px] whitespace-nowrap">지역응급의료센터</span>
+            </div>
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div className="w-0 h-0 flex-shrink-0 shadow-sm" style={{borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '10px solid rgb(16, 185, 129)'}} />
+              <span className="text-gray-300 text-[10px] whitespace-nowrap">지역응급의료기관</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 flex-nowrap">
-            <div className="w-2 h-2 flex-shrink-0 bg-emerald-500 rounded-sm border border-white/80 shadow-sm" />
-            <span className="text-gray-300 text-[10px] whitespace-nowrap">지역센터</span>
-          </div>
-          <div className="flex items-center gap-1.5 flex-nowrap">
-            <div className="w-1.5 h-1.5 flex-shrink-0 bg-emerald-500 rounded-full border border-white/80 shadow-sm" />
-            <span className="text-gray-300 text-[10px] whitespace-nowrap">지역기관</span>
+        </div>
+
+        {/* 병상 상태 */}
+        <div className="border-t border-gray-700/50 pt-2.5">
+          <div className="font-semibold text-gray-400 text-[9px] uppercase mb-1.5 tracking-wider">병상 상태</div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div className="w-2 h-2 flex-shrink-0 bg-green-500 rounded-full shadow-sm" />
+              <span className="text-gray-400 text-[9px] whitespace-nowrap">여유 있음</span>
+            </div>
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div className="w-2 h-2 flex-shrink-0 bg-blue-500 rounded-full shadow-sm" />
+              <span className="text-gray-400 text-[9px] whitespace-nowrap">적정 수준</span>
+            </div>
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div className="w-2 h-2 flex-shrink-0 bg-red-500 rounded-full shadow-sm" />
+              <span className="text-gray-400 text-[9px] whitespace-nowrap">부족</span>
+            </div>
           </div>
         </div>
       </div>

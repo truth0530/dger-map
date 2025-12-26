@@ -23,18 +23,17 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>('dark');
-  const [mounted, setMounted] = useState(false);
 
-  // 테마 적용 함수 (useEffect 외부에 정의)
+  // 테마 적용
   const applyTheme = (newTheme: Theme) => {
     const html = document.documentElement;
 
     if (newTheme === 'dark') {
       html.classList.add('dark');
-      html.classList.remove('light');
+      html.style.colorScheme = 'dark';
     } else {
       html.classList.remove('dark');
-      html.classList.add('light');
+      html.style.colorScheme = 'light';
     }
 
     localStorage.setItem('theme', newTheme);
@@ -48,19 +47,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
     setTheme(initialTheme);
     applyTheme(initialTheme);
-    setMounted(true);
   }, []);
-
   // 테마 토글
   const toggleTheme = () => {
     const newTheme: Theme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
     applyTheme(newTheme);
   };
-
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, isDark: theme === 'dark' }}>

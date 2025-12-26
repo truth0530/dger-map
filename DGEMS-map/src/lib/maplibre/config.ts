@@ -7,11 +7,10 @@ export const MAPTILER_CONFIG = {
   apiKey: process.env.NEXT_PUBLIC_MAPTILER_API_KEY || '',
 
   // 지도 스타일 URL
+  // 사용 가능한 스타일: dataviz-dark, voyager-v2
   styles: {
-    dark: 'https://api.maptiler.com/maps/dataviz-dark/style.json',
-    light: 'https://api.maptiler.com/maps/dataviz/style.json',
-    streets: 'https://api.maptiler.com/maps/streets-v2/style.json',
-    basic: 'https://api.maptiler.com/maps/basic-v2/style.json',
+    datavizDark: 'https://api.maptiler.com/maps/dataviz-dark/style.json',
+    voyager: 'https://api.maptiler.com/maps/voyager-v2/style.json',
   },
 
   // 한국 전체 뷰
@@ -71,13 +70,13 @@ export const CLASSIFICATION_MARKERS = {
     priority: 1,
   },
   '지역응급의료센터': {
-    shape: 'square',
+    shape: 'circle',
     size: 10,
     strokeWidth: 2,
     priority: 2,
   },
   '지역응급의료기관': {
-    shape: 'circle',
+    shape: 'triangle',
     size: 8,
     strokeWidth: 1,
     priority: 3,
@@ -91,7 +90,7 @@ export const CLASSIFICATION_MARKERS = {
 } as Record<string, { shape: string; size: number; strokeWidth: number; priority: number }>;
 
 // 스타일 URL 생성 헬퍼
-export function getStyleUrl(style: keyof typeof MAPTILER_CONFIG.styles = 'dark'): string {
+export function getStyleUrl(style: keyof typeof MAPTILER_CONFIG.styles = 'datavizDark'): string {
   const baseUrl = MAPTILER_CONFIG.styles[style];
   const apiKey = MAPTILER_CONFIG.apiKey;
 

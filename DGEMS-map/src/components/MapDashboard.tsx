@@ -416,7 +416,9 @@ export function MapDashboard() {
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* 좌측 사이드바 - 데스크탑에서만 표시 */}
-        <aside className="hidden md:flex w-56 bg-gray-900 border-r border-gray-800 flex-col overflow-y-auto">
+        <aside className="hidden md:flex w-56 bg-gray-900 border-r border-gray-800 flex-col overflow-hidden">
+          {/* 스크롤 가능한 컨테이너 */}
+          <div className="flex-1 overflow-y-auto">
           {/* 지역/요일 선택 */}
           <div className="px-3 py-2 border-b border-gray-800">
             <div className="grid grid-cols-2 gap-2">
@@ -453,52 +455,50 @@ export function MapDashboard() {
             </div>
           </div>
 
-          {/* 질환 선택 (44개 + 27개 가로 배치) */}
-          <div className="px-3 py-2 border-b border-gray-800">
-            <div className="grid grid-cols-2 gap-2">
-              {/* 자원조사 44개 */}
-              <div>
-                <label className="text-[9px] text-gray-500 mb-0.5 block">자원조사 44개</label>
-                <Select
-                  value={selectedDisease || "none"}
-                  onValueChange={(v) => setSelectedDisease(v === "none" ? null : v)}
-                >
-                  <SelectTrigger className="h-7 text-xs bg-gray-800 border-gray-700 text-white">
-                    <SelectValue placeholder="선택..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
-                    <SelectItem value="none" className="text-xs text-gray-400 hover:bg-gray-700">전체</SelectItem>
-                    {diseases.map((d) => (
-                      <SelectItem key={d.id} value={d.name} className="text-xs text-white hover:bg-gray-700">
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {/* 질환 선택 (44개 + 27개 상하 배치) */}
+          <div className="px-3 py-2 border-b border-gray-800 space-y-2">
+            {/* 자원조사 44개 */}
+            <div>
+              <label className="text-[9px] text-gray-500 mb-0.5 block">자원조사 44개</label>
+              <Select
+                value={selectedDisease || "none"}
+                onValueChange={(v) => setSelectedDisease(v === "none" ? null : v)}
+              >
+                <SelectTrigger className="h-7 text-xs bg-gray-800 border-gray-700 text-white">
+                  <SelectValue placeholder="선택..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
+                  <SelectItem value="none" className="text-xs text-gray-400 hover:bg-gray-700">전체</SelectItem>
+                  {diseases.map((d) => (
+                    <SelectItem key={d.id} value={d.name} className="text-xs text-white hover:bg-gray-700">
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* 실시간 27개 */}
+            <div>
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="text-[9px] text-gray-500">실시간 27개</label>
+                {severeLoading && <span className="text-[9px] text-orange-400">로딩...</span>}
               </div>
-              {/* 실시간 27개 */}
-              <div>
-                <div className="flex items-center justify-between mb-0.5">
-                  <label className="text-[9px] text-gray-500">실시간 27개</label>
-                  {severeLoading && <span className="text-[9px] text-orange-400">로딩...</span>}
-                </div>
-                <Select
-                  value={selectedSevereType || "none"}
-                  onValueChange={(v) => setSelectedSevereType(v === "none" ? null : v as SevereTypeKey)}
-                >
-                  <SelectTrigger className="h-7 text-xs bg-gray-800 border-gray-700 text-white">
-                    <SelectValue placeholder="선택..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
-                    <SelectItem value="none" className="text-xs text-gray-400 hover:bg-gray-700">전체</SelectItem>
-                    {SEVERE_TYPES.map((type) => (
-                      <SelectItem key={type.key} value={type.key} className="text-xs text-white hover:bg-gray-700">
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={selectedSevereType || "none"}
+                onValueChange={(v) => setSelectedSevereType(v === "none" ? null : v as SevereTypeKey)}
+              >
+                <SelectTrigger className="h-7 text-xs bg-gray-800 border-gray-700 text-white">
+                  <SelectValue placeholder="선택..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
+                  <SelectItem value="none" className="text-xs text-gray-400 hover:bg-gray-700">전체</SelectItem>
+                  {SEVERE_TYPES.map((type) => (
+                    <SelectItem key={type.key} value={type.key} className="text-xs text-white hover:bg-gray-700">
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {/* 통계 표시 */}
             {(stats || severeStats) && (
@@ -553,7 +553,7 @@ export function MapDashboard() {
                   selectedClassifications.includes("권역응급의료센터") ? "text-gray-300" : "text-gray-600"
                 }`}
               >
-                <span className={`w-2 h-2 rotate-45 border ${selectedClassifications.includes("권역응급의료센터") ? "border-gray-300" : "border-gray-600"}`} />
+                <span className={`w-2 h-2 border ${selectedClassifications.includes("권역응급의료센터") ? "border-gray-300" : "border-gray-600"}`} />
                 권역
               </button>
               <button
@@ -625,6 +625,7 @@ export function MapDashboard() {
                 불가
               </button>
             </div>
+          </div>
           </div>
         </aside>
 
