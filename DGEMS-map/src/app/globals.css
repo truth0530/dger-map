@@ -130,4 +130,102 @@
   html {
     color-scheme: dark;
   }
+  html.light {
+    color-scheme: light;
+  }
+}
+
+/* 라이트모드 스타일 */
+html.light {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* 라이트모드 추가 스타일 */
+html.light {
+  --bg-sidebar: #f3f4f6;
+  --bg-nav: #ffffff;
+  --text-nav: #1f2937;
+  --border-nav: #e5e7eb;
+}
+
+html.light nav {
+  @apply bg-white text-gray-900 border-b border-gray-200;
+}
+
+html.light nav button:hover {
+  @apply bg-gray-100;
+}
+
+html.light nav a:hover {
+  @apply text-gray-700 bg-gray-100;
+}
+
+html.light aside {
+  @apply bg-gray-50 border-r border-gray-200;
+}
+
+html.light .bg-gray-900 {
+  @apply bg-white;
+}
+
+html.light .bg-gray-900\/95 {
+  @apply bg-white/95;
+}
+
+html.light .text-gray-400 {
+  @apply text-gray-600;
+}
+
+html.light .text-gray-300 {
+  @apply text-gray-700;
+}
+
+html.light .text-white {
+  @apply text-gray-900;
+}
+
+html.light .border-gray-800 {
+  @apply border-gray-200;
+}
+
+html.light .border-gray-700\/50 {
+  @apply border-gray-300/50;
+}
+
+html.light .bg-gray-800 {
+  @apply bg-gray-100;
+}
+
+html.light .text-white\/80 {
+  @apply text-gray-600;
 }

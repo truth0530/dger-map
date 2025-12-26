@@ -7,6 +7,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 const NAV_ITEMS = [
   { href: '/', label: '병상현황', description: '응급실 병상 현황' },
@@ -76,6 +77,9 @@ export default function Navigation() {
                 );
               })}
             </div>
+
+            {/* 테마 토글 */}
+            <ThemeToggle />
 
           </div>
         </div>
