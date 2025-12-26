@@ -476,20 +476,20 @@ export default function MapLibreMap({
       )}
 
       {/* 범례 */}
-      <div className="absolute bottom-4 left-4 z-10 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/50 p-3 text-xs">
-        <div className="font-medium mb-2 text-gray-400 text-[10px] uppercase tracking-wide">기관분류</div>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2.5">
-            <div className="w-3 h-3 bg-emerald-500 rotate-45 border-2 border-white/80 shadow-sm" />
-            <span className="text-gray-300">권역센터</span>
+      <div className="absolute bottom-4 left-4 z-10 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/50 p-2 text-xs max-w-[140px]">
+        <div className="font-medium mb-1.5 text-gray-400 text-[9px] uppercase tracking-wide">기관분류</div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 flex-shrink-0 bg-emerald-500 rotate-45 border-1.5 border-white/80 shadow-sm" />
+            <span className="text-gray-300 text-[10px]">권역센터</span>
           </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm border-2 border-white/80 shadow-sm" />
-            <span className="text-gray-300">지역센터</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 flex-shrink-0 bg-emerald-500 rounded-sm border border-white/80 shadow-sm" />
+            <span className="text-gray-300 text-[10px]">지역센터</span>
           </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full border border-white/80 shadow-sm" />
-            <span className="text-gray-300">지역기관</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 flex-shrink-0 bg-emerald-500 rounded-full border border-white/80 shadow-sm" />
+            <span className="text-gray-300 text-[10px]">지역기관</span>
           </div>
         </div>
       </div>
