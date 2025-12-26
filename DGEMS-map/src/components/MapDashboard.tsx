@@ -418,10 +418,10 @@ export function MapDashboard() {
         {/* 좌측 사이드바 - 데스크탑에서만 표시 */}
         <aside className="hidden md:flex w-56 bg-gray-900 border-r border-gray-800 flex-col overflow-y-auto">
           {/* 지역/요일 선택 */}
-          <div className="px-3 py-3 border-b border-gray-800">
+          <div className="px-3 py-2 border-b border-gray-800">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-gray-500 mb-1 block">지역</label>
+                <label className="text-[9px] text-gray-500 mb-0.5 block">지역</label>
                 <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
                   <SelectTrigger className="h-7 text-xs bg-gray-800 border-gray-700 text-white">
                     <SelectValue />
@@ -436,7 +436,7 @@ export function MapDashboard() {
                 </Select>
               </div>
               <div>
-                <label className="text-[10px] text-gray-500 mb-1 block">요일</label>
+                <label className="text-[9px] text-gray-500 mb-0.5 block">요일</label>
                 <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
                   <SelectTrigger className="h-7 text-xs bg-gray-800 border-gray-700 text-white">
                     <SelectValue />
@@ -454,11 +454,11 @@ export function MapDashboard() {
           </div>
 
           {/* 질환 선택 (44개 + 27개 가로 배치) */}
-          <div className="px-3 py-3 border-b border-gray-800">
+          <div className="px-3 py-2 border-b border-gray-800">
             <div className="grid grid-cols-2 gap-2">
               {/* 자원조사 44개 */}
               <div>
-                <label className="text-[10px] text-gray-500 mb-1 block">자원조사 44개</label>
+                <label className="text-[9px] text-gray-500 mb-0.5 block">자원조사 44개</label>
                 <Select
                   value={selectedDisease || "none"}
                   onValueChange={(v) => setSelectedDisease(v === "none" ? null : v)}
@@ -478,8 +478,8 @@ export function MapDashboard() {
               </div>
               {/* 실시간 27개 */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] text-gray-500">실시간 27개</label>
+                <div className="flex items-center justify-between mb-0.5">
+                  <label className="text-[9px] text-gray-500">실시간 27개</label>
                   {severeLoading && <span className="text-[9px] text-orange-400">로딩...</span>}
                 </div>
                 <Select
@@ -502,7 +502,7 @@ export function MapDashboard() {
             </div>
             {/* 통계 표시 */}
             {(stats || severeStats) && (
-              <div className="flex items-center gap-3 mt-2 text-[11px]">
+              <div className="flex items-center gap-3 mt-1 text-[10px]">
                 {stats && (
                   <>
                     <span className="text-green-400">{stats.h24} <span className="text-gray-600">24h</span></span>
@@ -521,9 +521,9 @@ export function MapDashboard() {
           </div>
 
           {/* 병상 유형 */}
-          <div className="px-3 py-3 border-b border-gray-800">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-[10px] text-gray-500">병상 유형</label>
+          <div className="px-3 py-2 border-b border-gray-800">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[9px] text-gray-500">병상 유형</label>
               {bedLoading && <span className="text-[9px] text-orange-400">로딩...</span>}
             </div>
             <div className="flex flex-wrap gap-1">
@@ -544,8 +544,8 @@ export function MapDashboard() {
           </div>
 
           {/* 기관종류 필터 */}
-          <div className="px-3 py-3 border-b border-gray-800">
-            <label className="text-[10px] text-gray-500 mb-2 block">기관분류</label>
+          <div className="px-3 py-2 border-b border-gray-800">
+            <label className="text-[9px] text-gray-500 mb-1 block">기관분류</label>
             <div className="flex gap-3">
               <button
                 onClick={() => toggleClassification("권역응급의료센터")}
@@ -585,8 +585,8 @@ export function MapDashboard() {
           </div>
 
           {/* 가용성 필터 */}
-          <div className="px-3 py-3">
-            <label className="text-[10px] text-gray-500 mb-2 block">가용성</label>
+          <div className="px-3 py-2">
+            <label className="text-[9px] text-gray-500 mb-1 block">가용성</label>
             <div className="flex gap-3">
               <button
                 onClick={() => toggleStatus("24시간")}
