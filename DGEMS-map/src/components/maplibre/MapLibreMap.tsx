@@ -529,7 +529,7 @@ export default function MapLibreMap({
 
           {/* 마우스 오버시 표시되는 텍스트 */}
           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            {mapStyle === 'datavizDark' ? 'Voyager로 변경' : 'DataViz로 변경'}
+            {mapStyle === 'datavizDark' ? '다크모드로 변경' : '라이트모드로 변경'}
           </div>
         </div>
 

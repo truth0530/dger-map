@@ -39,12 +39,12 @@ export default function Navigation() {
     <>
       <SkipNavigation />
       <nav
-        className="bg-[#0a3a82] text-white"
+        className="bg-[#0a3a82] text-white relative z-40 overflow-visible"
         role="navigation"
         aria-label="메인 네비게이션"
       >
-        <div className="max-w-full mx-auto px-4">
-          <div className="flex items-center justify-between h-14">
+        <div className="max-w-full mx-auto px-4 overflow-visible">
+          <div className="flex items-center justify-between h-14 overflow-visible">
             {/* 로고 */}
             <Link
               href="/"
