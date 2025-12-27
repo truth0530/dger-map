@@ -886,14 +886,14 @@ export function KoreaSidoMap({
             top: Math.max(tooltipPos.y - 10, 10),
           }}
         >
-          <div className="bg-gray-800/95 backdrop-blur-sm rounded-lg p-2.5 border border-gray-600 shadow-xl">
-            <div className="font-bold text-white text-sm mb-1">
+          <div className={`backdrop-blur-sm rounded-lg p-2.5 border shadow-xl transition-colors ${isDark ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-300'}`}>
+            <div className={`font-bold text-sm mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
               {PATH_ID_TO_REGION[hoveredRegion] || hoveredRegion}
             </div>
-            <div className="text-xs text-gray-400">
+            <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               응급의료기관: {regionHospitalCounts[hoveredRegion] || 0}개
             </div>
-            <div className="text-[10px] text-orange-400 mt-1">
+            <div className={`text-[10px] mt-1 ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>
               클릭하여 상세 보기
             </div>
           </div>

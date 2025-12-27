@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import path from "path";
+import plugin from "tailwindcss/plugin";
 
 const config: Config = {
   content: [
@@ -8,9 +9,85 @@ const config: Config = {
     path.join(process.cwd(), "src/app/**/*.{js,ts,jsx,tsx,mdx}"),
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        card: "hsl(var(--card))",
+        "card-foreground": "hsl(var(--card-foreground))",
+        popover: "hsl(var(--popover))",
+        "popover-foreground": "hsl(var(--popover-foreground))",
+        primary: "hsl(var(--primary))",
+        "primary-foreground": "hsl(var(--primary-foreground))",
+        secondary: "hsl(var(--secondary))",
+        "secondary-foreground": "hsl(var(--secondary-foreground))",
+        muted: "hsl(var(--muted))",
+        "muted-foreground": "hsl(var(--muted-foreground))",
+        accent: "hsl(var(--accent))",
+        "accent-foreground": "hsl(var(--accent-foreground))",
+        destructive: "hsl(var(--destructive))",
+        "destructive-foreground": "hsl(var(--destructive-foreground))",
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+    },
   },
-  plugins: [],
+  plugins: [
+    plugin(function ({ addBase }) {
+      addBase({
+        ":root": {
+          "--background": "0 0% 100%",
+          "--foreground": "0 0% 3.6%",
+          "--card": "0 0% 100%",
+          "--card-foreground": "0 0% 3.6%",
+          "--popover": "0 0% 100%",
+          "--popover-foreground": "0 0% 3.6%",
+          "--primary": "0 0% 9%",
+          "--primary-foreground": "0 0% 100%",
+          "--secondary": "0 0% 96.1%",
+          "--secondary-foreground": "0 0% 9%",
+          "--muted": "0 0% 89.1%",
+          "--muted-foreground": "0 0% 45.1%",
+          "--accent": "0 0% 9%",
+          "--accent-foreground": "0 0% 100%",
+          "--destructive": "0 84.2% 60.2%",
+          "--destructive-foreground": "0 0% 100%",
+          "--border": "0 0% 89.1%",
+          "--input": "0 0% 89.1%",
+          "--ring": "0 0% 3.6%",
+          "--radius": "0.5rem",
+        },
+        ".dark": {
+          "--background": "0 0% 3.6%",
+          "--foreground": "0 0% 98.2%",
+          "--card": "0 0% 3.6%",
+          "--card-foreground": "0 0% 98.2%",
+          "--popover": "0 0% 3.6%",
+          "--popover-foreground": "0 0% 98.2%",
+          "--primary": "0 0% 98.2%",
+          "--primary-foreground": "0 0% 9%",
+          "--secondary": "0 0% 14.9%",
+          "--secondary-foreground": "0 0% 98.2%",
+          "--muted": "0 0% 14.9%",
+          "--muted-foreground": "0 0% 63.9%",
+          "--accent": "0 0% 98.2%",
+          "--accent-foreground": "0 0% 9%",
+          "--destructive": "0 62.8% 30.6%",
+          "--destructive-foreground": "0 0% 98.2%",
+          "--border": "0 0% 14.9%",
+          "--input": "0 0% 14.9%",
+          "--ring": "0 0% 83.1%",
+          "--radius": "0.5rem",
+        },
+      });
+    }),
+  ],
 };
 
 export default config;

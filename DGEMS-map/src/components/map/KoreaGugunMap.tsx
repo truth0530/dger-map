@@ -502,20 +502,20 @@ export function KoreaGugunMap({
               transform: pos.y < 150 ? 'translateY(0)' : 'translateY(-100%)',
             }}
           >
-            <div className="bg-gray-900/98 backdrop-blur-md rounded-xl shadow-2xl border border-gray-700/50 overflow-hidden min-w-[300px] max-w-[340px]">
+            <div className={`backdrop-blur-md rounded-xl shadow-2xl border overflow-hidden min-w-[300px] max-w-[340px] transition-colors ${isDark ? 'bg-gray-900/98 border-gray-700/50' : 'bg-white/98 border-gray-300/50'}`}>
               {/* 헤더 영역 */}
-              <div className="bg-gradient-to-r from-gray-800 to-gray-800/80 px-3 py-2.5 border-b border-gray-700/50">
+              <div className={`px-3 py-2.5 border-b transition-colors ${isDark ? 'bg-gradient-to-r from-gray-800 to-gray-800/80 border-gray-700/50' : 'bg-gradient-to-r from-gray-100 to-gray-50 border-gray-200/50'}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-white text-sm leading-tight truncate">{hoveredHospital.name}</div>
+                    <div className={`font-bold text-sm leading-tight truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{hoveredHospital.name}</div>
                     <div className="flex items-center gap-1.5 mt-1">
                       {hoveredHospital.classification && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-medium">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
                           {hoveredHospital.classification.replace('응급의료', '')}
                         </span>
                       )}
                       {hoveredHospital.district && (
-                        <span className="text-[10px] text-gray-500">
+                        <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
                           {hoveredHospital.district}
                         </span>
                       )}
@@ -523,7 +523,7 @@ export function KoreaGugunMap({
                   </div>
                   {/* 업데이트 시간 */}
                   {bedInfo?.hvidate && (
-                    <div className="text-[9px] text-gray-500 bg-gray-700/50 px-1.5 py-0.5 rounded">
+                    <div className={`text-[9px] px-1.5 py-0.5 rounded ${isDark ? 'text-gray-500 bg-gray-700/50' : 'text-gray-600 bg-gray-200/50'}`}>
                       {bedInfo.hvidate.substring(8, 10)}:{bedInfo.hvidate.substring(10, 12)}
                     </div>
                   )}
@@ -534,8 +534,8 @@ export function KoreaGugunMap({
               <div className="p-3 space-y-2.5">
                 {/* 질환 가용성 (44개 질환) */}
                 {selectedDisease && hoveredHospital.hasDiseaseData && diseaseStatus && (
-                  <div className="flex items-center justify-between bg-gray-800/50 rounded-lg px-2.5 py-2">
-                    <span className="text-[11px] text-gray-400 truncate flex-1 mr-2">{selectedDisease}</span>
+                  <div className={`flex items-center justify-between rounded-lg px-2.5 py-2 transition-colors ${isDark ? 'bg-gray-800/50' : 'bg-gray-200/50'}`}>
+                    <span className={`text-[11px] truncate flex-1 mr-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{selectedDisease}</span>
                     <span
                       className="text-[11px] font-semibold px-2 py-0.5 rounded"
                       style={{
@@ -551,7 +551,7 @@ export function KoreaGugunMap({
                 {/* 병상 현황 - 컴팩트 그리드 */}
                 {bedDataMap && selectedBedTypes && selectedBedTypes.size > 0 && (
                   <div>
-                    <div className="text-[10px] text-gray-500 mb-1.5 font-medium flex items-center gap-1">
+                    <div className={`text-[10px] mb-1.5 font-medium flex items-center gap-1 ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
@@ -565,20 +565,20 @@ export function KoreaGugunMap({
                           const total = bedInfo[config.totalKey] as number ?? 0;
 
                           return (
-                            <div key={bedType} className="bg-gray-800/60 rounded-md px-1.5 py-1.5 text-center">
-                              <div className="text-[9px] text-gray-500 truncate">{config.shortLabel}</div>
+                            <div key={bedType} className={`rounded-md px-1.5 py-1.5 text-center transition-colors ${isDark ? 'bg-gray-800/60' : 'bg-gray-200/60'}`}>
+                              <div className={`text-[9px] truncate ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>{config.shortLabel}</div>
                               <div className="text-[13px] font-bold mt-0.5">
-                                <span className={available > 0 ? "text-cyan-400" : "text-red-400"}>
+                                <span className={available > 0 ? (isDark ? "text-cyan-400" : "text-cyan-600") : (isDark ? "text-red-400" : "text-red-600")}>
                                   {available}
                                 </span>
-                                <span className="text-gray-600 text-[10px]">/{total}</span>
+                                <span className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-500'}`}>/{total}</span>
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      <div className="text-[10px] text-gray-500 bg-gray-800/40 rounded-lg py-2 text-center">
+                      <div className={`text-[10px] rounded-lg py-2 text-center transition-colors ${isDark ? 'text-gray-500 bg-gray-800/40' : 'text-gray-600 bg-gray-200/40'}`}>
                         실시간 데이터 없음
                       </div>
                     )}
@@ -647,7 +647,7 @@ export function KoreaGugunMap({
 
                   if (isLoading) {
                     return (
-                      <div className="text-[10px] text-gray-500 text-center py-1">
+                      <div className={`text-[10px] text-center py-1 ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
                         메시지 로딩 중...
                       </div>
                     );
@@ -655,14 +655,14 @@ export function KoreaGugunMap({
 
                   if (msgData && msgData.emergency.length > 0) {
                     return (
-                      <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20">
-                        <div className="text-[10px] text-green-400 mb-1.5 font-medium flex items-center gap-1">
+                      <div className={`rounded-lg p-2 border transition-colors ${isDark ? 'bg-green-500/10 border-green-500/20' : 'bg-green-100/50 border-green-400/20'}`}>
+                        <div className={`text-[10px] mb-1.5 font-medium flex items-center gap-1 ${isDark ? 'text-green-400' : 'text-green-700'}`}>
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           응급실 운영 정보
                           <button
-                            className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 hover:bg-green-500/30 pointer-events-auto"
+                            className={`ml-auto text-[9px] px-1.5 py-0.5 rounded pointer-events-auto transition-colors ${isDark ? 'bg-green-500/20 hover:bg-green-500/30' : 'bg-green-200/50 hover:bg-green-200/70'}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               setShowEmergencyMessages(!showEmergencyMessages);
@@ -677,16 +677,16 @@ export function KoreaGugunMap({
                               const parsed = parseMessage(item.msg, item.symTypCod);
                               const colors = getStatusColorClasses(parsed.status.color);
                               return (
-                                <div key={idx} className="text-[9px] bg-gray-800/50 rounded p-1.5">
+                                <div key={idx} className={`text-[9px] rounded p-1.5 transition-colors ${isDark ? 'bg-gray-800/50' : 'bg-gray-200/50'}`}>
                                   <div className="flex items-center gap-1 flex-wrap mb-0.5">
-                                    <span className="px-1 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                                    <span className={`px-1 py-0.5 rounded ${isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-200/70 text-orange-700'}`}>
                                       {parsed.department}
                                     </span>
                                     <span className={`px-1 py-0.5 rounded ${colors.bg} ${colors.text}`}>
                                       {parsed.status.label}
                                     </span>
                                   </div>
-                                  <div className="text-gray-400">{parsed.details}</div>
+                                  <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>{parsed.details}</div>
                                 </div>
                               );
                             })}
@@ -700,7 +700,7 @@ export function KoreaGugunMap({
 
                 {/* 진료정보 미등록 */}
                 {!hoveredHospital.hasDiseaseData && !bedInfo && availableDiseases.length === 0 && (
-                  <div className="text-[10px] text-gray-500 text-center py-1">
+                  <div className={`text-[10px] text-center py-1 ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
                     등록된 진료정보가 없습니다
                   </div>
                 )}
