@@ -9,6 +9,7 @@ import { BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifier";
+import { useTheme } from "@/lib/contexts/ThemeContext";
 
 // 시도명 → SVG 파일명 매핑
 const SIDO_TO_SVG_FILE: Record<string, string> = {
@@ -113,6 +114,7 @@ export function KoreaGugunMap({
   severeDataMap,
   selectedSevereType,
 }: KoreaGugunMapProps) {
+  const { isDark } = useTheme();
   const [svgPaths, setSvgPaths] = useState<PathInfo[]>([]);
   const [viewBox, setViewBox] = useState<string>("0 0 800 800");
   const [isLoading, setIsLoading] = useState(true);
@@ -410,7 +412,7 @@ export function KoreaGugunMap({
   return (
     <div
       ref={mapContainerRef}
-      className="w-full h-full relative bg-gray-950"
+      className={`w-full h-full relative ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
         onHospitalHover(null);
@@ -421,7 +423,7 @@ export function KoreaGugunMap({
         ref={svgRef}
         viewBox={viewBox}
         className="w-full h-full"
-        style={{ background: "#0f0f14" }}
+        style={{ background: isDark ? "#0f0f14" : "#f9fafb" }}
       >
         {/* 시군구 경계선만 표시 */}
         {svgPaths.map((pathInfo) => (
@@ -431,7 +433,7 @@ export function KoreaGugunMap({
             d={pathInfo.d}
             fill="transparent"
             fillRule={pathInfo.fillRule as "nonzero" | "evenodd" | undefined}
-            stroke="#374151"
+            stroke={isDark ? "#374151" : "#cbd5e1"}
             strokeWidth={1}
             className="pointer-events-none"
           />

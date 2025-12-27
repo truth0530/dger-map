@@ -6,11 +6,14 @@ export const MAPTILER_CONFIG = {
   // Maptiler API 키 (환경변수에서 로드)
   apiKey: process.env.NEXT_PUBLIC_MAPTILER_API_KEY || '',
 
-  // 지도 스타일 URL
-  // 사용 가능한 스타일: dataviz-dark, voyager-v2
+  // 지도 스타일 URL (라이트/다크 모드 쌍)
   styles: {
+    // 다크 모드 스타일
     datavizDark: 'https://api.maptiler.com/maps/dataviz-dark/style.json',
-    voyager: 'https://api.maptiler.com/maps/voyager-v2/style.json',
+    voyagerDark: 'https://api.maptiler.com/maps/voyager-v2/style.json',
+    // 라이트 모드 스타일
+    datavizLight: 'https://api.maptiler.com/maps/dataviz-light/style.json',
+    voyagerLight: 'https://api.maptiler.com/maps/voyager/style.json',
   },
 
   // 한국 전체 뷰
@@ -90,7 +93,7 @@ export const CLASSIFICATION_MARKERS = {
 } as Record<string, { shape: string; size: number; strokeWidth: number; priority: number }>;
 
 // 스타일 URL 생성 헬퍼
-export function getStyleUrl(style: keyof typeof MAPTILER_CONFIG.styles = 'datavizDark'): string {
+export function getStyleUrl(style: 'datavizDark' | 'voyagerDark' | 'datavizLight' | 'voyagerLight' = 'datavizDark'): string {
   const baseUrl = MAPTILER_CONFIG.styles[style];
   const apiKey = MAPTILER_CONFIG.apiKey;
 

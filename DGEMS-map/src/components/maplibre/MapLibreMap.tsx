@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getStyleUrl, getRegionView, MARKER_COLORS, CLASSIFICATION_MARKERS, MAPTILER_CONFIG } from '@/lib/maplibre/config';
+import { useTheme } from '@/lib/contexts/ThemeContext';
 import type { Hospital } from '@/types';
 import type { HospitalBedData } from '@/lib/hooks/useBedData';
 import type { HospitalSevereData } from '@/lib/hooks/useSevereData';
@@ -38,21 +39,34 @@ export default function MapLibreMap({
   onHospitalHover,
   onHospitalClick,
 }: MapLibreMapProps) {
+  const { isDark } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [mapStyle, setMapStyle] = useState<'datavizDark' | 'voyager'>('datavizDark');
+  const [mapStyleMode, setMapStyleMode] = useState<'dataviz' | 'voyager'>('dataviz'); // 'dataviz' 또는 'voyager'
 
-  // 지도 스타일 변경 핸들러
-  const handleStyleChange = useCallback((newStyle: 'datavizDark' | 'voyager') => {
-    if (map.current && newStyle !== mapStyle) {
-      setMapStyle(newStyle);
-      const styleUrl = getStyleUrl(newStyle);
+  // 현재 앱의 라이트/다크 모드를 고려한 실제 지도 스타일 생성
+  const getCurrentMapStyle = useCallback((): 'datavizDark' | 'datavizLight' | 'voyagerDark' | 'voyagerLight' => {
+    if (mapStyleMode === 'dataviz') {
+      return isDark ? 'datavizDark' : 'datavizLight';
+    } else {
+      return isDark ? 'voyagerDark' : 'voyagerLight';
+    }
+  }, [mapStyleMode, isDark]);
+
+  // 지도 스타일 변경 핸들러 (사용자가 지도 내부 버튼으로 dataviz/voyager 전환)
+  const handleStyleChange = useCallback((newMode: 'dataviz' | 'voyager') => {
+    if (map.current && newMode !== mapStyleMode) {
+      setMapStyleMode(newMode);
+      const actualStyle = newMode === 'dataviz'
+        ? (isDark ? 'datavizDark' : 'datavizLight')
+        : (isDark ? 'voyagerDark' : 'voyagerLight');
+      const styleUrl = getStyleUrl(actualStyle);
       map.current.setStyle(styleUrl);
     }
-  }, [mapStyle]);
+  }, [mapStyleMode, isDark]);
 
   // 필터링된 병원 목록
   const filteredHospitals = useMemo(() => {
@@ -184,14 +198,14 @@ export default function MapLibreMap({
     }
   };
 
-  // 팝업 내용 생성 (다크 모드)
-  const createPopupContent = useCallback((hospital: Hospital): string => {
+  // 팝업 내용 생성 (라이트/다크 모드 지원)
+  const createPopupContent = useCallback((hospital: Hospital, isDarkMode: boolean = true): string => {
     const bedData = bedDataMap?.get(hospital.code);
     const severeData = severeDataMap?.get(hospital.code);
     const classInfo = getClassificationInfo(hospital.classification);
 
     let content = `
-      <div class="popup-content">
+      <div class="popup-content ${isDarkMode ? 'popup-dark' : 'popup-light'}">
         <div class="popup-header">
           <span class="popup-badge" title="${classInfo.desc}">${classInfo.name}</span>
           <span class="popup-name">${hospital.name}</span>
@@ -324,7 +338,8 @@ export default function MapLibreMap({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    const styleUrl = getStyleUrl(mapStyle);
+    const actualStyle = getCurrentMapStyle();
+    const styleUrl = getStyleUrl(actualStyle);
     const initialView = getRegionView(selectedRegion);
 
     map.current = new maplibregl.Map({
@@ -382,6 +397,15 @@ export default function MapLibreMap({
     };
   }, []);
 
+  // 라이트/다크 모드 변경 시 지도 스타일 자동 변경
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+
+    const actualStyle = getCurrentMapStyle();
+    const styleUrl = getStyleUrl(actualStyle);
+    map.current.setStyle(styleUrl);
+  }, [isDark, mapStyleMode, isLoaded, getCurrentMapStyle]);
+
   // 지역 변경 시 지도 이동
   useEffect(() => {
     if (!map.current || !isLoaded) return;
@@ -424,7 +448,7 @@ export default function MapLibreMap({
           className: 'maplibre-popup-custom',
         })
           .setLngLat([hospital.lng!, hospital.lat!])
-          .setHTML(createPopupContent(hospital))
+          .setHTML(createPopupContent(hospital, isDark))
           .addTo(map.current!);
       });
 
@@ -480,7 +504,7 @@ export default function MapLibreMap({
             className: 'maplibre-popup-custom',
           })
             .setLngLat([hospital.lng, hospital.lat])
-            .setHTML(createPopupContent(hospital))
+            .setHTML(createPopupContent(hospital, isDark))
             .addTo(map.current!);
         }
       } else {
@@ -514,32 +538,32 @@ export default function MapLibreMap({
       )}
 
       {/* 지도 컨트롤 그룹 (스타일 토글 + 줌 + 전체화면) */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-gray-800/90 rounded-lg shadow-lg border border-gray-700/50 p-1.5">
+      <div className={`absolute top-4 right-4 z-20 flex items-center gap-2 rounded-lg shadow-lg border p-1.5 ${isDark ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-gray-300/50'}`}>
         {/* 스타일 토글 버튼 */}
         <div className="relative group">
           <button
-            onClick={() => handleStyleChange(mapStyle === 'datavizDark' ? 'voyager' : 'datavizDark')}
-            className="w-9 h-9 rounded-md hover:bg-gray-700/80 transition-all flex items-center justify-center text-white"
+            onClick={() => handleStyleChange(mapStyleMode === 'dataviz' ? 'voyager' : 'dataviz')}
+            className={`w-9 h-9 rounded-md transition-all flex items-center justify-center ${isDark ? 'hover:bg-gray-700/80 text-white' : 'hover:bg-gray-200/80 text-gray-900'}`}
           >
             {/* 달 모양 아이콘 고정 */}
-            <svg className="w-4 h-4 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+            <svg className={`w-4 h-4 ${isDark ? 'text-blue-300' : 'text-blue-600'}`} fill="currentColor" viewBox="0 0 20 20">
               <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
             </svg>
           </button>
 
           {/* 마우스 오버시 표시되는 텍스트 */}
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            {mapStyle === 'datavizDark' ? '다크모드로 변경' : '라이트모드로 변경'}
+          <div className={`absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 ${isDark ? 'text-white bg-gray-900' : 'text-gray-900 bg-white'}`}>
+            {mapStyleMode === 'dataviz' ? '지도 스타일 변경' : '데이터 시각화 보기'}
           </div>
         </div>
 
         {/* 구분선 */}
-        <div className="w-px h-5 bg-gray-700/50" />
+        <div className={`w-px h-5 ${isDark ? 'bg-gray-700/50' : 'bg-gray-400/50'}`} />
 
         {/* 줌 인 버튼 */}
         <button
           onClick={() => map.current?.zoomIn()}
-          className="w-9 h-9 rounded-md hover:bg-gray-700/80 transition-all flex items-center justify-center text-white font-bold"
+          className={`w-9 h-9 rounded-md transition-all flex items-center justify-center font-bold ${isDark ? 'hover:bg-gray-700/80 text-white' : 'hover:bg-gray-200/80 text-gray-900'}`}
           title="확대"
         >
           +
@@ -548,14 +572,14 @@ export default function MapLibreMap({
         {/* 줌 아웃 버튼 */}
         <button
           onClick={() => map.current?.zoomOut()}
-          className="w-9 h-9 rounded-md hover:bg-gray-700/80 transition-all flex items-center justify-center text-white font-bold"
+          className={`w-9 h-9 rounded-md transition-all flex items-center justify-center font-bold ${isDark ? 'hover:bg-gray-700/80 text-white' : 'hover:bg-gray-200/80 text-gray-900'}`}
           title="축소"
         >
           −
         </button>
 
         {/* 구분선 */}
-        <div className="w-px h-5 bg-gray-700/50" />
+        <div className={`w-px h-5 ${isDark ? 'bg-gray-700/50' : 'bg-gray-400/50'}`} />
 
         {/* 전체화면 버튼 */}
         <button
@@ -587,7 +611,7 @@ export default function MapLibreMap({
               console.warn('전체화면 요청 실패:', e);
             }
           }}
-          className="w-9 h-9 rounded-md hover:bg-gray-700/80 transition-all flex items-center justify-center text-white text-lg font-bold"
+          className={`w-9 h-9 rounded-md transition-all flex items-center justify-center text-lg font-bold ${isDark ? 'hover:bg-gray-700/80 text-white' : 'hover:bg-gray-200/80 text-gray-900'}`}
           title="전체화면"
         >
           ⛶
@@ -595,56 +619,56 @@ export default function MapLibreMap({
       </div>
 
       {/* 범례 */}
-      <div className="absolute bottom-20 left-4 z-10 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/50 p-3 text-xs w-fit max-w-xs max-h-64 overflow-y-auto">
-        <div className="font-semibold mb-2.5 text-gray-300 text-[11px] uppercase tracking-wider">기관분류 범례</div>
+      <div className={`absolute bottom-20 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border p-3 text-xs w-fit max-w-xs max-h-64 overflow-y-auto ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>
+        <div className={`font-semibold mb-2.5 text-[11px] uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>기관분류 범례</div>
 
         {/* 기관 유형 */}
         <div className="mb-3">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2.5 flex-nowrap">
               <div className="w-3 h-3 flex-shrink-0 bg-emerald-500 shadow-sm" style={{minWidth: '12px'}} />
-              <span className="text-gray-300 text-[10px] whitespace-nowrap">권역응급의료센터</span>
+              <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>권역응급의료센터</span>
             </div>
             <div className="flex items-center gap-2.5 flex-nowrap">
               <div className="w-3 h-3 flex-shrink-0 bg-emerald-500 rounded-full shadow-sm" style={{minWidth: '12px'}} />
-              <span className="text-gray-300 text-[10px] whitespace-nowrap">지역응급의료센터</span>
+              <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>지역응급의료센터</span>
             </div>
             <div className="flex items-center gap-2.5 flex-nowrap">
               <div className="w-0 h-0 flex-shrink-0 shadow-sm" style={{borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '10px solid rgb(16, 185, 129)'}} />
-              <span className="text-gray-300 text-[10px] whitespace-nowrap">지역응급의료기관</span>
+              <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>지역응급의료기관</span>
             </div>
           </div>
         </div>
 
         {/* 병상 상태 */}
-        <div className="border-t border-gray-700/50 pt-2.5">
-          <div className="font-semibold text-gray-400 text-[9px] uppercase mb-1.5 tracking-wider">병상 상태</div>
+        <div className={`border-t pt-2.5 ${isDark ? 'border-gray-700/50' : 'border-gray-300/50'}`}>
+          <div className={`font-semibold text-[9px] uppercase mb-1.5 tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>병상 상태</div>
           <div className="space-y-1">
             <div className="flex items-center gap-2.5 flex-nowrap">
               <div className="w-2 h-2 flex-shrink-0 bg-green-500 rounded-full shadow-sm" />
-              <span className="text-gray-400 text-[9px] whitespace-nowrap">여유 있음</span>
+              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>여유 있음</span>
             </div>
             <div className="flex items-center gap-2.5 flex-nowrap">
               <div className="w-2 h-2 flex-shrink-0 bg-blue-500 rounded-full shadow-sm" />
-              <span className="text-gray-400 text-[9px] whitespace-nowrap">적정 수준</span>
+              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>적정 수준</span>
             </div>
             <div className="flex items-center gap-2.5 flex-nowrap">
               <div className="w-2 h-2 flex-shrink-0 bg-red-500 rounded-full shadow-sm" />
-              <span className="text-gray-400 text-[9px] whitespace-nowrap">부족</span>
+              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>부족</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* 병원 수 표시 */}
-      <div className="absolute top-4 left-4 z-10 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700/50 px-3 py-2">
-        <span className="text-gray-400 text-xs">병원 </span>
-        <span className="font-semibold text-emerald-400 text-sm">{filteredHospitals.length}</span>
+      <div className={`absolute top-4 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border px-3 py-2 ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>
+        <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>병원 </span>
+        <span className={`font-semibold text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{filteredHospitals.length}</span>
       </div>
 
       {/* 스타일 */}
       <style jsx global>{`
-        /* 팝업 컨테이너 */
+        /* 팝업 컨테이너 - 다크 모드 */
         .maplibre-popup-custom .maplibregl-popup-content {
           padding: 0;
           background: #1f2937;
@@ -655,6 +679,16 @@ export default function MapLibreMap({
         }
         .maplibre-popup-custom .maplibregl-popup-tip {
           border-top-color: #1f2937;
+        }
+
+        /* 팝업 컨테이너 - 라이트 모드 */
+        .popup-light + .maplibregl-popup-content {
+          background: #ffffff;
+          border: 1px solid rgba(0,0,0,0.1);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .popup-light ~ .maplibregl-popup-tip {
+          border-top-color: #ffffff;
         }
 
         /* 팝업 내용 */
@@ -678,6 +712,47 @@ export default function MapLibreMap({
         .popup-content::-webkit-scrollbar-thumb:hover {
           background: rgba(255, 255, 255, 0.4);
         }
+
+        /* 라이트 모드 스크롤바 */
+        .popup-light::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.2);
+        }
+        .popup-light::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* 라이트 모드 헤더 */
+        .popup-light .popup-header {
+          background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+        }
+
+        /* 라이트 모드 배지 */
+        .popup-light .popup-badge {
+          color: #64748b;
+          background: rgba(100, 116, 139, 0.12);
+        }
+
+        /* 라이트 모드 병원명 */
+        .popup-light .popup-name {
+          color: #1f2937;
+        }
+
+        /* 라이트 모드 위치 정보 섹션 */
+        .popup-light .popup-info-section {
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+          background: rgba(0,0,0,0.02);
+        }
+
+        /* 라이트 모드 텍스트 */
+        .popup-light .popup-info-text {
+          color: #4b5563;
+        }
+
+        .popup-light .popup-coords {
+          color: #9ca3af;
+        }
+
         .popup-header {
           display: flex;
           align-items: center;

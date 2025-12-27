@@ -135,7 +135,7 @@
   }
 }
 
-/* 라이트모드 스타일 */
+/* 라이트모드 색상 변수 */
 html.light {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -168,16 +168,10 @@ html.light {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  color-scheme: light;
 }
 
-/* 라이트모드 추가 스타일 */
-html.light {
-  --bg-sidebar: #f3f4f6;
-  --bg-nav: #ffffff;
-  --text-nav: #1f2937;
-  --border-nav: #e5e7eb;
-}
-
+/* 라이트모드 네비게이션 */
 html.light nav {
   @apply bg-white text-gray-900 border-b border-gray-200;
 }
@@ -190,8 +184,23 @@ html.light nav a:hover {
   @apply text-gray-700 bg-gray-100;
 }
 
+/* 라이트모드 사이드바 */
 html.light aside {
   @apply bg-gray-50 border-r border-gray-200;
+}
+
+html.light aside button {
+  @apply text-gray-900 hover:bg-gray-200;
+}
+
+/* 라이트모드 배경 변환 */
+html.light body {
+  @apply bg-white text-gray-900;
+}
+
+html.light .bg-black,
+html.light .bg-gray-950 {
+  @apply bg-white;
 }
 
 html.light .bg-gray-900 {
@@ -202,6 +211,55 @@ html.light .bg-gray-900\/95 {
   @apply bg-white/95;
 }
 
+html.light .bg-gray-800 {
+  @apply bg-gray-100;
+}
+
+html.light .bg-gray-800\/50 {
+  @apply bg-gray-100/50;
+}
+
+html.light .bg-gray-800\/90 {
+  @apply bg-gray-100/90;
+}
+
+html.light .bg-gray-700\/80 {
+  @apply bg-gray-200/80;
+}
+
+html.light .bg-gray-700\/50 {
+  @apply bg-gray-300/50;
+}
+
+html.light .bg-gray-700 {
+  @apply bg-gray-300;
+}
+
+html.light .bg-gray-600 {
+  @apply bg-gray-400;
+}
+
+/* 라이트모드 텍스트 색상 */
+html.light .text-white {
+  @apply text-gray-900;
+}
+
+html.light .text-white\/80 {
+  @apply text-gray-700;
+}
+
+html.light .text-white\/50 {
+  @apply text-gray-600;
+}
+
+html.light .text-white\/20 {
+  @apply text-gray-400;
+}
+
+html.light .text-white\/10 {
+  @apply text-gray-300;
+}
+
 html.light .text-gray-400 {
   @apply text-gray-600;
 }
@@ -210,102 +268,83 @@ html.light .text-gray-300 {
   @apply text-gray-700;
 }
 
-html.light .text-white {
-  @apply text-gray-900;
-}
-
-html.light .border-gray-800 {
-  @apply border-gray-200;
-}
-
-html.light .border-gray-700\/50 {
-  @apply border-gray-300/50;
-}
-
-html.light .bg-gray-800 {
-  @apply bg-gray-100;
-}
-
-html.light .text-white\/80 {
-  @apply text-gray-600;
-}
-
-html.light .bg-gray-950 {
-  @apply bg-white;
-}
-
-html.light .bg-gray-800\/50 {
-  @apply bg-gray-100/50;
-}
-
-html.light .bg-gray-700\/80 {
-  @apply bg-gray-200/80;
-}
-
-html.light .text-gray-600 {
-  @apply text-gray-500;
+html.light .text-gray-200 {
+  @apply text-gray-800;
 }
 
 html.light .text-gray-500 {
   @apply text-gray-600;
 }
 
+html.light .text-gray-600 {
+  @apply text-gray-500;
+}
+
+/* 라이트모드 테두리 */
+html.light .border-gray-900 {
+  @apply border-gray-100;
+}
+
+html.light .border-gray-800 {
+  @apply border-gray-200;
+}
+
 html.light .border-gray-700 {
   @apply border-gray-300;
 }
 
-html.light .bg-emerald-500 {
-  @apply bg-emerald-500;
+html.light .border-gray-700\/50 {
+  @apply border-gray-300/50;
 }
 
-html.light .bg-green-500 {
-  @apply bg-green-500;
+html.light .border-white\/20 {
+  @apply border-gray-200;
 }
 
-html.light .bg-blue-500 {
-  @apply bg-blue-500;
+/* 라이트모드 hover 효과 */
+html.light .hover\:bg-white\/10:hover {
+  @apply hover:bg-gray-100;
 }
 
-html.light .bg-purple-500 {
-  @apply bg-purple-500;
-}
-
-html.light .bg-red-500 {
-  @apply bg-red-500;
-}
-
-html.light .text-green-400 {
-  @apply text-green-600;
-}
-
-html.light .text-blue-400 {
-  @apply text-blue-600;
-}
-
-html.light .text-purple-400 {
-  @apply text-purple-600;
-}
-
-html.light .text-orange-400 {
-  @apply text-orange-600;
-}
-
-html.light .text-red-400 {
-  @apply text-red-600;
-}
-
-html.light .hover\:bg-gray-700:hover {
+html.light .hover\:bg-white\/20:hover {
   @apply hover:bg-gray-200;
 }
 
-html.light .hover\:bg-gray-700\/80:hover {
-  @apply hover:bg-gray-200/80;
+html.light .hover\:bg-gray-700:hover {
+  @apply hover:bg-gray-300;
 }
 
+html.light .hover\:bg-gray-700\/80:hover {
+  @apply hover:bg-gray-300/80;
+}
+
+html.light .hover\:bg-gray-800:hover {
+  @apply hover:bg-gray-200;
+}
+
+html.light .hover\:text-white:hover {
+  @apply hover:text-gray-900;
+}
+
+/* 라이트모드 focus 효과 */
 html.light .focus\:ring-white\/20:focus {
   @apply focus:ring-gray-400/20;
 }
 
-html.light .hover\:bg-white\/10:hover {
-  @apply hover:bg-gray-200/20;
+html.light .focus\:ring-blue-500:focus {
+  @apply focus:ring-blue-600;
+}
+
+/* 라이트모드 색상 유지 (중요) */
+html.light .bg-emerald-500,
+html.light .bg-green-500,
+html.light .bg-blue-500,
+html.light .bg-purple-500,
+html.light .bg-red-500,
+html.light .text-green-400,
+html.light .text-blue-400,
+html.light .text-purple-400,
+html.light .text-orange-400,
+html.light .text-red-400 {
+  /* 색상 유지 */
 }

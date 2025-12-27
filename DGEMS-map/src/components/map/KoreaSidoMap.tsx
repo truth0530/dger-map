@@ -9,6 +9,7 @@ import { BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifier";
+import { useTheme } from "@/lib/contexts/ThemeContext";
 
 // 전국 좌표 범위 (위도/경도 → SVG viewBox 변환용)
 // SVG viewBox: 0 0 800 759
@@ -175,6 +176,7 @@ export function KoreaSidoMap({
   severeDataMap,
   selectedSevereType,
 }: KoreaSidoMapProps) {
+  const { isDark } = useTheme();
   const [svgPaths, setSvgPaths] = useState<PathInfo[]>([]);
   const [viewBox, setViewBox] = useState<string>("0 0 800 800");
   const [isLoading, setIsLoading] = useState(true);
@@ -550,7 +552,7 @@ export function KoreaSidoMap({
   return (
     <div
       ref={mapContainerRef}
-      className="w-full h-full relative bg-gray-950"
+      className={`w-full h-full relative ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
         if (onHospitalHover) onHospitalHover(null);
@@ -562,7 +564,7 @@ export function KoreaSidoMap({
         ref={svgRef}
         viewBox={viewBox}
         className="w-full h-full"
-        style={{ background: "#0f0f14" }}
+        style={{ background: isDark ? "#0f0f14" : "#f9fafb" }}
       >
         {/* 시도 경계선 */}
         {svgPaths.map((pathInfo) => {
@@ -571,18 +573,20 @@ export function KoreaSidoMap({
           const isDaegu = regionFullName === "대구광역시";
 
           // 대구는 살짝 밝게 (진료정보 있음 표시)
-          let fillColor = isDaegu
-            ? "rgba(100, 100, 110, 0.25)"
-            : "rgba(30, 30, 40, 0.3)";
+          let fillColor = isDark
+            ? (isDaegu ? "rgba(100, 100, 110, 0.25)" : "rgba(30, 30, 40, 0.3)")
+            : (isDaegu ? "rgba(200, 200, 210, 0.15)" : "rgba(220, 220, 230, 0.2)");
 
           // 호버 시 밝게
           if (isHovered) {
-            fillColor = isDaegu
-              ? "rgba(120, 120, 130, 0.35)"
-              : "rgba(50, 50, 60, 0.4)";
+            fillColor = isDark
+              ? (isDaegu ? "rgba(120, 120, 130, 0.35)" : "rgba(50, 50, 60, 0.4)")
+              : (isDaegu ? "rgba(180, 180, 190, 0.25)" : "rgba(190, 190, 200, 0.3)");
           }
 
-          const strokeColor = isHovered ? "#6b7280" : "#374151";
+          const strokeColor = isDark
+            ? (isHovered ? "#6b7280" : "#374151")
+            : (isHovered ? "#94a3b8" : "#cbd5e1");
           const strokeW = isHovered ? 1.2 : 0.5;
 
           return (
