@@ -13,8 +13,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { getStyleUrl, getRegionView, MAPTILER_CONFIG } from '@/lib/maplibre/config';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { parseMessage, getStatusColorClasses } from '@/lib/utils/messageClassifier';
-import { getMarkerColorByBedStatus } from '@/lib/utils/markerColors';
-import { getMarkerConfig, getMarkerSize } from '@/lib/utils/markerConfig';
+import { createMarkerElement } from '@/lib/utils/markerRenderer';
 import { Legend } from '@/components/Legend';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
 import type { Hospital } from '@/types';
@@ -94,63 +93,10 @@ export default function MapLibreMap({
     });
   }, [hospitals, selectedRegion, selectedClassifications]);
 
-  // 마커 색상 결정 - 공통 유틸 함수 사용
-  const getMarkerColor = useCallback((hospital: Hospital): string => {
-    return getMarkerColorByBedStatus(hospital, bedDataMap);
+  // 마커 HTML 생성 (공통 유틸 사용)
+  const createMarkerElementCallback = useCallback((hospital: Hospital, isHovered: boolean): HTMLElement => {
+    return createMarkerElement(hospital, bedDataMap, isHovered);
   }, [bedDataMap]);
-
-  // 마커 HTML 생성
-  const createMarkerElement = useCallback((hospital: Hospital, isHovered: boolean): HTMLElement => {
-    const el = document.createElement('div');
-    const color = getMarkerColor(hospital);
-    const size = getMarkerSize(hospital, isHovered);
-    const config = getMarkerConfig(hospital);
-
-    el.className = 'maplibre-marker';
-    el.style.cursor = 'pointer';
-    el.style.width = `${size}px`;
-    el.style.height = `${size}px`;
-    el.style.transition = 'all 0.15s ease';
-
-    if (config.shape === 'diamond') {
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-      el.style.backgroundColor = color;
-      el.style.transform = 'rotate(45deg)';
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-    } else if (config.shape === 'square') {
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-      el.style.backgroundColor = color;
-      el.style.borderRadius = '2px';
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-    } else if (config.shape === 'triangle') {
-      // CSS 클립패스를 사용한 삼각형 마커
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-      el.style.backgroundColor = color;
-      el.style.clipPath = 'polygon(50% 0%, 100% 100%, 0% 100%)';
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-    } else {
-      // circle (기본)
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-      el.style.backgroundColor = color;
-      el.style.borderRadius = '50%';
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-    }
-
-    if (isHovered) {
-      if (config.shape === 'triangle') {
-        el.style.filter = 'drop-shadow(0 0 0 4px rgba(255,255,255,0.5)) drop-shadow(0 4px 8px rgba(0,0,0,0.4))';
-      } else {
-        el.style.boxShadow = '0 0 0 4px rgba(255,255,255,0.5), 0 4px 8px rgba(0,0,0,0.4)';
-      }
-      el.style.zIndex = '100';
-    }
-
-    return el;
-  }, [getMarkerColor, getMarkerSize]);
 
   // 병상 상태 색상 결정
   const getBedStatusColor = (available: number, total: number): string => {
@@ -471,7 +417,7 @@ export default function MapLibreMap({
     filteredHospitals.forEach(hospital => {
       if (!hospital.lat || !hospital.lng) return;
 
-      const el = createMarkerElement(hospital, false); // 초기 생성 시 호버 상태 없음
+      const el = createMarkerElementCallback(hospital, false); // 초기 생성 시 호버 상태 없음
 
       // 호버 이벤트
       el.addEventListener('mouseenter', () => {
@@ -523,18 +469,17 @@ export default function MapLibreMap({
       if (!hospital) return;
 
       const isHovered = code === hoveredHospitalCode;
-      const el = marker.getElement();
-      const color = getMarkerColor(hospital);
-      const size = getMarkerSize(hospital, isHovered);
 
-      // 스타일 업데이트
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-      el.style.backgroundColor = color;
-
+      // 호버 상태에 따라 마커 재생성
       if (isHovered) {
-        el.style.boxShadow = '0 0 0 4px rgba(255,255,255,0.5), 0 4px 8px rgba(0,0,0,0.4)';
-        el.style.zIndex = '100';
+        // 새 마커로 교체
+        marker.remove();
+        const newEl = createMarkerElementCallback(hospital, true);
+        const newMarker = new maplibregl.Marker({ element: newEl })
+          .setLngLat([hospital.lng!, hospital.lat!])
+          .addTo(map.current!);
+
+        markersRef.current.set(code, newMarker);
 
         // 팝업 표시 (사이드바에서 호버한 경우)
         if (hospital.lng && hospital.lat) {
@@ -549,8 +494,14 @@ export default function MapLibreMap({
             .addTo(map.current!);
         }
       } else {
-        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-        el.style.zIndex = '';
+        // 호버 해제 시 원래 마커로 교체
+        marker.remove();
+        const newEl = createMarkerElementCallback(hospital, false);
+        const newMarker = new maplibregl.Marker({ element: newEl })
+          .setLngLat([hospital.lng!, hospital.lat!])
+          .addTo(map.current!);
+
+        markersRef.current.set(code, newMarker);
       }
     });
 
@@ -558,7 +509,7 @@ export default function MapLibreMap({
     if (!hoveredHospitalCode) {
       popupRef.current?.remove();
     }
-  }, [hoveredHospitalCode, filteredHospitals, getMarkerColor, getMarkerSize, isLoaded, createPopupContent]);
+  }, [hoveredHospitalCode, filteredHospitals, createMarkerElementCallback, isLoaded, createPopupContent]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>

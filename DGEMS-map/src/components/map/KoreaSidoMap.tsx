@@ -9,8 +9,7 @@ import { BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifier";
-import { getMarkerColorByBedStatus } from "@/lib/utils/markerColors";
-import { getMarkerShape as getMarkerShapeUtil, getMarkerSize as getMarkerSizeUtil, type MarkerShape } from "@/lib/utils/markerConfig";
+import { getSvgMarkerInfo, type SvgMarkerInfo } from "@/lib/utils/markerRenderer";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import { Legend } from "@/components/Legend";
 
@@ -414,75 +413,69 @@ export function KoreaSidoMap({
     return filteredHospitals.find((h) => h.code === hoveredHospitalCode) || null;
   }, [hoveredHospitalCode, filteredHospitals]);
 
-  // 마커 크기 계산 (공통 유틸 사용)
-  const getMarkerSize = (hospital: Hospital, isHovered: boolean): number => {
-    return getMarkerSizeUtil(hospital, isHovered);
-  };
-
-  // 마커 모양 가져오기 (공통 유틸 사용)
-  const getMarkerShape = (hospital: Hospital) => {
-    return getMarkerShapeUtil(hospital);
-  };
-
-  // 마커 색상 가져오기 - 공통 유틸 함수 사용
-  const getMarkerColor = (hospital: Hospital): string => {
-    return getMarkerColorByBedStatus(hospital, bedDataMap);
-  };
-
-  // SVG 마커 렌더링
+  // SVG 마커 렌더링 (공통 유틸 사용)
   const renderMarker = (
     x: number,
     y: number,
-    shape: MarkerShape,
-    color: string,
-    size: number,
+    hospital: Hospital,
     isHovered: boolean,
-    opacity: number
+    hasDiseaseData: boolean
   ) => {
-    const strokeColor = isHovered ? "#ffffff" : "#1f2937";
-    const strokeWidth = isHovered ? 1.5 : 0.5;
+    const markerInfo = getSvgMarkerInfo(hospital, bedDataMap, isHovered, !hasDiseaseData);
 
-    switch (shape) {
+    switch (markerInfo.shape) {
       case "diamond":
         // 다이아몬드 (권역응급의료센터)
-        const diamondSize = size * 1.2;
+        const diamondSize = markerInfo.size * 1.2;
         return (
           <polygon
             points={`${x},${y - diamondSize} ${x + diamondSize},${y} ${x},${y + diamondSize} ${x - diamondSize},${y}`}
-            fill={color}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-            opacity={opacity}
+            fill={markerInfo.color}
+            stroke={markerInfo.strokeColor}
+            strokeWidth={markerInfo.strokeWidth}
+            opacity={markerInfo.opacity}
           />
         );
       case "square":
-        // 사각형 (지역응급의료센터)
-        const squareSize = size * 0.9;
+        // 사각형 (응급실운영신고기관)
+        const squareSize = markerInfo.size * 0.9;
         return (
           <rect
             x={x - squareSize}
             y={y - squareSize}
             width={squareSize * 2}
             height={squareSize * 2}
-            fill={color}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-            opacity={opacity}
+            fill={markerInfo.color}
+            stroke={markerInfo.strokeColor}
+            strokeWidth={markerInfo.strokeWidth}
+            opacity={markerInfo.opacity}
             rx={0.5}
+          />
+        );
+      case "triangle":
+        // 삼각형 (지역응급의료기관)
+        const triangleSize = markerInfo.size * 1.1;
+        return (
+          <polygon
+            points={`${x},${y - triangleSize} ${x + triangleSize},${y + triangleSize * 0.5} ${x - triangleSize},${y + triangleSize * 0.5}`}
+            fill={markerInfo.color}
+            stroke={markerInfo.strokeColor}
+            strokeWidth={markerInfo.strokeWidth}
+            opacity={markerInfo.opacity}
           />
         );
       case "circle":
       default:
-        // 원형 (지역응급의료기관)
+        // 원형 (지역응급의료센터)
         return (
           <circle
             cx={x}
             cy={y}
-            r={size}
-            fill={color}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-            opacity={opacity}
+            r={markerInfo.size}
+            fill={markerInfo.color}
+            stroke={markerInfo.strokeColor}
+            strokeWidth={markerInfo.strokeWidth}
+            opacity={markerInfo.opacity}
           />
         );
     }
@@ -579,12 +572,8 @@ export function KoreaSidoMap({
 
           const rawPos = latLngToSvg(hospital.lat, hospital.lng);
           const pos = constrainToRegion(rawPos, hospital.region, hospital.code);
-          const status = getHospitalStatus(hospital);
           const isHovered = hoveredHospitalCode === hospital.code;
-          const color = getMarkerColor(hospital);
-          const shape = getMarkerShape(hospital);
-          const size = getMarkerSize(hospital, isHovered);
-          const opacity = status === "불가" ? 0.4 : hospital.hasDiseaseData ? 0.9 : 0.5;
+          const markerInfo = getSvgMarkerInfo(hospital, bedDataMap, isHovered, !hospital.hasDiseaseData);
 
           return (
             <g
@@ -597,16 +586,16 @@ export function KoreaSidoMap({
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r={size + 4}
+                  r={markerInfo.size + 4}
                   fill="transparent"
-                  stroke={color}
+                  stroke={markerInfo.color}
                   strokeWidth={1.5}
                   opacity={0.6}
                   className="animate-pulse"
                 />
               )}
               {/* 메인 마커 (모양별) */}
-              {renderMarker(pos.x, pos.y, shape, color, size, isHovered, opacity)}
+              {renderMarker(pos.x, pos.y, hospital, isHovered, hospital.hasDiseaseData)}
             </g>
           );
         })}
