@@ -436,30 +436,9 @@ export function KoreaSidoMap({
     return "circle"; // 기본값
   };
 
-  // 마커 색상 가져오기 (가용성 기반)
-  const getMarkerColor = (hospital: Hospital): string => {
-    // 27개 중증질환이 선택된 경우 해당 상태에 따른 색상
-    if (selectedSevereType && severeDataMap) {
-      const severeInfo = severeDataMap.get(hospital.code);
-      if (severeInfo) {
-        const severeStatus = (severeInfo.severeStatus[selectedSevereType] || '').trim().toUpperCase();
-        if (severeStatus === 'Y') return "#22c55e";  // 녹색 - 가능
-        if (severeStatus === 'N' || severeStatus === '불가능') return "#ef4444";  // 빨강 - 불가
-      }
-      return "#6b7280";  // 회색 - 정보없음
-    }
-
-    // 기존 44개 질환 가용성 기반 색상
-    const status = getHospitalStatus(hospital);
-    if (status) {
-      return STATUS_COLORS[status];
-    }
-    // 대구 진료정보 있는 병원은 밝은 회색, 그 외는 파란색
-    const isDaegu = hospital.region === "대구광역시";
-    if (isDaegu && hospital.hasDiseaseData) {
-      return "#9ca3af";  // 진료정보 있는 대구 병원
-    }
-    return "#60a5fa";  // 기본 파란색
+  // 마커 색상 가져오기 - 모든 마커를 녹색으로 통일
+  const getMarkerColor = (): string => {
+    return "#22c55e"; // 녹색 - 모든 마커 통일
   };
 
   // SVG 마커 렌더링
@@ -614,7 +593,7 @@ export function KoreaSidoMap({
           const pos = constrainToRegion(rawPos, hospital.region, hospital.code);
           const status = getHospitalStatus(hospital);
           const isHovered = hoveredHospitalCode === hospital.code;
-          const color = getMarkerColor(hospital);
+          const color = getMarkerColor();
           const shape = getMarkerShape(hospital);
           const size = getMarkerSize(isHovered, hospital.hasDiseaseData);
           const opacity = status === "불가" ? 0.4 : hospital.hasDiseaseData ? 0.9 : 0.5;
@@ -646,7 +625,7 @@ export function KoreaSidoMap({
       </svg>
 
       {/* 범례 */}
-      <div className={`absolute bottom-4 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border p-3 text-xs w-fit max-w-xs ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>
+      <div className={`absolute bottom-20 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border p-3 text-xs w-fit max-w-xs ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>
         <div className={`font-semibold mb-2.5 text-[11px] uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>기관분류 범례</div>
 
         {/* 기관 유형 */}

@@ -91,32 +91,10 @@ export default function MapLibreMap({
     });
   }, [hospitals, selectedRegion, selectedClassifications]);
 
-  // 마커 색상 결정
-  const getMarkerColor = useCallback((hospital: Hospital): string => {
-    // 27개 중증질환 선택 시
-    if (selectedSevereType && severeDataMap) {
-      const severeData = severeDataMap.get(hospital.code);
-      if (severeData) {
-        const status = (severeData.severeStatus?.[selectedSevereType] || '').toUpperCase();
-        if (status === 'Y') return MARKER_COLORS.available24h;
-        if (status === 'N' || status === '불가능') return MARKER_COLORS.unavailable;
-      }
-      return MARKER_COLORS.unknown;
-    }
-
-    // 병상 데이터 기반 색상
-    if (bedDataMap) {
-      const bedData = bedDataMap.get(hospital.code);
-      if (bedData && bedData.hvec !== undefined) {
-        if (bedData.hvec > 5) return MARKER_COLORS.available24h;
-        if (bedData.hvec > 0) return MARKER_COLORS.availableDay;
-        return MARKER_COLORS.unavailable;
-      }
-    }
-
-    // 기본 색상
-    return hospital.hasDiseaseData ? MARKER_COLORS.default : MARKER_COLORS.unknown;
-  }, [selectedSevereType, severeDataMap, bedDataMap]);
+  // 마커 색상 결정 - 모든 마커를 녹색으로 통일
+  const getMarkerColor = useCallback((): string => {
+    return MARKER_COLORS.available24h; // 녹색 - 모든 마커 통일
+  }, []);
 
   // 마커 크기 결정
   const getMarkerSize = useCallback((hospital: Hospital, isHovered: boolean): number => {
@@ -129,7 +107,7 @@ export default function MapLibreMap({
   // 마커 HTML 생성
   const createMarkerElement = useCallback((hospital: Hospital, isHovered: boolean): HTMLElement => {
     const el = document.createElement('div');
-    const color = getMarkerColor(hospital);
+    const color = getMarkerColor();
     const size = getMarkerSize(hospital, isHovered);
     const config = CLASSIFICATION_MARKERS[hospital.classification || '지역응급의료기관']
       || CLASSIFICATION_MARKERS['지역응급의료기관'];
@@ -552,7 +530,7 @@ export default function MapLibreMap({
 
       const isHovered = code === hoveredHospitalCode;
       const el = marker.getElement();
-      const color = getMarkerColor(hospital);
+      const color = getMarkerColor();
       const size = getMarkerSize(hospital, isHovered);
 
       // 스타일 업데이트
