@@ -10,10 +10,11 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getStyleUrl, getRegionView, CLASSIFICATION_MARKERS, MAPTILER_CONFIG } from '@/lib/maplibre/config';
+import { getStyleUrl, getRegionView, MAPTILER_CONFIG } from '@/lib/maplibre/config';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { parseMessage, getStatusColorClasses } from '@/lib/utils/messageClassifier';
 import { getMarkerColorByBedStatus } from '@/lib/utils/markerColors';
+import { getMarkerConfig, getMarkerSize } from '@/lib/utils/markerConfig';
 import { Legend } from '@/components/Legend';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
 import type { Hospital } from '@/types';
@@ -98,21 +99,12 @@ export default function MapLibreMap({
     return getMarkerColorByBedStatus(hospital, bedDataMap);
   }, [bedDataMap]);
 
-  // 마커 크기 결정
-  const getMarkerSize = useCallback((hospital: Hospital, isHovered: boolean): number => {
-    const baseConfig = CLASSIFICATION_MARKERS[hospital.classification || '지역응급의료기관']
-      || CLASSIFICATION_MARKERS['지역응급의료기관'];
-
-    return isHovered ? baseConfig.size * 1.5 : baseConfig.size;
-  }, []);
-
   // 마커 HTML 생성
   const createMarkerElement = useCallback((hospital: Hospital, isHovered: boolean): HTMLElement => {
     const el = document.createElement('div');
     const color = getMarkerColor(hospital);
     const size = getMarkerSize(hospital, isHovered);
-    const config = CLASSIFICATION_MARKERS[hospital.classification || '지역응급의료기관']
-      || CLASSIFICATION_MARKERS['지역응급의료기관'];
+    const config = getMarkerConfig(hospital);
 
     el.className = 'maplibre-marker';
     el.style.cursor = 'pointer';

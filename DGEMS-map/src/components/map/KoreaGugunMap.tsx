@@ -10,6 +10,7 @@ import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifier";
 import { getMarkerColorByBedStatus } from "@/lib/utils/markerColors";
+import { getMarkerShape as getMarkerShapeUtil, getMarkerSize as getMarkerSizeUtil, type MarkerShape } from "@/lib/utils/markerConfig";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import { Legend } from "@/components/Legend";
 
@@ -88,16 +89,6 @@ const STATUS_COLORS: Record<AvailabilityStatus, string> = {
   "주간": "#3b82f6",
   "야간": "#a855f7",
   "불가": "#6b7280",
-};
-
-// 기관종류별 마커 모양 타입
-type MarkerShape = "diamond" | "square" | "circle";
-
-// 기관종류 → 마커 모양 매핑
-const CLASSIFICATION_TO_SHAPE: Record<string, MarkerShape> = {
-  "권역응급의료센터": "diamond",
-  "지역응급의료센터": "square",
-  "지역응급의료기관": "circle",
 };
 
 export function KoreaGugunMap({
@@ -309,17 +300,14 @@ export function KoreaGugunMap({
     return filteredHospitals.find((h) => h.code === hoveredHospitalCode) || null;
   }, [hoveredHospitalCode, filteredHospitals]);
 
-  // 마커 크기 계산
-  const getMarkerSize = (isHovered: boolean): number => {
-    return isHovered ? 10 : 7;
+  // 마커 크기 계산 (공통 유틸 사용)
+  const getMarkerSize = (hospital: Hospital, isHovered: boolean): number => {
+    return getMarkerSizeUtil(hospital, isHovered);
   };
 
-  // 마커 모양 가져오기
-  const getMarkerShape = (hospital: Hospital): MarkerShape => {
-    if (hospital.classification && CLASSIFICATION_TO_SHAPE[hospital.classification]) {
-      return CLASSIFICATION_TO_SHAPE[hospital.classification];
-    }
-    return "circle"; // 기본값
+  // 마커 모양 가져오기 (공통 유틸 사용)
+  const getMarkerShape = (hospital: Hospital) => {
+    return getMarkerShapeUtil(hospital);
   };
 
   // 마커 색상 가져오기 - 공통 유틸 함수 사용
@@ -436,7 +424,7 @@ export function KoreaGugunMap({
           const isHovered = hoveredHospitalCode === hospital.code;
           const color = getMarkerColor(hospital);
           const shape = getMarkerShape(hospital);
-          const size = getMarkerSize(isHovered);
+          const size = getMarkerSize(hospital, isHovered);
 
           return (
             <g
