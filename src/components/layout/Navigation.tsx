@@ -8,6 +8,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { useTheme } from '@/lib/contexts/ThemeContext';
 
 const NAV_ITEMS = [
   { href: '/', label: '병상현황', description: '응급실 병상 현황' },
@@ -34,12 +35,13 @@ function SkipNavigation() {
 
 export default function Navigation() {
   const pathname = usePathname();
+  const { isDark } = useTheme();
 
   return (
     <>
       <SkipNavigation />
       <nav
-        className="bg-[#0a3a82] text-white relative z-40 overflow-visible"
+        className={`${isDark ? 'bg-gray-800' : 'bg-[#0a3a82]'} text-white relative z-40 overflow-visible`}
         role="navigation"
         aria-label="메인 네비게이션"
       >
@@ -48,7 +50,7 @@ export default function Navigation() {
             {/* 로고 */}
             <Link
               href="/"
-              className="font-bold text-lg hover:text-blue-200 transition-colors"
+              className={`font-bold text-lg transition-colors ${isDark ? 'hover:text-gray-300' : 'hover:text-blue-200'}`}
               aria-label="DGER 홈으로 이동"
             >
               DGER
@@ -64,8 +66,8 @@ export default function Navigation() {
                     href={item.href}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive
-                        ? 'bg-white/20 text-white'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? isDark ? 'bg-gray-600 text-white' : 'bg-white/20 text-white'
+                        : isDark ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-white/80 hover:text-white hover:bg-white/10'
                     }`}
                     title={item.description}
                     aria-label={item.description}

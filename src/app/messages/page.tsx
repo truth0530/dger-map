@@ -86,7 +86,7 @@ const SEVERE_TYPE_OPTIONS = [
 // 기관분류 필터 옵션
 const ORG_TYPE_OPTIONS = [
   { value: '권역응급의료센터', label: '권역', shortLabel: '권' },
-  { value: '지역응급의료센터', label: '지역', shortLabel: '센' },
+  { value: '지역응급의료센터', label: '센터', shortLabel: '센' },
   { value: '지역응급의료기관', label: '기관', shortLabel: '기' }
 ];
 
@@ -373,51 +373,58 @@ export default function MessagesPage() {
     }
   }, [selectedRegion, hospitalTypeMap, loadAllHospitalData]);
 
-  // 필터링된 메시지
+  // 필터링된 메시지 - 개별 메시지 단위로 필터링
   const filteredMessages = useMemo(() => {
     const hospitalSearchLower = hospitalSearch.toLowerCase();
     const messageSearchLower = messageSearch.toLowerCase();
 
-    return allMessages.filter(hospital => {
-      // 병원명 필터
-      if (hospitalSearchLower && !hospital.name.toLowerCase().includes(hospitalSearchLower)) {
-        return false;
-      }
-
-      // 기관분류 필터
-      const hospitalType = getHospitalLevel(hospital);
-      if (!selectedOrgTypes.includes(hospitalType)) {
-        return false;
-      }
-
-      // 메시지 필터
-      const hasMatchingMessage = hospital.messages.some(msg => {
-        // 메시지 검색
-        if (messageSearchLower) {
-          const symptomLower = (msg.standardizedSymptom || '').toLowerCase();
-          if (!msg.msg.toLowerCase().includes(messageSearchLower) && !symptomLower.includes(messageSearchLower)) {
-            return false;
-          }
+    return allMessages
+      .map(hospital => {
+        // 병원명 필터
+        if (hospitalSearchLower && !hospital.name.toLowerCase().includes(hospitalSearchLower)) {
+          return null;
         }
 
-        // 질환 필터
-        if (selectedSevereType) {
-          const keywords = selectedSevereType
-            .replace(/[\[\]]/g, '')
-            .split(/\s+/)
-            .filter(word => word.length > 1);
-
-          const symptomLower = (msg.standardizedSymptom || '').toLowerCase();
-          if (!keywords.every(keyword => symptomLower.includes(keyword.toLowerCase()))) {
-            return false;
-          }
+        // 기관분류 필터
+        const hospitalType = getHospitalLevel(hospital);
+        if (!selectedOrgTypes.includes(hospitalType)) {
+          return null;
         }
 
-        return true;
-      });
+        // 개별 메시지 필터링
+        const filteredMsgs = hospital.messages.filter(msg => {
+          // 메시지 검색 - 메시지 내용 또는 증상명에서 검색
+          if (messageSearchLower) {
+            const msgLower = msg.msg.toLowerCase();
+            const symptomLower = (msg.standardizedSymptom || '').toLowerCase();
+            if (!msgLower.includes(messageSearchLower) && !symptomLower.includes(messageSearchLower)) {
+              return false;
+            }
+          }
 
-      return hasMatchingMessage;
-    });
+          // 질환 필터
+          if (selectedSevereType) {
+            const keywords = selectedSevereType
+              .replace(/[\[\]]/g, '')
+              .split(/\s+/)
+              .filter(word => word.length > 1);
+
+            const symptomLower = (msg.standardizedSymptom || '').toLowerCase();
+            if (!keywords.every(keyword => symptomLower.includes(keyword.toLowerCase()))) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+
+        // 필터링된 메시지가 있는 경우에만 병원 반환
+        if (filteredMsgs.length > 0) {
+          return { ...hospital, messages: filteredMsgs };
+        }
+        return null;
+      })
+      .filter((h): h is HospitalWithMessages => h !== null);
   }, [allMessages, hospitalSearch, messageSearch, selectedSevereType, selectedOrgTypes, getHospitalLevel]);
 
   // 병원 그룹 토글
@@ -489,14 +496,14 @@ export default function MessagesPage() {
               return (
                 <label
                   key={option.value}
-                  className={`inline-flex items-center gap-1 px-2.5 text-xs cursor-pointer border-2 rounded transition-colors ${
+                  className={`inline-flex items-center gap-1 px-2.5 text-xs font-medium cursor-pointer border-2 rounded transition-colors ${
                     isSelected
                       ? isDark
                         ? 'bg-blue-600 text-white border-blue-600'
                         : 'bg-[#0a3a82] text-white border-[#0a3a82]'
                       : isDark
-                        ? 'bg-gray-700 text-gray-300 border-gray-600'
-                        : 'bg-white text-gray-700 border-gray-300'
+                        ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                        : 'bg-white text-gray-800 border-gray-400 hover:bg-gray-100'
                   }`}
                   style={{ height: '32px', lineHeight: '28px' }}
                 >

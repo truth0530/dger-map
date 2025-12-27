@@ -326,13 +326,16 @@ export default function HomePage() {
             {(Object.keys(orgTypes) as (keyof OrgTypes)[]).map((key) => (
               <label
                 key={key}
-                className={`px-2 py-1.5 text-sm rounded border cursor-pointer transition-colors h-9 flex items-center whitespace-nowrap ${
+                className={`px-2.5 py-1.5 text-xs font-medium rounded border-2 cursor-pointer transition-colors flex items-center whitespace-nowrap ${
                   orgTypes[key]
-                    ? 'bg-[#0a3a82] text-white border-[#0a3a82]'
+                    ? isDark
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-[#0a3a82] text-white border-[#0a3a82]'
                     : isDark
-                      ? 'bg-gray-800 text-gray-300 border-gray-600'
-                      : 'bg-white text-gray-700 border-gray-300'
+                      ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                      : 'bg-white text-gray-800 border-gray-400 hover:bg-gray-100'
                 }`}
+                style={{ height: '32px' }}
               >
                 <input
                   type="checkbox"

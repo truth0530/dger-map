@@ -116,13 +116,12 @@
     @apply border-border outline-ring/50;
     box-sizing: border-box;
   }
-  html, body, #__next {
-    width: 100vw;
-    height: 100vh;
+  html, body {
+    width: 100%;
     min-height: 100vh;
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    overflow-x: hidden;
   }
   body {
     @apply bg-background text-foreground;
