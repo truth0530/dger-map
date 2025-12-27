@@ -9,6 +9,7 @@ import { BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifier";
+import { getMarkerColorByBedStatus } from "@/lib/utils/markerColors";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import { Legend } from "@/components/Legend";
 
@@ -321,9 +322,9 @@ export function KoreaGugunMap({
     return "circle"; // 기본값
   };
 
-  // 마커 색상 가져오기 - 모든 마커를 녹색으로 통일
-  const getMarkerColor = (): string => {
-    return "#22c55e"; // 녹색 - 모든 마커 통일
+  // 마커 색상 가져오기 - 공통 유틸 함수 사용
+  const getMarkerColor = (hospital: Hospital): string => {
+    return getMarkerColorByBedStatus(hospital, bedDataMap);
   };
 
   // SVG 마커 렌더링
@@ -433,7 +434,7 @@ export function KoreaGugunMap({
 
           const status = getHospitalStatus(hospital);
           const isHovered = hoveredHospitalCode === hospital.code;
-          const color = getMarkerColor();
+          const color = getMarkerColor(hospital);
           const shape = getMarkerShape(hospital);
           const size = getMarkerSize(isHovered);
 

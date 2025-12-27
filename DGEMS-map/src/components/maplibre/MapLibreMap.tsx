@@ -10,9 +10,10 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getStyleUrl, getRegionView, MARKER_COLORS, CLASSIFICATION_MARKERS, MAPTILER_CONFIG } from '@/lib/maplibre/config';
+import { getStyleUrl, getRegionView, CLASSIFICATION_MARKERS, MAPTILER_CONFIG } from '@/lib/maplibre/config';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { parseMessage, getStatusColorClasses } from '@/lib/utils/messageClassifier';
+import { getMarkerColorByBedStatus } from '@/lib/utils/markerColors';
 import { Legend } from '@/components/Legend';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
 import type { Hospital } from '@/types';
@@ -92,10 +93,10 @@ export default function MapLibreMap({
     });
   }, [hospitals, selectedRegion, selectedClassifications]);
 
-  // 마커 색상 결정 - 모든 마커를 녹색으로 통일
-  const getMarkerColor = useCallback((): string => {
-    return MARKER_COLORS.available24h; // 녹색 - 모든 마커 통일
-  }, []);
+  // 마커 색상 결정 - 공통 유틸 함수 사용
+  const getMarkerColor = useCallback((hospital: Hospital): string => {
+    return getMarkerColorByBedStatus(hospital, bedDataMap);
+  }, [bedDataMap]);
 
   // 마커 크기 결정
   const getMarkerSize = useCallback((hospital: Hospital, isHovered: boolean): number => {
@@ -108,7 +109,7 @@ export default function MapLibreMap({
   // 마커 HTML 생성
   const createMarkerElement = useCallback((hospital: Hospital, isHovered: boolean): HTMLElement => {
     const el = document.createElement('div');
-    const color = getMarkerColor();
+    const color = getMarkerColor(hospital);
     const size = getMarkerSize(hospital, isHovered);
     const config = CLASSIFICATION_MARKERS[hospital.classification || '지역응급의료기관']
       || CLASSIFICATION_MARKERS['지역응급의료기관'];
@@ -531,7 +532,7 @@ export default function MapLibreMap({
 
       const isHovered = code === hoveredHospitalCode;
       const el = marker.getElement();
-      const color = getMarkerColor();
+      const color = getMarkerColor(hospital);
       const size = getMarkerSize(hospital, isHovered);
 
       // 스타일 업데이트
