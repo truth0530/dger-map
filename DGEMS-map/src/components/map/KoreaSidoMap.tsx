@@ -10,6 +10,7 @@ import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifier";
 import { useTheme } from "@/lib/contexts/ThemeContext";
+import { Legend } from "@/components/Legend";
 
 // 전국 좌표 범위 (위도/경도 → SVG viewBox 변환용)
 // SVG viewBox: 0 0 800 759
@@ -624,26 +625,8 @@ export function KoreaSidoMap({
         })}
       </svg>
 
-      {/* 범례 */}
-      <div className={`absolute bottom-20 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border p-3 text-xs w-fit max-w-xs ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>
-        <div className={`font-semibold mb-2.5 text-[11px] uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>기관분류 범례</div>
-
-        {/* 기관 유형 */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5 flex-nowrap">
-            <div className="w-3 h-3 flex-shrink-0 bg-emerald-500 shadow-sm" style={{minWidth: '12px'}} />
-            <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>권역응급의료센터</span>
-          </div>
-          <div className="flex items-center gap-2.5 flex-nowrap">
-            <div className="w-3 h-3 flex-shrink-0 bg-emerald-500 rounded-full shadow-sm" style={{minWidth: '12px'}} />
-            <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>지역응급의료센터</span>
-          </div>
-          <div className="flex items-center gap-2.5 flex-nowrap">
-            <div className="w-0 h-0 flex-shrink-0 shadow-sm" style={{borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '10px solid rgb(16, 185, 129)'}} />
-            <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>지역응급의료기관</span>
-          </div>
-        </div>
-      </div>
+      {/* 범례 - 공통 Legend 컴포넌트 사용 */}
+      <Legend position="bottom-left" showBedStatus={false} />
 
       {/* 병원 호버 툴팁 - 개선된 디자인 */}
       {hoveredHospital && (() => {

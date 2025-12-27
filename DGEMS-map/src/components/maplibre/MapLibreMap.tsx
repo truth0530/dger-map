@@ -13,6 +13,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { getStyleUrl, getRegionView, MARKER_COLORS, CLASSIFICATION_MARKERS, MAPTILER_CONFIG } from '@/lib/maplibre/config';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { parseMessage, getStatusColorClasses } from '@/lib/utils/messageClassifier';
+import { Legend } from '@/components/Legend';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
 import type { Hospital } from '@/types';
 import type { HospitalBedData } from '@/lib/hooks/useBedData';
@@ -665,47 +666,8 @@ export default function MapLibreMap({
         </button>
       </div>
 
-      {/* 범례 */}
-      <div className={`absolute bottom-20 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border p-3 text-xs w-fit max-w-xs max-h-64 overflow-y-auto ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>
-        <div className={`font-semibold mb-2.5 text-[11px] uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>기관분류 범례</div>
-
-        {/* 기관 유형 */}
-        <div className="mb-3">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5 flex-nowrap">
-              <div className="w-3 h-3 flex-shrink-0 bg-emerald-500 shadow-sm" style={{minWidth: '12px'}} />
-              <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>권역응급의료센터</span>
-            </div>
-            <div className="flex items-center gap-2.5 flex-nowrap">
-              <div className="w-3 h-3 flex-shrink-0 bg-emerald-500 rounded-full shadow-sm" style={{minWidth: '12px'}} />
-              <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>지역응급의료센터</span>
-            </div>
-            <div className="flex items-center gap-2.5 flex-nowrap">
-              <div className="w-0 h-0 flex-shrink-0 shadow-sm" style={{borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '10px solid rgb(16, 185, 129)'}} />
-              <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>지역응급의료기관</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 병상 상태 */}
-        <div className={`border-t pt-2.5 ${isDark ? 'border-gray-700/50' : 'border-gray-300/50'}`}>
-          <div className={`font-semibold text-[9px] uppercase mb-1.5 tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>병상 상태</div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5 flex-nowrap">
-              <div className="w-2 h-2 flex-shrink-0 bg-green-500 rounded-full shadow-sm" />
-              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>여유 있음</span>
-            </div>
-            <div className="flex items-center gap-2.5 flex-nowrap">
-              <div className="w-2 h-2 flex-shrink-0 bg-blue-500 rounded-full shadow-sm" />
-              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>적정 수준</span>
-            </div>
-            <div className="flex items-center gap-2.5 flex-nowrap">
-              <div className="w-2 h-2 flex-shrink-0 bg-red-500 rounded-full shadow-sm" />
-              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>부족</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* 범례 - 공통 Legend 컴포넌트 사용 */}
+      <Legend position="bottom-left" showBedStatus={true} />
 
       {/* 병원 수 표시 */}
       <div className={`absolute top-4 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border px-3 py-2 ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>
