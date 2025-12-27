@@ -39,15 +39,16 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     localStorage.setItem('theme', newTheme);
   };
 
-  // 초기 테마 로드
+  // 초기 테마 로드 (기본값: 다크 모드)
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as Theme | null;
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+    // 저장된 테마가 없으면 다크 모드로 기본 설정
+    const initialTheme = savedTheme || 'dark';
     setTheme(initialTheme);
     applyTheme(initialTheme);
   }, []);
+
   // 테마 토글
   const toggleTheme = () => {
     const newTheme: Theme = theme === 'dark' ? 'light' : 'dark';

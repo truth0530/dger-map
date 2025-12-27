@@ -12,6 +12,8 @@ import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifi
 import { getSvgMarkerInfo, type SvgMarkerInfo } from "@/lib/utils/markerRenderer";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import { Legend } from "@/components/Legend";
+import { latLngToSvgAffine } from "@/lib/utils/coordinateCalibration";
+import { calculateNormalizedBoundsForSvg } from "@/lib/utils/svgAspectRatioFix";
 
 // 전국 좌표 범위 (위도/경도 → SVG viewBox 변환용)
 // SVG viewBox: 0 0 800 759
@@ -277,14 +279,15 @@ export function KoreaSidoMap({
     });
   }, [hospitals, selectedClassifications, selectedDisease, selectedDay, selectedStatus, diseaseData]);
 
-  // 위도/경도를 SVG 좌표로 변환
+  // 위도/경도를 SVG 좌표로 변환 (종횡비 보정 + Affine 변환 사용)
   const latLngToSvg = useCallback((lat: number, lng: number): { x: number; y: number } => {
-    const { minLat, maxLat, minLng, maxLng } = KOREA_BOUNDS;
+    // SVG의 실제 종횡비에 맞게 geographic bounds 정규화
+    // 전국 지도는 "전국" region을 사용하여 bounds 정규화
+    const normalizedBounds = calculateNormalizedBoundsForSvg(KOREA_BOUNDS, "전국");
 
-    const x = ((lng - minLng) / (maxLng - minLng)) * svgDimensions.width;
-    const y = ((maxLat - lat) / (maxLat - minLat)) * svgDimensions.height;
-
-    return { x, y };
+    // Affine 좌표 변환 적용 (정확도 향상)
+    const pos = latLngToSvgAffine(lat, lng, normalizedBounds, svgDimensions.width, svgDimensions.height);
+    return pos || { x: 0, y: 0 }; // fallback
   }, [svgDimensions]);
 
   // 병원 좌표를 시도 경계 내로 제한

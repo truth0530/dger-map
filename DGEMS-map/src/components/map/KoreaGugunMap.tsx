@@ -12,6 +12,8 @@ import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifi
 import { getSvgMarkerInfo, type SvgMarkerInfo } from "@/lib/utils/markerRenderer";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import { Legend } from "@/components/Legend";
+import { latLngToSvgAffine, calculateBoundsFromHospitals, CALIBRATED_REGION_BOUNDS } from "@/lib/utils/coordinateCalibration";
+import { calculateNormalizedBoundsForSvg } from "@/lib/utils/svgAspectRatioFix";
 
 // 시도명 → SVG 파일명 매핑
 const SIDO_TO_SVG_FILE: Record<string, string> = {
@@ -209,20 +211,22 @@ export function KoreaGugunMap({
     });
   }, [hospitals, selectedRegion, selectedClassifications, selectedDisease, selectedDay, selectedStatus, diseaseData]);
 
-  // 위도/경도를 SVG 좌표로 변환
+  // 위도/경도를 SVG 좌표로 변환 (종횡비 보정 + Affine 변환 사용)
   const latLngToSvg = useCallback((lat: number, lng: number): { x: number; y: number } | null => {
-    const bounds = REGION_BOUNDS[selectedRegion];
+    // 1. 병원 데이터 기반 동적 bounds 계산 (최초 1회)
+    const dynamicBounds = calculateBoundsFromHospitals(hospitals, selectedRegion);
+
+    // 2. 동적 bounds가 없으면 사전정의된 보정 bounds 사용
+    let bounds = dynamicBounds || CALIBRATED_REGION_BOUNDS[selectedRegion];
     if (!bounds) return null;
 
-    const { minLat, maxLat, minLng, maxLng } = bounds;
+    // 3. SVG viewBox 의 종횡비에 맞게 geographic bounds 정규화
+    // SVG 파일의 실제 proportions에 맞춰 좌표 범위를 조정하여 정확한 매핑 보장
+    bounds = calculateNormalizedBoundsForSvg(bounds, selectedRegion);
 
-    // 위도는 Y축 (위쪽이 큰 값이므로 반전)
-    // 경도는 X축
-    const x = ((lng - minLng) / (maxLng - minLng)) * svgDimensions.width;
-    const y = ((maxLat - lat) / (maxLat - minLat)) * svgDimensions.height;
-
-    return { x, y };
-  }, [selectedRegion, svgDimensions]);
+    // 4. Affine 좌표 변환 적용 (정확도 향상)
+    return latLngToSvgAffine(lat, lng, bounds, svgDimensions.width, svgDimensions.height);
+  }, [selectedRegion, svgDimensions, hospitals]);
 
   // 병원 가용성 상태 가져오기
   const getHospitalStatus = useCallback((hospital: Hospital): AvailabilityStatus | null => {
