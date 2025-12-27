@@ -2,9 +2,8 @@
 
 /**
  * 중증응급질환 수용가능 현황 페이지
- * 원본: dger-api/public/27severe-react2.html
- *
- * dger-api와 동일한 구조, Next.js에 맞게 변환
+ * 원본: dger-api/public/27severe.html
+ * 완전히 동일하게 구현
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -12,247 +11,508 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 
 // 중증질환 코드 목록 (dger-api와 동일)
 const SEVERE_CODES = [
-  { qn: '1',  label: '[재관류중재술] 심근경색', field: 'MKioskTy1' },
-  { qn: '2',  label: '[재관류중재술] 뇌경색', field: 'MKioskTy2' },
-  { qn: '3',  label: '[뇌출혈수술] 거미막하출혈', field: 'MKioskTy3' },
-  { qn: '4',  label: '[뇌출혈수술] 거미막하출혈 외', field: 'MKioskTy4' },
-  { qn: '5',  label: '[대동맥응급] 흉부', field: 'MKioskTy5' },
-  { qn: '6',  label: '[대동맥응급] 복부', field: 'MKioskTy6' },
-  { qn: '7',  label: '[담낭담관질환] 담낭질환', field: 'MKioskTy7' },
-  { qn: '8',  label: '[담낭담관질환] 담도포함질환', field: 'MKioskTy8' },
-  { qn: '9',  label: '[복부응급수술] 비외상', field: 'MKioskTy9' },
-  { qn: '10', label: '[장중첩/폐색] 영유아', field: 'MKioskTy10' },
-  { qn: '11', label: '[응급내시경] 성인 위장관', field: 'MKioskTy11' },
-  { qn: '12', label: '[응급내시경] 영유아 위장관', field: 'MKioskTy12' },
-  { qn: '13', label: '[응급내시경] 성인 기관지', field: 'MKioskTy13' },
-  { qn: '14', label: '[응급내시경] 영유아 기관지', field: 'MKioskTy14' },
-  { qn: '15', label: '[저체중출생아] 집중치료', field: 'MKioskTy15' },
-  { qn: '16', label: '[산부인과응급] 분만', field: 'MKioskTy16' },
-  { qn: '17', label: '[산부인과응급] 산과수술', field: 'MKioskTy17' },
-  { qn: '18', label: '[산부인과응급] 부인과수술', field: 'MKioskTy18' },
-  { qn: '19', label: '[중증화상] 전문치료', field: 'MKioskTy19' },
-  { qn: '20', label: '[사지접합] 수족지접합', field: 'MKioskTy20' },
-  { qn: '21', label: '[사지접합] 수족지접합 외', field: 'MKioskTy21' },
-  { qn: '22', label: '[응급투석] HD', field: 'MKioskTy22' },
-  { qn: '23', label: '[응급투석] CRRT', field: 'MKioskTy23' },
-  { qn: '24', label: '[정신과적응급] 폐쇄병동입원', field: 'MKioskTy24' },
-  { qn: '25', label: '[안과적수술] 응급', field: 'MKioskTy25' },
-  { qn: '26', label: '[영상의학혈관중재] 성인', field: 'MKioskTy26' },
-  { qn: '27', label: '[영상의학혈관중재] 영유아', field: 'MKioskTy27' }
+  { qn: 1,  label: '[재관류중재술] 심근경색', field: 'MKioskTy1' },
+  { qn: 2,  label: '[재관류중재술] 뇌경색', field: 'MKioskTy2' },
+  { qn: 3,  label: '[뇌출혈수술] 거미막하출혈', field: 'MKioskTy3' },
+  { qn: 4,  label: '[뇌출혈수술] 거미막하출혈 외', field: 'MKioskTy4' },
+  { qn: 5,  label: '[대동맥응급] 흉부', field: 'MKioskTy5' },
+  { qn: 6,  label: '[대동맥응급] 복부', field: 'MKioskTy6' },
+  { qn: 7,  label: '[담낭담관질환] 담낭질환', field: 'MKioskTy7' },
+  { qn: 8,  label: '[담낭담관질환] 담도포함질환', field: 'MKioskTy8' },
+  { qn: 9,  label: '[복부응급수술] 비외상', field: 'MKioskTy9' },
+  { qn: 10, label: '[장중첩/폐색] 영유아', field: 'MKioskTy10' },
+  { qn: 11, label: '[응급내시경] 성인 위장관', field: 'MKioskTy11' },
+  { qn: 12, label: '[응급내시경] 영유아 위장관', field: 'MKioskTy12' },
+  { qn: 13, label: '[응급내시경] 성인 기관지', field: 'MKioskTy13' },
+  { qn: 14, label: '[응급내시경] 영유아 기관지', field: 'MKioskTy14' },
+  { qn: 15, label: '[저체중출생아] 집중치료', field: 'MKioskTy15' },
+  { qn: 16, label: '[산부인과응급] 분만', field: 'MKioskTy16' },
+  { qn: 17, label: '[산부인과응급] 산과수술', field: 'MKioskTy17' },
+  { qn: 18, label: '[산부인과응급] 부인과수술', field: 'MKioskTy18' },
+  { qn: 19, label: '[중증화상] 전문치료', field: 'MKioskTy19' },
+  { qn: 20, label: '[사지접합] 수족지접합', field: 'MKioskTy20' },
+  { qn: 21, label: '[사지접합] 수족지접합 외', field: 'MKioskTy21' },
+  { qn: 22, label: '[응급투석] HD', field: 'MKioskTy22' },
+  { qn: 23, label: '[응급투석] CRRT', field: 'MKioskTy23' },
+  { qn: 24, label: '[정신과적응급] 폐쇄병동입원', field: 'MKioskTy24' },
+  { qn: 25, label: '[안과적수술] 응급', field: 'MKioskTy25' },
+  { qn: 26, label: '[영상의학혈관중재] 성인', field: 'MKioskTy26' },
+  { qn: 27, label: '[영상의학혈관중재] 영유아', field: 'MKioskTy27' }
 ];
 
-interface DiseaseStats {
+// 시도명 매핑
+const REGION_OPTIONS = [
+  { value: '대구', label: '대구' },
+  { value: '서울특별시', label: '서울' },
+  { value: '부산광역시', label: '부산' },
+  { value: '인천광역시', label: '인천' },
+  { value: '광주광역시', label: '광주' },
+  { value: '대전광역시', label: '대전' },
+  { value: '울산광역시', label: '울산' },
+  { value: '경기도', label: '경기' },
+  { value: '강원특별자치도', label: '강원' },
+  { value: '충청북도', label: '충북' },
+  { value: '충청남도', label: '충남' },
+  { value: '전북특별자치도', label: '전북' },
+  { value: '전라남도', label: '전남' },
+  { value: '경상북도', label: '경북' },
+  { value: '경상남도', label: '경남' },
+  { value: '제주특별자치도', label: '제주' },
+  { value: '세종특별자치시', label: '세종' }
+];
+
+interface HospitalInfo {
+  name: string;
+  hpid: string;
+  status: string;
+  dutyEmclsName?: string;
+  occupancy: number;
+}
+
+interface DiseaseData {
   name: string;
   available: number;
   unavailable: number;
-  unknown: number;
-  rate: number;
+  noInfo: number;
+  availableHospitals: HospitalInfo[];
+  unavailableHospitals: HospitalInfo[];
+  noInfoHospitals: HospitalInfo[];
+}
+
+interface BedInfo {
+  dutyName: string;
+  dutyEmclsName: string;
+  hvec: number;
+  hvs01: number;
+  hv27: number;
+  HVS59: number;
+  hv29: number;
+  HVS03: number;
+  hv30: number;
+  HVS04: number;
+  hv28: number;
+  HVS02: number;
+  hv15: number;
+  HVS48: number;
+  hv16: number;
+  HVS49: number;
+}
+
+// 재실인원 계산 함수 (dger-api/js/utils.js와 동일)
+function calculateTotalOccupancy(bedInfo: BedInfo): number {
+  // 응급실 + 중환자실 재실인원
+  const hvs01 = bedInfo.hvs01 || 0; // 응급실 재실
+  const HVS59 = bedInfo.HVS59 || 0; // 응급전용 중환자실 재실
+  const HVS03 = bedInfo.HVS03 || 0; // 신경과 중환자실 재실
+  const HVS04 = bedInfo.HVS04 || 0; // 신생아 중환자실 재실
+  const HVS02 = bedInfo.HVS02 || 0; // 일반 중환자실 재실
+  const HVS48 = bedInfo.HVS48 || 0; // 외과 중환자실 재실
+  const HVS49 = bedInfo.HVS49 || 0; // 심장내과 중환자실 재실
+
+  return hvs01 + HVS59 + HVS03 + HVS04 + HVS02 + HVS48 + HVS49;
+}
+
+// 센터급 병원 판별
+function isCenterHospital(dutyEmclsName?: string): boolean {
+  const centerTypes = ['권역응급의료센터', '지역응급의료센터', '전문응급의료센터'];
+  return centerTypes.includes(dutyEmclsName || '');
 }
 
 export default function SeverePage() {
   const { isDark } = useTheme();
   const [selectedRegion, setSelectedRegion] = useState('대구');
-  const [diseaseStats, setDiseaseStats] = useState<Record<string, DiseaseStats>>({});
+  const [diseaseData, setDiseaseData] = useState<Record<number, DiseaseData>>({});
   const [loading, setLoading] = useState(false);
+  const [expandedCards, setExpandedCards] = useState<Record<number, string | null>>({});
+  const [allExpanded, setAllExpanded] = useState(false);
 
-  // 질환 통계 로드 (dger-api와 동일)
-  const loadDiseaseStats = useCallback(async () => {
+  // 질환 데이터 로드
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        STAGE1: selectedRegion,
-        numOfRows: '1000',
-        pageNo: '1'
-      });
+      // 시도명 매핑
+      const mappedRegion = selectedRegion === '대구' ? '대구광역시' : selectedRegion;
 
-      const response = await fetch(`/api/severe-diseases?${params}`);
-      if (!response.ok) throw new Error('통계 로드 실패');
+      // 중증질환 API와 병상정보 API 병렬 호출
+      const [severeResponse, bedResponse] = await Promise.all([
+        fetch(`/api/severe-diseases?STAGE1=${encodeURIComponent(mappedRegion)}&numOfRows=1000&pageNo=1`),
+        fetch(`/api/bed-info?region=${encodeURIComponent(mappedRegion)}`)
+      ]);
 
-      const xml = await response.text();
+      if (!severeResponse.ok) throw new Error('중증질환 데이터 로드 실패');
+
+      // 병상정보 파싱
+      const bedInfoMap = new Map<string, BedInfo>();
+      if (bedResponse.ok) {
+        const bedXml = await bedResponse.text();
+        const bedParser = new DOMParser();
+        const bedDoc = bedParser.parseFromString(bedXml, 'text/xml');
+        const bedItems = bedDoc.querySelectorAll('item');
+
+        Array.from(bedItems).forEach(item => {
+          const hpid = item.querySelector('hpid')?.textContent || '';
+          if (hpid) {
+            const info: BedInfo = {
+              dutyName: item.querySelector('dutyName')?.textContent || '',
+              dutyEmclsName: item.querySelector('dutyEmclsName')?.textContent || '',
+              hvec: parseInt(item.querySelector('hvec')?.textContent || '0'),
+              hvs01: parseInt(item.querySelector('hvs01')?.textContent || '0'),
+              hv27: parseInt(item.querySelector('hv27')?.textContent || '0'),
+              HVS59: parseInt(item.querySelector('HVS59')?.textContent || '0'),
+              hv29: parseInt(item.querySelector('hv29')?.textContent || '0'),
+              HVS03: parseInt(item.querySelector('HVS03')?.textContent || '0'),
+              hv30: parseInt(item.querySelector('hv30')?.textContent || '0'),
+              HVS04: parseInt(item.querySelector('HVS04')?.textContent || '0'),
+              hv28: parseInt(item.querySelector('hv28')?.textContent || '0'),
+              HVS02: parseInt(item.querySelector('HVS02')?.textContent || '0'),
+              hv15: parseInt(item.querySelector('hv15')?.textContent || '0'),
+              HVS48: parseInt(item.querySelector('HVS48')?.textContent || '0'),
+              hv16: parseInt(item.querySelector('hv16')?.textContent || '0'),
+              HVS49: parseInt(item.querySelector('HVS49')?.textContent || '0')
+            };
+            bedInfoMap.set(hpid, info);
+          }
+        });
+      }
+
+      // 중증질환 데이터 파싱
+      const severeXml = await severeResponse.text();
       const parser = new DOMParser();
-      const doc = parser.parseFromString(xml, 'text/xml');
+      const doc = parser.parseFromString(severeXml, 'text/xml');
       const items = doc.querySelectorAll('item');
 
-      const stats: Record<string, DiseaseStats> = {};
+      const data: Record<number, DiseaseData> = {};
+
+      // 초기화
       SEVERE_CODES.forEach(disease => {
-        stats[disease.qn] = {
+        data[disease.qn] = {
           name: disease.label,
           available: 0,
           unavailable: 0,
-          unknown: 0,
-          rate: 0
+          noInfo: 0,
+          availableHospitals: [],
+          unavailableHospitals: [],
+          noInfoHospitals: []
         };
       });
 
+      // 데이터 수집
       Array.from(items).forEach(item => {
+        const hpid = item.querySelector('hpid')?.textContent || '';
+        const dutyName = item.querySelector('dutyName')?.textContent || '';
+        const dutyEmclsName = item.querySelector('dutyEmclsName')?.textContent || '';
+
+        // 병상정보에서 재실인원 가져오기
+        const bedInfo = bedInfoMap.get(hpid);
+        const occupancy = bedInfo ? calculateTotalOccupancy(bedInfo) : 0;
+
         SEVERE_CODES.forEach(disease => {
           const fieldValue = item.querySelector(disease.field)?.textContent || '';
-          const yn = fieldValue?.trim();
+          const yn = fieldValue?.trim().toUpperCase();
+
+          const hospitalInfo: HospitalInfo = {
+            name: bedInfo?.dutyName || dutyName,
+            hpid,
+            status: yn,
+            dutyEmclsName: bedInfo?.dutyEmclsName || dutyEmclsName,
+            occupancy
+          };
 
           if (yn === 'Y') {
-            stats[disease.qn].available++;
+            data[disease.qn].available++;
+            data[disease.qn].availableHospitals.push(hospitalInfo);
           } else if (yn === 'N' || yn === '불가능') {
-            stats[disease.qn].unavailable++;
+            data[disease.qn].unavailable++;
+            data[disease.qn].unavailableHospitals.push(hospitalInfo);
           } else {
-            stats[disease.qn].unknown++;
+            data[disease.qn].noInfo++;
+            data[disease.qn].noInfoHospitals.push(hospitalInfo);
           }
         });
       });
 
-      // 수용가능률 계산
-      Object.values(stats).forEach(stat => {
-        const total = stat.available + stat.unavailable;
-        stat.rate = total > 0 ? Math.round((stat.available / total) * 100) : 0;
+      // 병원 정렬 (센터급 우선, 재실인원 내림차순)
+      const sortHospitals = (hospitals: HospitalInfo[]) => {
+        return hospitals.sort((a, b) => {
+          const aIsCenter = isCenterHospital(a.dutyEmclsName);
+          const bIsCenter = isCenterHospital(b.dutyEmclsName);
+          if (aIsCenter && !bIsCenter) return -1;
+          if (!aIsCenter && bIsCenter) return 1;
+          // 같은 급수 내에서는 재실인원 내림차순
+          return b.occupancy - a.occupancy;
+        });
+      };
+
+      Object.values(data).forEach(d => {
+        d.availableHospitals = sortHospitals(d.availableHospitals);
+        d.unavailableHospitals = sortHospitals(d.unavailableHospitals);
+        d.noInfoHospitals = sortHospitals(d.noInfoHospitals);
       });
 
-      setDiseaseStats(stats);
+      setDiseaseData(data);
     } catch (error) {
-      console.error('통계 로드 실패:', error);
+      console.error('데이터 로드 실패:', error);
     } finally {
       setLoading(false);
     }
   }, [selectedRegion]);
 
   useEffect(() => {
-    loadDiseaseStats();
-  }, [loadDiseaseStats]);
+    loadData();
+  }, [loadData]);
 
-  // 렌더링 (dger-api와 동일한 스타일)
+  // 섹션 토글
+  const toggleSection = (qn: number, section: string) => {
+    setExpandedCards(prev => {
+      const current = prev[qn];
+      if (current === section) {
+        return { ...prev, [qn]: null };
+      }
+      return { ...prev, [qn]: section };
+    });
+  };
+
+  // 전체 펼치기/접기
+  const toggleAll = () => {
+    if (allExpanded) {
+      setExpandedCards({});
+      setAllExpanded(false);
+    } else {
+      const newExpanded: Record<number, string> = {};
+      SEVERE_CODES.forEach(d => {
+        newExpanded[d.qn] = 'all';
+      });
+      setExpandedCards(newExpanded);
+      setAllExpanded(true);
+    }
+  };
+
+  // 새로고침
+  const handleRefresh = () => {
+    loadData();
+  };
+
+  // 병원 리스트 렌더링
+  const renderHospitalList = (qn: number, section: string | null) => {
+    if (!section) return null;
+
+    const data = diseaseData[qn];
+    if (!data) return null;
+
+    let hospitals: HospitalInfo[] = [];
+    let title = '';
+    let statusClass = '';
+    let statusText = '';
+
+    if (section === 'available') {
+      hospitals = data.availableHospitals;
+      title = '수용가능 병원';
+      statusClass = isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-700';
+      statusText = '수용가능';
+    } else if (section === 'unavailable') {
+      hospitals = data.unavailableHospitals;
+      title = '수용불가 병원';
+      statusClass = isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-700';
+      statusText = '불가';
+    } else if (section === 'noInfo') {
+      hospitals = data.noInfoHospitals;
+      title = '미참여 병원';
+      statusClass = isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600';
+      statusText = '미참여';
+    } else if (section === 'all') {
+      // 전체 펼치기일 때 모든 병원 표시
+      return (
+        <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} max-h-[250px] overflow-y-auto`}>
+          {data.availableHospitals.length > 0 && (
+            <>
+              <div className={`px-4 py-2 text-xs font-semibold sticky top-0 ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                수용가능 병원
+              </div>
+              {data.availableHospitals.map((h, i) => (
+                <div key={`a-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
+                    {h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-700'}`}>수용가능</span>
+                </div>
+              ))}
+            </>
+          )}
+          {data.unavailableHospitals.length > 0 && (
+            <>
+              <div className={`px-4 py-2 text-xs font-semibold sticky top-0 ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                수용불가 병원
+              </div>
+              {data.unavailableHospitals.map((h, i) => (
+                <div key={`u-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
+                    {h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-700'}`}>불가</span>
+                </div>
+              ))}
+            </>
+          )}
+          {data.noInfoHospitals.length > 0 && (
+            <>
+              <div className={`px-4 py-2 text-xs font-semibold sticky top-0 ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                미참여 병원
+              </div>
+              {data.noInfoHospitals.map((h, i) => (
+                <div key={`n-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
+                    {h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'}`}>미참여</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    if (hospitals.length === 0) {
+      return (
+        <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} p-4 text-center text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+          병원 정보가 없습니다.
+        </div>
+      );
+    }
+
+    return (
+      <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} max-h-[250px] overflow-y-auto`}>
+        <div className={`px-4 py-2 text-xs font-semibold sticky top-0 z-10 ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+          {title}
+        </div>
+        {hospitals.map((h, i) => (
+          <div key={i} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+            <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
+              {h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+            </span>
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusClass}`}>{statusText}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // 로딩 화면
   if (loading) {
     return (
       <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className={`w-10 h-10 border-4 ${isDark ? 'border-gray-700 border-t-blue-500' : 'border-gray-200 border-t-[#0a3a82]'} rounded-full animate-spin`}></div>
+        <div className="fixed inset-0 flex justify-center items-center bg-white/90 dark:bg-gray-900/90 z-50">
+          <div className={`w-12 h-12 border-4 ${isDark ? 'border-gray-700 border-t-blue-500' : 'border-gray-200 border-t-[#0a3a82]'} rounded-full animate-spin`}></div>
         </div>
       </div>
     );
   }
 
-  const totalHospitals = Object.values(diseaseStats)[0]
-    ? Object.values(diseaseStats)[0].available +
-      Object.values(diseaseStats)[0].unavailable +
-      Object.values(diseaseStats)[0].unknown
-    : 0;
-
-  const avgRate = Object.values(diseaseStats).length > 0
-    ? Math.round(
-        Object.values(diseaseStats).reduce((sum, stat) => sum + stat.rate, 0) /
-        Object.values(diseaseStats).length
-      )
-    : 0;
-
-  const bestDisease = Object.values(diseaseStats).reduce(
-    (max, stat) => (stat.rate > (max?.rate || 0) ? stat : max),
-    { name: '-', rate: 0 } as DiseaseStats
-  );
-
   return (
-    <div className={`min-h-screen flex flex-col ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      <main className="flex-1 p-4 max-w-[1800px] mx-auto w-full">
-        {/* 지역 선택 - dger-api와 동일한 스타일 */}
-        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg p-2 mb-4 shadow-sm flex justify-center items-center gap-2`}>
+    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+      <main className="p-2 sm:p-4 max-w-[1800px] mx-auto">
+        {/* 컨트롤 섹션 - 좌측 정렬 */}
+        <div className="flex items-center justify-start gap-2 mb-2 px-2 overflow-x-auto">
           <select
-            className={`px-2.5 border-2 rounded text-xs cursor-pointer transition-colors ${
+            className={`px-2 border rounded text-sm cursor-pointer transition-colors ${
               isDark
-                ? 'bg-gray-700 border-gray-600 text-white hover:border-gray-500 focus:border-blue-500'
-                : 'bg-white border-gray-300 hover:border-gray-400 focus:border-[#0a3a82]'
+                ? 'bg-gray-800 border-gray-600 text-white hover:border-gray-500'
+                : 'bg-white border-gray-300 text-gray-900 hover:border-gray-400'
             } focus:outline-none`}
-            style={{ height: '32px', lineHeight: '32px' }}
+            style={{ height: '36px', width: '80px' }}
             value={selectedRegion}
             onChange={(e) => setSelectedRegion(e.target.value)}
           >
-            <option value="대구">대구</option>
-            <option value="서울">서울</option>
-            <option value="부산">부산</option>
-            <option value="인천">인천</option>
-            <option value="광주">광주</option>
-            <option value="대전">대전</option>
-            <option value="울산">울산</option>
-            <option value="세종">세종</option>
-            <option value="경기">경기</option>
-            <option value="강원">강원</option>
-            <option value="충북">충북</option>
-            <option value="충남">충남</option>
-            <option value="전북">전북</option>
-            <option value="전남">전남</option>
-            <option value="경북">경북</option>
-            <option value="경남">경남</option>
-            <option value="제주">제주</option>
+            {REGION_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
+
+          <button
+            onClick={toggleAll}
+            className={`px-3 text-sm font-medium rounded cursor-pointer transition-colors whitespace-nowrap ${
+              isDark
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600'
+                : 'bg-[#0a3a82] hover:bg-[#0c4ba0] text-white'
+            }`}
+            style={{ height: '36px' }}
+          >
+            {allExpanded ? '전체 접기' : '전체 펼치기'}
+          </button>
+
+          <button
+            onClick={handleRefresh}
+            className={`px-3 text-sm font-medium rounded cursor-pointer transition-colors whitespace-nowrap ${
+              isDark
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600'
+                : 'bg-[#0a3a82] hover:bg-[#0c4ba0] text-white'
+            }`}
+            style={{ height: '36px' }}
+          >
+            새로고침
+          </button>
         </div>
 
-        {/* 대시보드 */}
-        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-6 shadow-lg border`}>
-          <div className={`flex justify-between items-center mb-6 pb-4 border-b-2 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-            <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>
-              {selectedRegion} 전체 중증질환 현황
-            </h2>
-          </div>
+        {/* 질환 그리드 - dger-api와 동일한 스타일 */}
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
+          {SEVERE_CODES.map(disease => {
+            const data = diseaseData[disease.qn];
+            if (!data) return null;
 
-          {/* 요약 섹션 */}
-          <div className={`grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 p-4 ${isDark ? 'bg-gray-900' : 'bg-gray-50'} rounded-lg`}>
-            <div className={`text-center p-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-lg border`}>
-              <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-2`}>총 병원 수</div>
-              <div className={`text-3xl font-bold ${isDark ? 'text-blue-400' : 'text-[#0a3a82]'}`}>{totalHospitals}</div>
-            </div>
-            <div className={`text-center p-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-lg border`}>
-              <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-2`}>평균 수용가능률</div>
-              <div className={`text-3xl font-bold ${isDark ? 'text-blue-400' : 'text-[#0a3a82]'}`}>{avgRate}%</div>
-            </div>
-            <div className={`text-center p-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-lg border`}>
-              <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-2`}>최고 수용가능 질환</div>
-              <div className={`text-base font-bold ${isDark ? 'text-blue-400' : 'text-[#0a3a82]'}`}>{bestDisease.name}</div>
-            </div>
-          </div>
-
-          {/* 질환 그리드 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Object.entries(diseaseStats).map(([qn, stat]) => (
+            return (
               <div
-                key={qn}
-                className={`${isDark ? 'bg-gray-900 border-gray-700 hover:bg-gray-800' : 'bg-white border-gray-200 hover:shadow-lg'} border rounded-lg p-4 cursor-pointer transition-all hover:-translate-y-0.5`}
+                key={disease.qn}
+                className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg overflow-hidden transition-shadow hover:shadow-md`}
               >
-                <div className={`font-semibold ${isDark ? 'text-white' : 'text-gray-800'} mb-4 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} text-sm`}>
-                  {qn}. {stat.name}
-                </div>
-                <div className="flex justify-around mb-4">
-                  <div className="text-center flex-1">
-                    <span className={`block text-2xl font-bold mb-1 ${isDark ? 'text-green-400' : 'text-green-600'}`}>
-                      {stat.available}
+                {/* 카드 컨텐츠 - 컴팩트 레이아웃 */}
+                <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                  {/* 질환명 */}
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full border ${isDark ? 'bg-gray-700 border-gray-600 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                      {disease.qn}
                     </span>
-                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>수용가능</span>
-                  </div>
-                  <div className="text-center flex-1">
-                    <span className={`block text-2xl font-bold mb-1 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
-                      {stat.unavailable}
+                    <span className={`font-semibold text-sm truncate ${isDark ? 'text-white' : 'text-gray-800'}`} title={data.name}>
+                      {data.name}
                     </span>
-                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>불가</span>
                   </div>
-                  <div className="text-center flex-1">
-                    <span className={`block text-2xl font-bold mb-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {stat.unknown}
-                    </span>
-                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>미참여</span>
+
+                  {/* 통계 - 클릭 가능 */}
+                  <div className="flex gap-3 flex-shrink-0">
+                    <div
+                      className={`flex items-center gap-1 text-sm cursor-pointer px-1.5 py-1 rounded transition-colors ${
+                        isDark ? 'hover:bg-gray-700 text-green-400' : 'hover:bg-gray-100 text-green-700'
+                      }`}
+                      onClick={() => toggleSection(disease.qn, 'available')}
+                    >
+                      <span className="text-xs font-medium">가능</span>
+                      <span className="font-bold">{data.available}</span>
+                    </div>
+                    <div
+                      className={`flex items-center gap-1 text-sm cursor-pointer px-1.5 py-1 rounded transition-colors ${
+                        isDark ? 'hover:bg-gray-700 text-red-400' : 'hover:bg-gray-100 text-red-700'
+                      }`}
+                      onClick={() => toggleSection(disease.qn, 'unavailable')}
+                    >
+                      <span className="text-xs font-medium">불가</span>
+                      <span className="font-bold">{data.unavailable}</span>
+                    </div>
+                    <div
+                      className={`flex items-center gap-1 text-sm cursor-pointer px-1.5 py-1 rounded transition-colors ${
+                        isDark ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                      }`}
+                      onClick={() => toggleSection(disease.qn, 'noInfo')}
+                    >
+                      <span className="text-xs font-medium">미참여</span>
+                      <span className="font-bold">{data.noInfo}</span>
+                    </div>
                   </div>
                 </div>
-                <div className={`text-center p-2 ${isDark ? 'bg-gray-800' : 'bg-gray-50'} rounded-md text-sm`}>
-                  수용가능률:{' '}
-                  <strong
-                    style={{
-                      color:
-                        stat.rate >= 50
-                          ? isDark ? '#4ade80' : '#059669'
-                          : stat.rate >= 20
-                          ? isDark ? '#fbbf24' : '#d97706'
-                          : isDark ? '#f87171' : '#dc2626'
-                    }}
-                  >
-                    {stat.rate}%
-                  </strong>
-                </div>
+
+                {/* 병원 리스트 */}
+                {expandedCards[disease.qn] && renderHospitalList(disease.qn, expandedCards[disease.qn])}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </main>
     </div>

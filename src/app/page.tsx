@@ -14,9 +14,10 @@ import { useBedData, HospitalBedData } from '@/lib/hooks/useBedData';
 import { REGIONS, SEVERE_TYPES } from '@/lib/constants/dger';
 import { mapSidoName } from '@/lib/utils/regionMapping';
 import { isCenterHospital, shortenHospitalName } from '@/lib/utils/hospitalUtils';
-import { formatDateWithDay, formatUpdateTime } from '@/lib/utils/dateUtils';
+import { formatDateWithDay } from '@/lib/utils/dateUtils';
 import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
 import { ClassifiedMessages, parseMessageWithHighlights, getHighlightClass, HighlightedSegment } from '@/lib/utils/messageClassifier';
+import { OccupancyBattery } from '@/components/ui/OccupancyBattery';
 
 // 하이라이트된 메시지 렌더링 컴포넌트
 function HighlightedMessage({ message }: { message: string }) {
@@ -279,25 +280,35 @@ export default function HomePage() {
           <div className="flex items-center flex-shrink-0">
             <button
               onClick={() => setViewMode('table')}
-              className={`px-3 py-1.5 text-sm rounded-l border h-9 transition-colors whitespace-nowrap ${
-                viewMode === 'table'
-                  ? 'bg-[#0a3a82] text-white border-[#0a3a82]'
-                  : isDark
-                    ? 'bg-gray-800 text-gray-300 border-gray-600'
-                    : 'bg-white text-gray-700 border-gray-300'
-              }`}
+              className="px-3 py-1.5 text-sm rounded-l border h-9 transition-colors whitespace-nowrap"
+              style={{
+                backgroundColor: viewMode === 'table'
+                  ? (isDark ? '#4b5563' : '#0a3a82')
+                  : (isDark ? '#1f2937' : '#f3f4f6'),
+                borderColor: viewMode === 'table'
+                  ? (isDark ? '#6b7280' : '#0a3a82')
+                  : (isDark ? '#4b5563' : '#d1d5db'),
+                color: viewMode === 'table'
+                  ? '#ffffff'
+                  : (isDark ? '#d1d5db' : '#374151')
+              }}
             >
               테이블 보기
             </button>
             <button
               onClick={() => setViewMode('cards')}
-              className={`px-3 py-1.5 text-sm rounded-r border-t border-r border-b h-9 transition-colors whitespace-nowrap ${
-                viewMode === 'cards'
-                  ? 'bg-[#0a3a82] text-white border-[#0a3a82]'
-                  : isDark
-                    ? 'bg-gray-800 text-gray-300 border-gray-600'
-                    : 'bg-white text-gray-700 border-gray-300'
-              }`}
+              className="px-3 py-1.5 text-sm rounded-r border-t border-r border-b h-9 transition-colors whitespace-nowrap"
+              style={{
+                backgroundColor: viewMode === 'cards'
+                  ? (isDark ? '#4b5563' : '#0a3a82')
+                  : (isDark ? '#1f2937' : '#f3f4f6'),
+                borderColor: viewMode === 'cards'
+                  ? (isDark ? '#6b7280' : '#0a3a82')
+                  : (isDark ? '#4b5563' : '#d1d5db'),
+                color: viewMode === 'cards'
+                  ? '#ffffff'
+                  : (isDark ? '#d1d5db' : '#374151')
+              }}
             >
               카드 보기
             </button>
@@ -326,16 +337,19 @@ export default function HomePage() {
             {(Object.keys(orgTypes) as (keyof OrgTypes)[]).map((key) => (
               <label
                 key={key}
-                className={`px-2.5 py-1.5 text-xs font-medium rounded border-2 cursor-pointer transition-colors flex items-center whitespace-nowrap ${
-                  orgTypes[key]
-                    ? isDark
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-[#0a3a82] text-white border-[#0a3a82]'
-                    : isDark
-                      ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
-                      : 'bg-white text-gray-800 border-gray-400 hover:bg-gray-100'
-                }`}
-                style={{ height: '32px' }}
+                className="px-2.5 py-1.5 text-xs font-medium rounded border-2 cursor-pointer transition-colors flex items-center whitespace-nowrap"
+                style={{
+                  height: '32px',
+                  backgroundColor: orgTypes[key]
+                    ? (isDark ? '#4b5563' : '#0a3a82')
+                    : (isDark ? '#374151' : '#f3f4f6'),
+                  borderColor: orgTypes[key]
+                    ? (isDark ? '#6b7280' : '#0a3a82')
+                    : (isDark ? '#4b5563' : '#d1d5db'),
+                  color: orgTypes[key]
+                    ? '#ffffff'
+                    : (isDark ? '#d1d5db' : '#374151')
+                }}
               >
                 <input
                   type="checkbox"
@@ -395,15 +409,6 @@ export default function HomePage() {
             {expandedMessages.size > 0 ? '접기' : '펼치기'}
           </button>
 
-          {/* 마지막 업데이트 시간 */}
-          {lastUpdate && (() => {
-            const updateInfo = formatUpdateTime(lastUpdate.toISOString());
-            return (
-              <span className={`text-xs ml-auto whitespace-nowrap ${updateInfo.color}`}>
-                {updateInfo.text}
-              </span>
-            );
-          })()}
         </div>
 
         {/* 로딩 상태 */}
@@ -603,7 +608,7 @@ function HospitalRow({ hospital, isDark, isExpanded, onToggle, messages, message
 
         {/* 병상포화도 */}
         <td style={columnWidths ? { width: columnWidths.occupancy } : undefined} className="px-3 py-2 text-center whitespace-nowrap">
-          <OccupancyBattery rate={occupancyRate} isDark={isDark} />
+          <OccupancyBattery rate={occupancyRate} isDark={isDark} size="large" />
         </td>
 
         {/* 재실인원 */}
@@ -763,7 +768,10 @@ function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messag
               {hospital.dutyName}
             </h3>
           </div>
-          <OccupancyBattery rate={occupancyRate} isDark={isDark} />
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{totalOccupancy}명</span>
+            <OccupancyBattery rate={occupancyRate} isDark={isDark} size="large" />
+          </div>
         </div>
         {isCenter && (
           <span className={`text-xs ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
@@ -774,11 +782,7 @@ function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messag
 
       {/* 병상 정보 */}
       <div className="px-4 py-3">
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          <div className="text-center">
-            <div className={isDark ? 'text-gray-400' : 'text-gray-500'}>재실</div>
-            <div className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{totalOccupancy}</div>
-          </div>
+        <div className="grid grid-cols-5 gap-2 text-xs">
           <div className="text-center">
             <div className={isDark ? 'text-gray-400' : 'text-gray-500'}>일반</div>
             <div className={`font-semibold ${getBedStatusClass(beds.general.available, beds.general.total)}`}>
@@ -868,27 +872,3 @@ function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messag
   );
 }
 
-interface OccupancyBatteryProps {
-  rate: number;
-  isDark: boolean;
-}
-
-function OccupancyBattery({ rate, isDark }: OccupancyBatteryProps) {
-  const fillWidth = Math.min(100, Math.max(0, rate));
-  const fillClass = rate >= 95 ? 'bg-red-500' : rate >= 60 ? 'bg-amber-500' : 'bg-green-500';
-
-  return (
-    <div className="inline-flex items-center justify-center">
-      <div className={`relative w-12 h-6 border-2 rounded bg-transparent flex items-center justify-center ${isDark ? 'border-gray-400' : 'border-gray-300'}`}>
-        <div
-          className={`absolute top-0.5 left-0.5 bottom-0.5 transition-all ${fillClass}`}
-          style={{ width: `calc(${fillWidth}% - 4px)`, borderRadius: '2px' }}
-        />
-        <span className={`relative z-10 text-xs font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          {rate}%
-        </span>
-        <div className={`absolute -right-1 top-1/2 -translate-y-1/2 w-1 h-2 ${isDark ? 'bg-gray-500' : 'bg-gray-300'}`} style={{ borderRadius: '1px' }} />
-      </div>
-    </div>
-  );
-}

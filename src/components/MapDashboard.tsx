@@ -414,9 +414,9 @@ export function MapDashboard() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex relative">
         {/* 좌측 사이드바 - 데스크탑에서만 표시 */}
-        <aside className={`hidden md:flex w-56 flex-col overflow-hidden border-r ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+        <aside className={`hidden md:flex w-56 flex-col border-r ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
           {/* 스크롤 가능한 컨테이너 */}
           <div className="flex-1 overflow-y-auto">
           {/* 지역/요일 선택 */}
@@ -430,7 +430,7 @@ export function MapDashboard() {
                   </SelectTrigger>
                   <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
                     {REGIONS.map((r) => (
-                      <SelectItem key={r.value} value={r.value} className={`text-xs ${isDark ? 'text-white hover:bg-gray-700' : 'text-gray-900 hover:bg-gray-100'}`}>
+                      <SelectItem key={r.value} value={r.value} className={isDark ? 'text-white' : 'text-gray-900'}>
                         {r.label}
                       </SelectItem>
                     ))}
@@ -445,7 +445,7 @@ export function MapDashboard() {
                   </SelectTrigger>
                   <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
                     {DAYS_OF_WEEK.map((day) => (
-                      <SelectItem key={day} value={day} className={`text-xs ${isDark ? 'text-white hover:bg-gray-700' : 'text-gray-900 hover:bg-gray-100'}`}>
+                      <SelectItem key={day} value={day} className={isDark ? 'text-white' : 'text-gray-900'}>
                         {day}요일
                       </SelectItem>
                     ))}
@@ -620,7 +620,7 @@ export function MapDashboard() {
         </aside>
 
         {/* Map */}
-        <main className="flex-1 relative min-h-0" style={{ minHeight: 0 }}>
+        <main className="flex-1 relative min-h-0 overflow-hidden" style={{ minHeight: 0 }}>
           <HybridMap
             hospitals={filteredHospitals}
             bedDataMap={bedDataMap}
@@ -658,7 +658,8 @@ export function MapDashboard() {
                 placeholder="병원명 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-7 pl-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-gray-600' : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-gray-400'}`}
+                className={`w-full h-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-gray-600' : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-gray-400'}`}
+                style={{ paddingLeft: '28px' }}
               />
               {searchQuery && (
                 <button
@@ -771,7 +772,7 @@ export function MapDashboard() {
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
                       {REGIONS.map((r) => (
-                        <SelectItem key={r.value} value={r.value} className="text-xs text-white hover:bg-gray-700">
+                        <SelectItem key={r.value} value={r.value} className="text-white">
                           {r.label}
                         </SelectItem>
                       ))}
@@ -786,7 +787,7 @@ export function MapDashboard() {
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
                       {DAYS_OF_WEEK.map((day) => (
-                        <SelectItem key={day} value={day} className="text-xs text-white hover:bg-gray-700">
+                        <SelectItem key={day} value={day} className="text-white">
                           {day}요일
                         </SelectItem>
                       ))}
@@ -809,9 +810,9 @@ export function MapDashboard() {
                       <SelectValue placeholder="선택..." />
                     </SelectTrigger>
                     <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
-                      <SelectItem value="none" className="text-xs text-gray-400 hover:bg-gray-700">전체</SelectItem>
+                      <SelectItem value="none" className="text-gray-400">전체</SelectItem>
                       {diseases.map((d) => (
-                        <SelectItem key={d.id} value={d.name} className="text-xs text-white hover:bg-gray-700">
+                        <SelectItem key={d.id} value={d.name} className="text-white">
                           {d.name}
                         </SelectItem>
                       ))}
@@ -828,9 +829,9 @@ export function MapDashboard() {
                       <SelectValue placeholder="선택..." />
                     </SelectTrigger>
                     <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
-                      <SelectItem value="none" className="text-xs text-gray-400 hover:bg-gray-700">전체</SelectItem>
+                      <SelectItem value="none" className="text-gray-400">전체</SelectItem>
                       {SEVERE_TYPES.map((type) => (
-                        <SelectItem key={type.key} value={type.key} className="text-xs text-white hover:bg-gray-700">
+                        <SelectItem key={type.key} value={type.key} className="text-white">
                           {type.label}
                         </SelectItem>
                       ))}
@@ -956,7 +957,8 @@ export function MapDashboard() {
                 placeholder="병원명 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-7 pl-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-gray-600' : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-gray-400'}`}
+                className={`w-full h-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-gray-600' : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-gray-400'}`}
+                style={{ paddingLeft: '28px' }}
               />
               {searchQuery && (
                 <button

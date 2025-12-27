@@ -408,10 +408,12 @@ export function parseMessageWithHighlights(message: string): HighlightedSegment[
 
   // 패턴 정의: 진료과목, 의료진, 장비, 질환명
   const patterns = [
-    { regex: /\[([^\]]+)\]/g, type: 'department' as HighlightType },  // [진료과목]
+    { regex: /\[([^\]]+)\]/g, type: 'department' as HighlightType },  // [진료과목] 대괄호 형태
+    // 대괄호 없는 진료과목 (문장 시작 또는 콤마/공백 뒤)
+    { regex: /(감염내과|혈액\s*종양내과|영상의학과|비뇨의학과|비뇨기과|신경과|치과|산부인과|산과|부인과|신경외과|피부과|소아청소년과|소아신경과|내분비내과|정형외과|흉부외과|심장내과|호흡기내과|소화기내과|신장내과|류마티스내과|재활의학과|마취통증의학과|응급의학과|이비인후과|안과|정신건강의학과|가정의학과|외과|내과|구강악면외과|대장항문외과|성형외과|비뇨의학과)/g, type: 'department' as HighlightType },
     { regex: /(의료진)/g, type: 'staff' as HighlightType },           // 의료진
-    { regex: /(장비|기기|기계|CT|MRI|X-ray|초음파|내시경|인공호흡기|호흡기|ECMO|투석|혈액투석|산소|모니터)/gi, type: 'equipment' as HighlightType }, // 장비 관련
-    { regex: /(뇌출혈|뇌경색|심근경색|대동맥|중환자실|골절|출혈|경색|수술|stroke|급성|중증|패혈증|쇼크|외상|화상)/gi, type: 'disease' as HighlightType }, // 질환명 관련
+    { regex: /(장비|기기|기계|CT|MRI|X-ray|초음파|내시경|인공호흡기|호흡기|ECMO|투석|혈액투석|산소|모니터|sono)/gi, type: 'equipment' as HighlightType }, // 장비 관련
+    { regex: /(뇌출혈|뇌경색|심근경색|대동맥|중환자실|골절|출혈|경색|수술|acute\s*stroke|acute\s*storke|stroke|storke|급성|중증|패혈증|쇼크|외상|화상|간질환|담낭|담도|폐색|장중첩|장충첩증|정복술|복부손상|사지접합|저체중출생아|중증외상|epilepsy|seizure|spine|두경부|심경부감염|급성후두개염|상기도\s*폐쇄|목통증|후두개염|식도\s*응급질환|식도|척추|경련|소아응급|산모|객혈|BAE|의식저하|약물중독|자해)/gi, type: 'disease' as HighlightType }, // 질환명 관련
   ];
 
   // 모든 매치를 찾아서 위치와 함께 저장

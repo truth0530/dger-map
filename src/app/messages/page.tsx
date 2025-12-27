@@ -9,6 +9,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
+import { parseMessageWithHighlights, getHighlightClass, HighlightType } from '@/lib/utils/messageClassifier';
+import { OccupancyBattery, OrgTypeBadge, calculateOccupancyRate } from '@/components/ui/OccupancyBattery';
 
 // 질환 패턴 정의 (dger-api/public/js/diseasePatterns.js와 동일)
 const SYMPTOM_CODE_TO_DISEASE_MAP: Record<string, number> = {
@@ -83,11 +85,11 @@ const SEVERE_TYPE_OPTIONS = [
   { value: '[안과적수술] 응급', label: '[안과적수술] 응급' }
 ];
 
-// 기관분류 필터 옵션
+// 기관분류 필터 옵션 (축약형)
 const ORG_TYPE_OPTIONS = [
-  { value: '권역응급의료센터', label: '권역', shortLabel: '권' },
-  { value: '지역응급의료센터', label: '센터', shortLabel: '센' },
-  { value: '지역응급의료기관', label: '기관', shortLabel: '기' }
+  { value: '권역', label: '권역', shortLabel: '권' },
+  { value: '센터', label: '센터', shortLabel: '센' },
+  { value: '기관', label: '기관', shortLabel: '기' }
 ];
 
 // 메시지 인터페이스
@@ -107,6 +109,27 @@ interface Hospital {
   name: string;
   tel: string;
   hpbd?: string;
+  // 포화도 계산용 필드
+  hvec?: number;  // 응급실 가용 병상
+  hvs01?: number; // 일반입원실 가용
+  hvs59?: number; // 코호트 가용
+  hv29?: number;  // 음압격리(성인)
+  hv13?: number;  // 음압격리(소아)
+  hv30?: number;  // 일반격리(성인)
+  hv14?: number;  // 일반격리(소아)
+  hv15?: number;  // 소아
+  hv16?: number;  // 소아음압
+  hvs17?: number; // 소아일반
+  // 총병상
+  hvs02?: number; // 일반입원실 총
+  hvs60?: number; // 코호트 총
+  hvs03?: number; // 음압격리(성인) 총
+  hvs46?: number; // 음압격리(소아) 총
+  hvs04?: number; // 일반격리(성인) 총
+  hvs47?: number; // 일반격리(소아) 총
+  hvs06?: number; // 소아 총
+  hvs07?: number; // 소아음압 총
+  hvs18?: number; // 소아일반 총
 }
 
 interface HospitalWithMessages extends Hospital {
@@ -115,6 +138,14 @@ interface HospitalWithMessages extends Hospital {
 
 // 유틸리티 함수
 const normalizeKey = (value: string) => (value || '').replace(/\s+/g, '').toLowerCase();
+
+// 병원 유형 축약
+const getShortOrgType = (type: string): string => {
+  if (type.includes('권역') || type.includes('전문')) return '권역';
+  if (type.includes('지역응급의료센터')) return '센터';
+  if (type.includes('지역응급의료기관')) return '기관';
+  return '기관';
+};
 
 // 메시지 추출 함수
 const extractMsgContentFromXml = (itemXml: string): string => {
@@ -129,7 +160,7 @@ const extractMsgContentFromXml = (itemXml: string): string => {
   return '';
 };
 
-// 날짜 포맷팅
+// 날짜 포맷팅 (컴팩트 버전)
 const formatPeriod = (startStr: string, endStr: string): string => {
   if (!startStr || startStr.length < 14) return '-';
 
@@ -137,19 +168,21 @@ const formatPeriod = (startStr: string, endStr: string): string => {
   const startDay = startStr.substring(6, 8);
   const startHour = startStr.substring(8, 10);
   const startMin = startStr.substring(10, 12);
-  const start = `${startMonth}/${startDay} ${startHour}:${startMin}`;
 
   if (!endStr || endStr.length < 14) {
-    return start;
+    return `${startMonth}/${startDay} ${startHour}:${startMin}`;
   }
 
   const endMonth = endStr.substring(4, 6);
   const endDay = endStr.substring(6, 8);
   const endHour = endStr.substring(8, 10);
   const endMin = endStr.substring(10, 12);
-  const end = `${endMonth}/${endDay} ${endHour}:${endMin}`;
 
-  return `${start} ~ ${end}`;
+  // 같은 월이면 종료일만 일/시간 표시
+  if (startMonth === endMonth) {
+    return `${startMonth}/${startDay} ${startHour}:${startMin}~${endDay} ${endHour}:${endMin}`;
+  }
+  return `${startMonth}/${startDay}~${endMonth}/${endDay}`;
 };
 
 const formatDateNoYear = (dateStr: string): string => {
@@ -161,10 +194,44 @@ const formatDateNoYear = (dateStr: string): string => {
   return `${month}/${day} ${hour}:${minute}`;
 };
 
+// 하이라이트 타입별 색상 클래스 (라이트/다크 모드 지원)
+const getHighlightColorClass = (type: HighlightType, isDark: boolean): string => {
+  switch (type) {
+    case 'department':  // 진료과목 - 파란색
+      return isDark ? 'text-blue-400 font-semibold' : 'text-blue-600 font-semibold';
+    case 'staff':       // 의료진 - 빨간색
+      return isDark ? 'text-red-400 font-semibold' : 'text-red-600 font-semibold';
+    case 'equipment':   // 장비 - 초록색
+      return isDark ? 'text-green-400 font-semibold' : 'text-green-600 font-semibold';
+    case 'disease':     // 질환명 - 보라색
+      return isDark ? 'text-purple-400 font-semibold' : 'text-purple-600 font-semibold';
+    default:
+      return '';
+  }
+};
+
+// 하이라이트된 메시지 렌더링 컴포넌트
+const HighlightedMessage = ({ message, isDark }: { message: string; isDark: boolean }) => {
+  const segments = parseMessageWithHighlights(message);
+
+  return (
+    <>
+      {segments.map((segment, idx) => (
+        <span
+          key={idx}
+          className={segment.type !== 'none' ? getHighlightColorClass(segment.type, isDark) : ''}
+        >
+          {segment.text}
+        </span>
+      ))}
+    </>
+  );
+};
+
 export default function MessagesPage() {
   const { isDark } = useTheme();
   const [selectedRegion, setSelectedRegion] = useState('대구');
-  const [selectedOrgTypes, setSelectedOrgTypes] = useState(['권역응급의료센터', '지역응급의료센터', '지역응급의료기관']);
+  const [selectedOrgTypes, setSelectedOrgTypes] = useState(['권역', '센터', '기관']);
   const [hospitalSearch, setHospitalSearch] = useState('');
   const [messageSearch, setMessageSearch] = useState('');
   const [selectedSevereType, setSelectedSevereType] = useState('');
@@ -236,16 +303,32 @@ export default function MessagesPage() {
     return messages;
   }, []);
 
-  // 지역별 병원 목록 가져오기
+  // 지역별 병원 목록 가져오기 (bed-info API 사용 - 더 완전한 목록)
   const fetchHospitalsForRegion = useCallback(async (region: string): Promise<Hospital[]> => {
     try {
-      const params = new URLSearchParams({
-        STAGE1: region,
-        numOfRows: '1000',
-        pageNo: '1'
-      });
+      // 시도명 매핑
+      const regionMap: Record<string, string> = {
+        '대구': '대구광역시',
+        '서울': '서울특별시',
+        '부산': '부산광역시',
+        '인천': '인천광역시',
+        '광주': '광주광역시',
+        '대전': '대전광역시',
+        '울산': '울산광역시',
+        '세종': '세종특별자치시',
+        '경기': '경기도',
+        '강원': '강원특별자치도',
+        '충북': '충청북도',
+        '충남': '충청남도',
+        '전북': '전북특별자치도',
+        '전남': '전라남도',
+        '경북': '경상북도',
+        '경남': '경상남도',
+        '제주': '제주특별자치도'
+      };
+      const mappedRegion = regionMap[region] || region;
 
-      const res = await fetch(`/api/severe-diseases?${params}`);
+      const res = await fetch(`/api/bed-info?region=${encodeURIComponent(mappedRegion)}`);
       if (!res.ok) return [];
 
       const text = await res.text();
@@ -255,6 +338,11 @@ export default function MessagesPage() {
       const items = xml.getElementsByTagName('item');
       const hospitalSet = new Map<string, Hospital>();
 
+      const getNum = (item: Element, tag: string): number => {
+        const val = item.getElementsByTagName(tag)[0]?.textContent;
+        return val ? parseInt(val, 10) || 0 : 0;
+      };
+
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         const hpid = item.getElementsByTagName('hpid')[0]?.textContent || '';
@@ -262,7 +350,32 @@ export default function MessagesPage() {
         const tel = item.getElementsByTagName('dutyTel3')[0]?.textContent || '';
 
         if (hpid && name && !hospitalSet.has(hpid)) {
-          hospitalSet.set(hpid, { id: hpid, name, tel });
+          hospitalSet.set(hpid, {
+            id: hpid,
+            name,
+            tel,
+            // 가용 병상
+            hvec: getNum(item, 'hvec'),
+            hvs01: getNum(item, 'hvs01'),
+            hvs59: getNum(item, 'hvs59'),
+            hv29: getNum(item, 'hv29'),
+            hv13: getNum(item, 'hv13'),
+            hv30: getNum(item, 'hv30'),
+            hv14: getNum(item, 'hv14'),
+            hv15: getNum(item, 'hv15'),
+            hv16: getNum(item, 'hv16'),
+            hvs17: getNum(item, 'hvs17'),
+            // 총 병상
+            hvs02: getNum(item, 'hvs02'),
+            hvs60: getNum(item, 'hvs60'),
+            hvs03: getNum(item, 'hvs03'),
+            hvs46: getNum(item, 'hvs46'),
+            hvs04: getNum(item, 'hvs04'),
+            hvs47: getNum(item, 'hvs47'),
+            hvs06: getNum(item, 'hvs06'),
+            hvs07: getNum(item, 'hvs07'),
+            hvs18: getNum(item, 'hvs18'),
+          });
         }
       }
 
@@ -313,24 +426,29 @@ export default function MessagesPage() {
       : (message.symBpmgGubun && message.symBpmgGubun !== '-' ? message.symBpmgGubun
         : (message.msgGubun && message.msgGubun !== '-' ? message.msgGubun : '응급실'));
 
+    // isDisease 판단 로직 개선:
+    // 1. 패턴 매칭 성공
+    // 2. msgGubun(symBlkMsgTyp)이 "중증"인 경우
+    // 3. symBpmgGubun(symTypCodMag)이 "응급실"이 아닌 구체적인 질환명인 경우
+    const isDiseaseByMsgGubun = message.msgGubun === '중증';
+    const isDiseaseBySymptom = message.symBpmgGubun &&
+      message.symBpmgGubun !== '-' &&
+      message.symBpmgGubun !== '응급실' &&
+      message.symBpmgGubun !== '응급';
+    const isDisease = !!pattern || isDiseaseByMsgGubun || isDiseaseBySymptom;
+
     return {
       ...message,
       diseasePattern: pattern || undefined,
       standardizedSymptom,
-      isDisease: !!pattern
+      isDisease
     };
   }, [resolveDiseasePattern]);
 
   // 병원 레벨 계산
   const getHospitalLevel = useCallback((hospital: Hospital): string => {
     const hpbd = hospitalTypeMap[hospital.id] || hospital.hpbd || '';
-    switch (hpbd) {
-      case '권역응급의료센터': return '권역응급의료센터';
-      case '지역응급의료센터': return '지역응급의료센터';
-      case '전문응급의료센터': return '전문응급의료센터';
-      case '지역응급의료기관': return '지역응급의료기관';
-      default: return '기타';
-    }
+    return getShortOrgType(hpbd);
   }, [hospitalTypeMap]);
 
   // 데이터 로딩
@@ -467,7 +585,7 @@ export default function MessagesPage() {
                 ? 'bg-gray-700 border-gray-600 text-white'
                 : 'bg-white border-gray-300'
             }`}
-            style={{ height: '32px', lineHeight: '32px' }}
+            style={{ height: '32px', lineHeight: '30px', paddingTop: '0', paddingBottom: '0' }}
             value={selectedRegion}
             onChange={(e) => setSelectedRegion(e.target.value)}
           >
@@ -496,16 +614,20 @@ export default function MessagesPage() {
               return (
                 <label
                   key={option.value}
-                  className={`inline-flex items-center gap-1 px-2.5 text-xs font-medium cursor-pointer border-2 rounded transition-colors ${
-                    isSelected
-                      ? isDark
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-[#0a3a82] text-white border-[#0a3a82]'
-                      : isDark
-                        ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
-                        : 'bg-white text-gray-800 border-gray-400 hover:bg-gray-100'
-                  }`}
-                  style={{ height: '32px', lineHeight: '28px' }}
+                  className="inline-flex items-center gap-1 px-2.5 text-xs font-medium cursor-pointer border-2 rounded transition-colors"
+                  style={{
+                    height: '32px',
+                    lineHeight: '28px',
+                    backgroundColor: isSelected
+                      ? (isDark ? '#4b5563' : '#0a3a82')
+                      : (isDark ? '#374151' : '#f3f4f6'),
+                    borderColor: isSelected
+                      ? (isDark ? '#6b7280' : '#0a3a82')
+                      : (isDark ? '#4b5563' : '#d1d5db'),
+                    color: isSelected
+                      ? '#ffffff'
+                      : (isDark ? '#d1d5db' : '#374151')
+                  }}
                 >
                   <input
                     type="checkbox"
@@ -560,7 +682,7 @@ export default function MessagesPage() {
                 ? 'bg-gray-700 border-gray-600 text-white'
                 : 'bg-white border-gray-300'
             }`}
-            style={{ height: '32px' }}
+            style={{ height: '32px', lineHeight: '30px', paddingTop: '0', paddingBottom: '0' }}
             value={selectedSevereType}
             onChange={(e) => setSelectedSevereType(e.target.value)}
           >
@@ -573,7 +695,7 @@ export default function MessagesPage() {
             onClick={loadAllHospitalData}
             className={`flex-shrink-0 px-2.5 text-xs rounded whitespace-nowrap ${
               isDark
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                ? 'bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600'
                 : 'bg-[#0a3a82] text-white hover:bg-[#0c4b9a]'
             }`}
             style={{ height: '32px' }}
@@ -587,12 +709,12 @@ export default function MessagesPage() {
           <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-sm overflow-hidden`}>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse table-fixed">
-                <thead className={isDark ? 'bg-blue-700' : 'bg-[#0056b3]'}>
+                <thead className={isDark ? 'bg-gray-700' : 'bg-[#0056b3]'}>
                   <tr>
-                    <th className="px-4 py-3 text-center text-white font-bold text-sm w-20">구분</th>
-                    <th className="px-4 py-3 text-center text-white font-bold text-sm w-56">중증</th>
-                    <th className="px-4 py-3 text-center text-white font-bold text-sm">메시지</th>
-                    <th className="px-4 py-3 text-center text-white font-bold text-sm w-48">기간</th>
+                    <th className="px-2 py-2 text-center text-white font-bold text-sm w-14">구분</th>
+                    <th className="px-2 py-2 text-left text-white font-bold text-sm w-20">중증</th>
+                    <th className="px-3 py-2 text-center text-white font-bold text-sm">메시지</th>
+                    <th className="px-2 py-2 pr-4 text-center text-white font-bold text-sm w-40">기간</th>
                   </tr>
                 </thead>
                 {filteredMessages.length === 0 ? (
@@ -617,6 +739,7 @@ export default function MessagesPage() {
                     .map(hospital => {
                       const isCollapsed = collapsedGroups.has(hospital.name);
                       const level = getHospitalLevel(hospital);
+                      const { rate, occupied } = calculateOccupancyRate(hospital.hvs01 || 0, hospital.hvec || 0);
                       const emergencyMsgs = hospital.messages.filter(m => !m.isDisease);
                       const diseaseMsgs = hospital.messages.filter(m => m.isDisease);
                       const orderedMsgs = [...emergencyMsgs, ...diseaseMsgs];
@@ -627,31 +750,32 @@ export default function MessagesPage() {
                             className={`cursor-pointer transition-colors ${
                               isCollapsed
                                 ? isDark ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-500 hover:bg-gray-400'
-                                : isDark ? 'bg-blue-700 hover:bg-blue-600' : 'bg-[#0056b3] hover:bg-[#0069d9]'
+                                : isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-[#1976d2] hover:bg-[#1565c0]'
                             }`}
                             onClick={() => toggleHospitalGroup(hospital.name)}
                           >
-                            <td colSpan={4} className="px-4 py-2 text-white font-bold text-left relative pl-12">
+                            <td colSpan={4} className="px-3 py-1.5 text-white font-bold text-left relative pl-10">
                               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-white">
                                 {isCollapsed ? '▶' : '▼'}
                               </span>
                               {hospital.name}
-                              <span className="font-normal text-sm text-gray-200 ml-2">({level})</span>
-                              {hospital.tel && <span className="font-normal text-sm text-gray-200 ml-2">{hospital.tel}</span>}
+                              <span className="font-normal text-sm text-gray-200 ml-2">{occupied}명</span>
+                              <span className="ml-1"><OccupancyBattery rate={rate} isDark={isDark} size="small" /></span>
+                              <span className="ml-2"><OrgTypeBadge type={level} isDark={isDark} /></span>
                             </td>
                           </tr>
                           {!isCollapsed && orderedMsgs.map((msg, idx) => (
                             <tr key={idx} className={`border-b ${isDark ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}>
-                              <td className={`px-4 py-3 text-center text-sm ${msg.isDisease ? (isDark ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : (isDark ? 'text-gray-300' : 'text-gray-700')}`}>
-                                {msg.isDisease ? '질환' : '응급실'}
+                              <td className={`px-2 py-1.5 text-center text-sm ${msg.isDisease ? (isDark ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : (isDark ? 'text-gray-300' : 'text-gray-700')}`}>
+                                {msg.isDisease ? '중증' : '응급'}
                               </td>
-                              <td className={`px-4 py-3 text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                              <td className={`px-2 py-1.5 text-left text-sm truncate ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
                                 {msg.standardizedSymptom}
                               </td>
-                              <td className={`px-4 py-3 text-sm break-words ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                                {msg.msg}
+                              <td className={`px-3 py-1.5 text-sm break-words ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                                <HighlightedMessage message={msg.msg} isDark={isDark} />
                               </td>
-                              <td className={`px-4 py-3 text-center text-sm whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                              <td className={`px-2 py-1.5 pr-4 text-center text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                 {formatPeriod(msg.symBlkSttDtm, msg.symBlkEndDtm)}
                               </td>
                             </tr>
@@ -686,6 +810,7 @@ export default function MessagesPage() {
                 .map(hospital => {
                   const isCollapsed = collapsedGroups.has(hospital.name);
                   const level = getHospitalLevel(hospital);
+                  const { rate, occupied } = calculateOccupancyRate(hospital.hvs01 || 0, hospital.hvec || 0);
                   const emergencyMsgs = hospital.messages.filter(m => !m.isDisease);
                   const diseaseMsgs = hospital.messages.filter(m => m.isDisease);
 
@@ -696,25 +821,26 @@ export default function MessagesPage() {
                     >
                       {/* 병원 헤더 */}
                       <div
-                        className={`px-4 py-3 cursor-pointer font-bold text-sm text-center text-white ${
+                        className={`px-3 py-2 cursor-pointer font-bold text-sm text-center text-white ${
                           isCollapsed
                             ? isDark ? 'bg-gray-600' : 'bg-gray-500'
-                            : isDark ? 'bg-blue-700' : 'bg-[#0056b3]'
+                            : isDark ? 'bg-gray-700' : 'bg-[#1976d2]'
                         }`}
                         onClick={() => toggleHospitalGroup(hospital.name)}
                       >
                         {hospital.name}
-                        <span className="font-normal text-xs text-gray-200 ml-2">({level})</span>
-                        {hospital.tel && <span className="font-normal text-xs text-gray-200 ml-2">{hospital.tel}</span>}
+                        <span className="font-normal text-xs text-gray-200 ml-2">{occupied}명</span>
+                        <span className="ml-1"><OccupancyBattery rate={rate} isDark={isDark} size="small" /></span>
+                        <span className="ml-2"><OrgTypeBadge type={level} isDark={isDark} /></span>
                       </div>
 
                       {/* 병원 콘텐츠 */}
                       {!isCollapsed && (
-                        <div className="p-3">
+                        <div className="p-2">
                           {/* 응급실 메시지 */}
                           {emergencyMsgs.length > 0 && (
-                            <div className={`mb-3 p-3 rounded-md ${isDark ? 'bg-gray-900 border-green-700' : 'bg-green-50 border-green-500'} border-l-4`}>
-                              <div className={`font-semibold text-xs mb-2 ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                            <div className={`mb-2 p-2 rounded-md ${isDark ? 'bg-gray-900 border-green-700' : 'bg-green-50 border-green-500'} border-l-4`}>
+                              <div className={`font-semibold text-xs mb-1 ${isDark ? 'text-green-400' : 'text-green-700'}`}>
                                 [응급실] 운영 정보
                               </div>
                               {emergencyMsgs.map((msg, idx) => (
@@ -724,7 +850,7 @@ export default function MessagesPage() {
                                       {msg.standardizedSymptom}
                                     </span>
                                   )}
-                                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>{msg.msg}</span>
+                                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}><HighlightedMessage message={msg.msg} isDark={isDark} /></span>
                                   <span className={`ml-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                                     {formatDateNoYear(msg.symBlkSttDtm)}
                                   </span>
@@ -735,8 +861,8 @@ export default function MessagesPage() {
 
                           {/* 중증질환 메시지 */}
                           {diseaseMsgs.length > 0 && (
-                            <div className={`p-3 rounded-md ${isDark ? 'bg-gray-900 border-red-700' : 'bg-red-50 border-red-500'} border-l-4`}>
-                              <div className={`font-semibold text-xs mb-2 ${isDark ? 'text-red-400' : 'text-red-700'}`}>
+                            <div className={`p-2 rounded-md ${isDark ? 'bg-gray-900 border-red-700' : 'bg-red-50 border-red-500'} border-l-4`}>
+                              <div className={`font-semibold text-xs mb-1 ${isDark ? 'text-red-400' : 'text-red-700'}`}>
                                 [중증질환] 수용불가 정보
                               </div>
                               {diseaseMsgs.map((msg, idx) => (
@@ -744,7 +870,7 @@ export default function MessagesPage() {
                                   <span className={`font-bold mr-2 ${isDark ? 'text-red-400' : 'text-red-700'}`}>
                                     {msg.diseasePattern?.displayFormat || msg.standardizedSymptom}
                                   </span>
-                                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>{msg.msg}</span>
+                                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}><HighlightedMessage message={msg.msg} isDark={isDark} /></span>
                                   <span className={`ml-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                                     {formatDateNoYear(msg.symBlkSttDtm)}
                                   </span>
