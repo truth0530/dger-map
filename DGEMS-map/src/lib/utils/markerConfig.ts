@@ -16,13 +16,13 @@ export interface MarkerConfig {
 
 /**
  * 병원 분류별 마커 설정
- * - 권역응급의료센터: 다이아몬드 (마름모)
+ * - 권역응급의료센터: 사각형 (square)
  * - 지역응급의료센터: 원형 (동그라미)
  * - 지역응급의료기관: 삼각형
  */
 export const MARKER_CONFIG_BY_CLASSIFICATION: Record<string, MarkerConfig> = {
   '권역응급의료센터': {
-    shape: 'diamond',
+    shape: 'square',
     size: 12,
     strokeWidth: 2,
     priority: 1,

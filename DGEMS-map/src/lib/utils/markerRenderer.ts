@@ -45,9 +45,6 @@ export function getMarkerStyle(
 
   // 마커 모양별 추가 스타일
   switch (config.shape) {
-    case 'diamond':
-      baseStyle.transform = 'rotate(45deg)';
-      break;
     case 'square':
       baseStyle.borderRadius = '2px';
       break;

@@ -311,20 +311,8 @@ export function KoreaGugunMap({
     const markerInfo = getSvgMarkerInfo(hospital, bedDataMap, isHovered, status === "불가");
 
     switch (markerInfo.shape) {
-      case "diamond":
-        // 다이아몬드 (권역응급의료센터)
-        const diamondSize = markerInfo.size * 1.2;
-        return (
-          <polygon
-            points={`${x},${y - diamondSize} ${x + diamondSize},${y} ${x},${y + diamondSize} ${x - diamondSize},${y}`}
-            fill={markerInfo.color}
-            stroke={markerInfo.strokeColor}
-            strokeWidth={markerInfo.strokeWidth}
-            opacity={markerInfo.opacity}
-          />
-        );
       case "square":
-        // 사각형 (응급실운영신고기관)
+        // 사각형 (권역응급의료센터, 응급실운영신고기관)
         const squareSize = markerInfo.size * 0.9;
         return (
           <rect
