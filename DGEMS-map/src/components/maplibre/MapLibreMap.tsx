@@ -12,14 +12,18 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getStyleUrl, getRegionView, MARKER_COLORS, CLASSIFICATION_MARKERS, MAPTILER_CONFIG } from '@/lib/maplibre/config';
 import { useTheme } from '@/lib/contexts/ThemeContext';
+import { parseMessage, getStatusColorClasses } from '@/lib/utils/messageClassifier';
+import { SEVERE_TYPES } from '@/lib/constants/dger';
 import type { Hospital } from '@/types';
 import type { HospitalBedData } from '@/lib/hooks/useBedData';
 import type { HospitalSevereData } from '@/lib/hooks/useSevereData';
+import type { ClassifiedMessages } from '@/lib/utils/messageClassifier';
 
 interface MapLibreMapProps {
   hospitals: Hospital[];
   bedDataMap?: Map<string, HospitalBedData>;
   severeDataMap?: Map<string, HospitalSevereData>;
+  emergencyMessages?: Map<string, ClassifiedMessages>;
   selectedRegion: string;
   selectedSevereType?: string | null;
   selectedClassifications: string[];
@@ -32,6 +36,7 @@ export default function MapLibreMap({
   hospitals,
   bedDataMap,
   severeDataMap,
+  emergencyMessages,
   selectedRegion,
   selectedSevereType,
   selectedClassifications,
@@ -202,6 +207,7 @@ export default function MapLibreMap({
   const createPopupContent = useCallback((hospital: Hospital, isDarkMode: boolean = true): string => {
     const bedData = bedDataMap?.get(hospital.code);
     const severeData = severeDataMap?.get(hospital.code);
+    const msgData = emergencyMessages?.get(hospital.code);
     const classInfo = getClassificationInfo(hospital.classification);
 
     let content = `
@@ -212,12 +218,8 @@ export default function MapLibreMap({
         </div>
     `;
 
-    // 위치 정보 (주소, 전화, 좌표)
-    content += `
-      <div class="popup-info-section">
-    `;
-
-    // 주소
+    // 위치 정보 (주소)
+    content += `<div class="popup-info-section">`;
     if (bedData?.dutyAddr) {
       content += `
         <div class="popup-info-row">
@@ -226,13 +228,10 @@ export default function MapLibreMap({
         </div>
       `;
     }
-
-
     content += `</div>`;
 
     // 병상 정보
     if (bedData) {
-      // 점유율 계산
       const occupancyRate = bedData.occupancyRate ?? 0;
       const occupancyColor = occupancyRate > 80 ? '#f87171' : occupancyRate > 50 ? '#fbbf24' : '#4ade80';
 
@@ -292,15 +291,106 @@ export default function MapLibreMap({
       `;
     }
 
-    // 중증질환 정보
-    if (severeData && selectedSevereType) {
-      const status = severeData.severeStatus?.[selectedSevereType];
-      const isAvailable = status === 'Y';
+    // 중증질환 진료 가능 정보
+    if (severeData && severeData.severeStatus) {
+      const availableDiseases = Object.entries(severeData.severeStatus)
+        .filter(([_, status]) => status === 'Y')
+        .map(([key, _]) => {
+          const diseaseType = SEVERE_TYPES.find(t => t.key === key);
+          return diseaseType;
+        })
+        .filter((type): type is typeof SEVERE_TYPES[0] => !!type);
+
+      if (availableDiseases.length > 0) {
+        const bgColor = isDarkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.1)';
+        const borderColor = isDarkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.2)';
+
+        content += `
+          <div class="popup-section" style="background:${bgColor};border:1px solid ${borderColor};">
+            <div class="popup-section-title" style="color:#22c55e;">중증질환 진료 가능</div>
+            <div style="display:flex;flex-wrap:wrap;gap:0.25rem;">
+        `;
+
+        availableDiseases.slice(0, 8).forEach(disease => {
+          const label = disease.label.replace(/\[.*?\]\s*/, '');
+          content += `
+            <span style="font-size:0.75rem;background:rgba(34, 197, 94, 0.15);color:#22c55e;padding:0.375rem 0.5rem;border-radius:0.375rem;border:1px solid rgba(34, 197, 94, 0.2);">
+              ${label}
+            </span>
+          `;
+        });
+
+        if (availableDiseases.length > 8) {
+          content += `<span style="font-size:0.75rem;color:#999;padding:0.375rem 0.5rem;">+${availableDiseases.length - 8}</span>`;
+        }
+
+        content += `</div></div>`;
+      }
+    }
+
+    // 중증질환 메시지 섹션
+    if (msgData && msgData.allDiseases && msgData.allDiseases.length > 0) {
+      const bgColor = isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+      const borderColor = isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+
       content += `
-        <div class="popup-status ${isAvailable ? 'available' : 'unavailable'}">
-          ${isAvailable ? '● 진료 가능' : '○ 진료 불가'}
-        </div>
+        <div class="popup-section" style="background:${bgColor};border:1px solid ${borderColor};">
+          <div class="popup-section-title" style="color:#ef4444;">중증질환 메시지</div>
       `;
+
+      msgData.allDiseases.slice(0, 3).forEach(disease => {
+        const displayName = disease.displayName.replace(/\[.*?\]\s*/, '');
+        content += `
+          <div style="font-size:0.75rem;margin-bottom:0.5rem;">
+            <span style="color:#fca5a5;font-weight:bold;">${displayName}:</span>
+            <span style="color:#999;margin-left:0.25rem;">${disease.content}</span>
+          </div>
+        `;
+      });
+
+      if (msgData.allDiseases.length > 3) {
+        content += `<div style="font-size:0.75rem;color:#999;">+${msgData.allDiseases.length - 3}개 메시지</div>`;
+      }
+
+      content += `</div>`;
+    }
+
+    // 응급실 운영 정보 섹션
+    if (msgData && msgData.emergency && msgData.emergency.length > 0) {
+      const bgColor = isDarkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.1)';
+      const borderColor = isDarkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.2)';
+
+      content += `
+        <div class="popup-section" style="background:${bgColor};border:1px solid ${borderColor};">
+          <div class="popup-section-title" style="color:#22c55e;">응급실 운영 정보</div>
+      `;
+
+      msgData.emergency.slice(0, 3).forEach(item => {
+        const parsed = parseMessage(item.msg, item.symTypCod);
+        const statusColor = parsed.status.color === 'red' ? '#ef4444' :
+                           parsed.status.color === 'orange' ? '#f97316' :
+                           parsed.status.color === 'green' ? '#22c55e' : '#999';
+
+        content += `
+          <div style="font-size:0.75rem;margin-bottom:0.5rem;background:${isDarkMode ? 'rgba(55,65,81,0.5)' : 'rgba(229,231,235,0.5)'};padding:0.375rem;border-radius:0.25rem;">
+            <div style="display:flex;gap:0.25rem;margin-bottom:0.25rem;flex-wrap:wrap;">
+              <span style="background:${isDarkMode ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.2)'};color:#fb923c;padding:0.125rem 0.375rem;border-radius:0.125rem;font-size:0.7rem;">
+                ${parsed.department}
+              </span>
+              <span style="background:${isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.2)'};color:${statusColor};padding:0.125rem 0.375rem;border-radius:0.125rem;font-size:0.7rem;">
+                ${parsed.status.label}
+              </span>
+            </div>
+            <div style="color:#bfdbfe;word-break:break-word;">${parsed.details}</div>
+          </div>
+        `;
+      });
+
+      if (msgData.emergency.length > 3) {
+        content += `<div style="font-size:0.75rem;color:#999;">+${msgData.emergency.length - 3}개 메시지</div>`;
+      }
+
+      content += `</div>`;
     }
 
     // 업데이트 시간
@@ -311,7 +401,7 @@ export default function MapLibreMap({
 
     content += '</div>';
     return content;
-  }, [bedDataMap, severeDataMap, selectedSevereType]);
+  }, [bedDataMap, severeDataMap, emergencyMessages, selectedSevereType, isDark]);
 
   // 지도 초기화
   useEffect(() => {

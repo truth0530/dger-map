@@ -27,6 +27,7 @@ const MapLibreMap = dynamic(() => import("@/components/maplibre/MapLibreMap"), {
 });
 import { useBedData, HospitalBedData } from "@/lib/hooks/useBedData";
 import { useSevereData, HospitalSevereData } from "@/lib/hooks/useSevereData";
+import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { mapSidoName } from "@/lib/utils/regionMapping";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
@@ -98,6 +99,8 @@ export function MapDashboard() {
   const { data: bedData, fetchBedData, loading: bedLoading } = useBedData();
   // 중증질환 데이터 훅
   const { data: severeData, fetchSevereData, loading: severeLoading } = useSevereData();
+  // 응급 메시지 훅
+  const { messages: emergencyMessages, fetchMessages: fetchEmergencyMessages } = useEmergencyMessages();
 
   // 지역 변경 시 병상 및 중증질환 데이터 로드
   useEffect(() => {
@@ -364,9 +367,15 @@ export function MapDashboard() {
   };
 
   // 병원 호버 핸들러
-  const handleHospitalHover = (code: string | null) => {
+  const handleHospitalHover = useCallback((code: string | null) => {
     setHoveredHospitalCode(code);
-  };
+    // 호버된 병원의 응급 메시지 가져오기
+    if (code) {
+      fetchEmergencyMessages(code).catch(err => {
+        console.error(`[MapDashboard] 응급 메시지 조회 오류 (${code}):`, err);
+      });
+    }
+  }, [fetchEmergencyMessages]);
 
   // 사이드바에 표시할 지역명
   const getSidebarRegionLabel = (): string => {
@@ -669,6 +678,7 @@ export function MapDashboard() {
               hospitals={filteredHospitals}
               bedDataMap={bedDataMap}
               severeDataMap={severeDataMap}
+              emergencyMessages={emergencyMessages}
               selectedRegion={selectedRegion}
               selectedSevereType={selectedSevereType}
               selectedClassifications={selectedClassifications}
