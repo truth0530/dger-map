@@ -52,6 +52,20 @@ export function formatDateShort(dateString: string): string {
 }
 
 /**
+ * 날짜를 MM/DD(요일) HH:mm 형식으로 반환
+ * 예: 12/27(금) 22:25
+ */
+export function formatDateWithDay(dateString: string): string {
+  const d = parseDateString(dateString);
+  if (!d) return '-';
+
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+  const dayName = dayNames[d.getDay()];
+
+  return `${d.getMonth() + 1}/${pad(d.getDate())}(${dayName}) ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
  * 날짜를 'n분 전', 'n시간 전', '방금 전' 등 상대적 시간(모바일용)으로 반환
  */
 export function formatDateRelative(dateString: string): string {

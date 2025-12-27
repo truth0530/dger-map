@@ -10,6 +10,8 @@ import { SEVERE_TYPES } from '@/lib/constants/dger';
 export interface EmergencyMessage {
   msg: string;
   symTypCod: string;
+  symTypCodMag: string; // 질환명 (예: "뇌출혈수술(거미막하 출혈 외)")
+  symBlkMsgTyp: string; // 메시지 타입 (예: "중증", "응급")
   rnum?: string;
 }
 
@@ -20,6 +22,21 @@ interface UseEmergencyMessagesReturn {
   clearMessages: () => void;
 }
 
+// XML에서 메시지 내용 추출 (우선순위 기반: symBlkMsg > msg > hviMsg > dissMsg > symOutDspMsg)
+function extractMsgContent(itemXml: string): string {
+  const msgTags = ['symBlkMsg', 'msg', 'hviMsg', 'dissMsg', 'symOutDspMsg'];
+
+  for (const tag of msgTags) {
+    const regex = new RegExp(`<${tag}>([^<]*)</${tag}>`, 'i');
+    const match = itemXml.match(regex);
+    if (match && match[1] && match[1].trim()) {
+      return match[1].trim();
+    }
+  }
+
+  return '';
+}
+
 // XML 파싱 헬퍼
 function parseXmlItems(xmlText: string): EmergencyMessage[] {
   const items: EmergencyMessage[] = [];
@@ -28,16 +45,51 @@ function parseXmlItems(xmlText: string): EmergencyMessage[] {
 
   while ((match = itemRegex.exec(xmlText)) !== null) {
     const itemXml = match[1];
-    const msg = itemXml.match(/<symBlkMsg>([^<]*)<\/symBlkMsg>/i)?.[1] || '';
+    const msg = extractMsgContent(itemXml);
     const symTypCod = itemXml.match(/<symTypCod>([^<]*)<\/symTypCod>/i)?.[1] || '';
+    const symTypCodMag = itemXml.match(/<symTypCodMag>([^<]*)<\/symTypCodMag>/i)?.[1] || '';
+    const symBlkMsgTyp = itemXml.match(/<symBlkMsgTyp>([^<]*)<\/symBlkMsgTyp>/i)?.[1] || '';
     const rnum = itemXml.match(/<rnum>([^<]*)<\/rnum>/i)?.[1] || '';
 
     if (msg) {
-      items.push({ msg, symTypCod, rnum });
+      items.push({ msg, symTypCod, symTypCodMag, symBlkMsgTyp, rnum });
     }
   }
 
   return items;
+}
+
+// 질환명 포맷 변환 (예: "뇌출혈수술(거미막하 출혈 외)" -> "[뇌출혈] 거미막하출혈 외")
+function formatDiseaseName(symTypCodMag: string): string {
+  if (!symTypCodMag) return '';
+
+  // "뇌출혈수술(거미막하 출혈 외)" -> "[뇌출혈] 거미막하출혈 외"
+  // "뇌출혈수술(거미막하 출혈)" -> "[뇌출혈] 거미막하출혈"
+  // "뇌경색의 재관류중재술" -> "[뇌경색] 재관류중재술"
+
+  const patterns = [
+    { regex: /뇌출혈수술\(거미막하\s*출혈\s*외\)/i, result: '[뇌출혈] 거미막하출혈 외' },
+    { regex: /뇌출혈수술\(거미막하\s*출혈\)/i, result: '[뇌출혈] 거미막하출혈' },
+    { regex: /뇌경색의\s*재관류중재술/i, result: '[뇌경색] 재관류중재술' },
+    { regex: /대동맥수술/i, result: '[대동맥] 수술' },
+    { regex: /응급실/i, result: '[응급실]' },
+  ];
+
+  for (const pattern of patterns) {
+    if (pattern.regex.test(symTypCodMag)) {
+      return pattern.result;
+    }
+  }
+
+  // 기본적으로 괄호 형식이면 변환
+  const match = symTypCodMag.match(/^(.+?)[의수술]*\((.+)\)$/);
+  if (match) {
+    const category = match[1].replace(/수술$/, '').trim();
+    const detail = match[2].replace(/\s+/g, '').trim();
+    return `[${category}] ${detail}`;
+  }
+
+  return symTypCodMag;
 }
 
 // 메시지 분류
@@ -51,33 +103,27 @@ function classifyMessages(items: EmergencyMessage[]): ClassifiedMessages {
   }> = [];
 
   items.forEach((item) => {
-    const { msg, symTypCod } = item;
+    const { msg, symTypCod, symTypCodMag, symBlkMsgTyp } = item;
 
-    // symTypCod가 있으면 중증질환 관련 메시지
-    if (symTypCod) {
-      // S001 ~ S027 형식의 코드를 MKioskTy1 ~ MKioskTy27로 변환
-      const diseaseNum = symTypCod.replace(/^S0?/, '');
-      const severeType = SEVERE_TYPES.find((t) => t.key === `MKioskTy${diseaseNum}`);
+    // 중증질환 메시지 (symBlkMsgTyp이 "중증"이거나 symTypCodMag이 있는 경우)
+    if (symBlkMsgTyp === '중증' || (symTypCodMag && symTypCod && symTypCod !== 'Y000')) {
+      // symTypCodMag을 포맷된 질환명으로 변환
+      const displayName = formatDiseaseName(symTypCodMag) || symTypCodMag || '[중증질환]';
 
-      if (severeType) {
-        // [카테고리] 세부명 형식 파싱
-        const labelMatch = severeType.label.match(/\[([^\]]+)\]\s*(.*)/);
-        const category = labelMatch ? `[${labelMatch[1]}]` : '[기타]';
-        const subcategory = labelMatch ? labelMatch[2] : severeType.label;
+      // [카테고리] 세부명 형식 파싱
+      const labelMatch = displayName.match(/\[([^\]]+)\]\s*(.*)/);
+      const category = labelMatch ? `[${labelMatch[1]}]` : '[중증질환]';
+      const subcategory = labelMatch ? labelMatch[2] : displayName;
 
-        diseaseMessages.push({
-          category,
-          subcategory,
-          displayName: severeType.label,
-          content: msg
-        });
-      } else {
-        // 알 수 없는 코드는 응급실 메시지로 처리
-        emergency.push({ msg, symTypCod });
-      }
+      diseaseMessages.push({
+        category,
+        subcategory,
+        displayName,
+        content: msg  // 실제 메시지 내용
+      });
     } else {
-      // symTypCod가 없으면 응급실 메시지
-      emergency.push({ msg, symTypCod: '' });
+      // 응급실 메시지
+      emergency.push({ msg, symTypCod: symTypCod || '' });
     }
   });
 

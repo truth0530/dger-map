@@ -2,6 +2,13 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Combobox } from "@/components/ui/combobox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getAllData, getHospitals, getDiseases, getMeta } from "@/lib/data";
 import { DAYS_OF_WEEK } from "@/lib/constants";
 import type { DayOfWeek, AvailabilityStatus, Hospital } from "@/types";

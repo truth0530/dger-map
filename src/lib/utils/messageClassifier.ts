@@ -269,27 +269,232 @@ export function classifyMessages(
 
 /**
  * 메시지 심각도 판별
+ * 모든 메시지는 "불가" 상태이므로 정상 운영은 없음
+ * - critical (빨간색): 의료진 부족/부재, 신환 수용불가 - 가장 심각
+ * - warning (주황색): 일반적인 진료불가, 수용불가 - 일시적 상황
+ * - info (파란색): 기타 안내 메시지
  */
-export function getMessageSeverity(message: string): 'critical' | 'warning' | 'info' | 'normal' {
+export function getMessageSeverity(message: string): 'critical' | 'warning' | 'info' {
   const lowerMessage = message.toLowerCase();
 
+  // Critical: 의료진 문제 (가장 심각 - 인력 부재)
   if (lowerMessage.includes('의료진') && (lowerMessage.includes('부족') || lowerMessage.includes('부재'))) {
     return 'critical';
   }
+
+  // Critical: 신환 수용 완전 불가
   if (lowerMessage.includes('신환') && lowerMessage.includes('불가')) {
     return 'critical';
   }
-  if (lowerMessage.includes('불가')) {
-    return 'warning';
-  }
-  if (lowerMessage.includes('제한') || lowerMessage.includes('지연')) {
-    return 'warning';
-  }
-  if (lowerMessage.includes('정상')) {
-    return 'normal';
+
+  // Critical: 완전히 수용 불가능한 상태
+  if (lowerMessage.includes('수용') && lowerMessage.includes('불가')) {
+    return 'critical';
   }
 
+  // Warning: 일반적인 진료불가, 제한, 지연 상태
+  if (lowerMessage.includes('불가') || lowerMessage.includes('제한') || lowerMessage.includes('지연')) {
+    return 'warning';
+  }
+
+  // Info: 기타 안내 메시지
   return 'info';
+}
+
+/**
+ * 진료과목 추출
+ */
+export function extractDepartment(message: string): string {
+  // [진료과목] 형식에서 추출
+  const match = message.match(/^\[([^\]]+)\]/);
+  if (match) {
+    return match[1];
+  }
+  return '기타';
+}
+
+// 진료과목별 색상 타입
+export type DepartmentColor =
+  | 'neuro'      // 신경계 (신경외과, 신경과)
+  | 'pediatric'  // 소아 (소아청소년과, 소아외과)
+  | 'ortho'      // 정형외과
+  | 'cardio'     // 심장/흉부 (심장내과, 흉부외과)
+  | 'general'    // 일반외과/내과
+  | 'obgyn'      // 산부인과
+  | 'emergency'  // 응급의학과
+  | 'other';     // 기타
+
+/**
+ * 진료과목 색상 분류
+ */
+export function getDepartmentColor(message: string): DepartmentColor {
+  const dept = extractDepartment(message);
+
+  // 신경계
+  if (dept.includes('신경')) {
+    return 'neuro';
+  }
+
+  // 소아
+  if (dept.includes('소아') || dept.includes('청소년')) {
+    return 'pediatric';
+  }
+
+  // 정형외과
+  if (dept.includes('정형')) {
+    return 'ortho';
+  }
+
+  // 심장/흉부
+  if (dept.includes('심장') || dept.includes('흉부') || dept.includes('순환기')) {
+    return 'cardio';
+  }
+
+  // 산부인과
+  if (dept.includes('산부') || dept.includes('산과') || dept.includes('부인')) {
+    return 'obgyn';
+  }
+
+  // 응급의학과
+  if (dept.includes('응급')) {
+    return 'emergency';
+  }
+
+  // 일반 외과/내과
+  if (dept.includes('외과') || dept.includes('내과')) {
+    return 'general';
+  }
+
+  return 'other';
+}
+
+/**
+ * 진료과목별 Tailwind 클래스 (더 이상 사용하지 않음 - 단색 메시지로 변경)
+ */
+export function getDepartmentClasses(color: DepartmentColor): {
+  bg: string;
+  text: string;
+  border: string;
+} {
+  // 모든 메시지는 단색 배경 사용
+  return { bg: 'bg-slate-700/50', text: 'text-gray-200', border: 'border-slate-600' };
+}
+
+/**
+ * 키워드 하이라이트 타입
+ */
+export type HighlightType = 'department' | 'staff' | 'equipment' | 'disease' | 'none';
+
+/**
+ * 메시지에서 하이라이트할 키워드 패턴
+ * - department (파란색): 진료과목 [xxx]
+ * - staff (빨간색): 의료진 관련
+ * - equipment (초록색): 장비 관련
+ * - disease (보라색): 질환명 관련
+ */
+export interface HighlightedSegment {
+  text: string;
+  type: HighlightType;
+}
+
+/**
+ * 메시지를 하이라이트 세그먼트로 분리
+ */
+export function parseMessageWithHighlights(message: string): HighlightedSegment[] {
+  if (!message) return [];
+
+  const segments: HighlightedSegment[] = [];
+  let remaining = message;
+
+  // 패턴 정의: 진료과목, 의료진, 장비, 질환명
+  const patterns = [
+    { regex: /\[([^\]]+)\]/g, type: 'department' as HighlightType },  // [진료과목]
+    { regex: /(의료진)/g, type: 'staff' as HighlightType },           // 의료진
+    { regex: /(장비|기기|기계|CT|MRI|X-ray|초음파|내시경|인공호흡기|호흡기|ECMO|투석|혈액투석|산소|모니터)/gi, type: 'equipment' as HighlightType }, // 장비 관련
+    { regex: /(뇌출혈|뇌경색|심근경색|대동맥|중환자실|골절|출혈|경색|수술|stroke|급성|중증|패혈증|쇼크|외상|화상)/gi, type: 'disease' as HighlightType }, // 질환명 관련
+  ];
+
+  // 모든 매치를 찾아서 위치와 함께 저장
+  interface Match {
+    start: number;
+    end: number;
+    text: string;
+    type: HighlightType;
+  }
+
+  const allMatches: Match[] = [];
+
+  for (const pattern of patterns) {
+    const regex = new RegExp(pattern.regex.source, 'gi');
+    let match;
+    while ((match = regex.exec(message)) !== null) {
+      allMatches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        text: match[0],
+        type: pattern.type
+      });
+    }
+  }
+
+  // 위치순 정렬
+  allMatches.sort((a, b) => a.start - b.start);
+
+  // 겹치는 매치 제거 (먼저 나온 것 우선)
+  const filteredMatches: Match[] = [];
+  let lastEnd = 0;
+  for (const match of allMatches) {
+    if (match.start >= lastEnd) {
+      filteredMatches.push(match);
+      lastEnd = match.end;
+    }
+  }
+
+  // 세그먼트 생성
+  let currentIndex = 0;
+  for (const match of filteredMatches) {
+    // 매치 전 일반 텍스트
+    if (match.start > currentIndex) {
+      segments.push({
+        text: message.substring(currentIndex, match.start),
+        type: 'none'
+      });
+    }
+    // 매치된 텍스트
+    segments.push({
+      text: match.text,
+      type: match.type
+    });
+    currentIndex = match.end;
+  }
+
+  // 남은 텍스트
+  if (currentIndex < message.length) {
+    segments.push({
+      text: message.substring(currentIndex),
+      type: 'none'
+    });
+  }
+
+  return segments;
+}
+
+/**
+ * 하이라이트 타입별 CSS 클래스
+ */
+export function getHighlightClass(type: HighlightType): string {
+  switch (type) {
+    case 'department':  // 진료과목 - 파란색
+      return 'text-blue-400 font-semibold';
+    case 'staff':       // 의료진 - 빨간색
+      return 'text-red-400 font-semibold';
+    case 'equipment':   // 장비 - 초록색
+      return 'text-green-400 font-semibold';
+    case 'disease':     // 질환명 - 보라색
+      return 'text-purple-400 font-semibold';
+    default:
+      return '';
+  }
 }
 
 /**
@@ -339,6 +544,9 @@ export function summarizeMessage(message: string, maxLength: number = 50): strin
 
 /**
  * 심각도별 Tailwind 클래스
+ * - critical (빨간색): 의료진 부족/부재, 수용불가 - 가장 심각
+ * - warning (주황색): 일반 진료불가 - 일시적 상황
+ * - info (파란색): 기타 안내
  */
 export function getSeverityClasses(severity: ReturnType<typeof getMessageSeverity>): {
   bg: string;
@@ -349,9 +557,8 @@ export function getSeverityClasses(severity: ReturnType<typeof getMessageSeverit
     case 'critical':
       return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/40' };
     case 'warning':
-      return { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/40' };
-    case 'normal':
-      return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/40' };
+      return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40' };
+    case 'info':
     default:
       return { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/40' };
   }
