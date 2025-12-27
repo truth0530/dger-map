@@ -667,7 +667,7 @@ export default function MapLibreMap({
       </div>
 
       {/* 범례 - 공통 Legend 컴포넌트 사용 */}
-      <Legend position="bottom-left" showBedStatus={true} />
+      <Legend position="bottom-left" />
 
       {/* 병원 수 표시 */}
       <div className={`absolute top-4 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border px-3 py-2 ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>

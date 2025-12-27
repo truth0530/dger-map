@@ -626,7 +626,7 @@ export function KoreaSidoMap({
       </svg>
 
       {/* 범례 - 공통 Legend 컴포넌트 사용 */}
-      <Legend position="bottom-left" showBedStatus={false} />
+      <Legend position="bottom-left" />
 
       {/* 병원 호버 툴팁 - 개선된 디자인 */}
       {hoveredHospital && (() => {
