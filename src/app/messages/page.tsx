@@ -431,10 +431,10 @@ export default function MessagesPage() {
     // 2. msgGubun(symBlkMsgTyp)이 "중증"인 경우
     // 3. symBpmgGubun(symTypCodMag)이 "응급실"이 아닌 구체적인 질환명인 경우
     const isDiseaseByMsgGubun = message.msgGubun === '중증';
-    const isDiseaseBySymptom = message.symBpmgGubun &&
+    const isDiseaseBySymptom = !!(message.symBpmgGubun &&
       message.symBpmgGubun !== '-' &&
       message.symBpmgGubun !== '응급실' &&
-      message.symBpmgGubun !== '응급';
+      message.symBpmgGubun !== '응급');
     const isDisease = !!pattern || isDiseaseByMsgGubun || isDiseaseBySymptom;
 
     return {
