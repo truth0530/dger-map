@@ -227,27 +227,6 @@ export default function MapLibreMap({
       `;
     }
 
-    // 전화번호
-    if (bedData?.dutyTel3) {
-      content += `
-        <div class="popup-info-row">
-          <span class="popup-info-icon">📞</span>
-          <span class="popup-info-text popup-tel">${bedData.dutyTel3}</span>
-        </div>
-      `;
-    }
-
-    // 좌표
-    if (hospital.lat && hospital.lng) {
-      const lat = hospital.lat.toFixed(4);
-      const lng = hospital.lng.toFixed(4);
-      content += `
-        <div class="popup-info-row">
-          <span class="popup-info-icon">🧭</span>
-          <span class="popup-info-text popup-coords">${lat}, ${lng}</span>
-        </div>
-      `;
-    }
 
     content += `</div>`;
 
@@ -668,7 +647,7 @@ export default function MapLibreMap({
 
       {/* 스타일 */}
       <style jsx global>{`
-        /* 팝업 컨테이너 - 다크 모드 */
+        /* 팝업 컨테이너 */
         .maplibre-popup-custom .maplibregl-popup-content {
           padding: 0;
           background: #1f2937;
@@ -679,16 +658,6 @@ export default function MapLibreMap({
         }
         .maplibre-popup-custom .maplibregl-popup-tip {
           border-top-color: #1f2937;
-        }
-
-        /* 팝업 컨테이너 - 라이트 모드 */
-        .popup-light + .maplibregl-popup-content {
-          background: #ffffff;
-          border: 1px solid rgba(0,0,0,0.1);
-          box-shadow: 0 8px 24px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .popup-light ~ .maplibregl-popup-tip {
-          border-top-color: #ffffff;
         }
 
         /* 팝업 내용 */
@@ -713,46 +682,7 @@ export default function MapLibreMap({
           background: rgba(255, 255, 255, 0.4);
         }
 
-        /* 라이트 모드 스크롤바 */
-        .popup-light::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.2);
-        }
-        .popup-light::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 0, 0, 0.3);
-        }
-
-        /* 라이트 모드 헤더 */
-        .popup-light .popup-header {
-          background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-          border-bottom: 1px solid rgba(0,0,0,0.08);
-        }
-
-        /* 라이트 모드 배지 */
-        .popup-light .popup-badge {
-          color: #64748b;
-          background: rgba(100, 116, 139, 0.12);
-        }
-
-        /* 라이트 모드 병원명 */
-        .popup-light .popup-name {
-          color: #1f2937;
-        }
-
-        /* 라이트 모드 위치 정보 섹션 */
-        .popup-light .popup-info-section {
-          border-bottom: 1px solid rgba(0,0,0,0.08);
-          background: rgba(0,0,0,0.02);
-        }
-
-        /* 라이트 모드 텍스트 */
-        .popup-light .popup-info-text {
-          color: #4b5563;
-        }
-
-        .popup-light .popup-coords {
-          color: #9ca3af;
-        }
-
+        /* 헤더 */
         .popup-header {
           display: flex;
           align-items: center;
@@ -819,44 +749,11 @@ export default function MapLibreMap({
           font-size: 10px;
           color: #9ca3af;
         }
+
+        /* 병상 섹션 */
         .popup-section {
           padding: 10px 12px;
         }
-        .popup-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 4px 0;
-        }
-        .popup-row:not(:last-child) {
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .popup-label {
-          font-size: 11px;
-          color: #9ca3af;
-        }
-        .popup-value {
-          font-size: 12px;
-          color: #e5e7eb;
-          font-variant-numeric: tabular-nums;
-        }
-        .popup-status {
-          padding: 8px 12px;
-          font-size: 12px;
-          font-weight: 500;
-          text-align: center;
-          border-top: 1px solid rgba(255,255,255,0.05);
-        }
-        .popup-status.available {
-          color: #4ade80;
-          background: rgba(74,222,128,0.1);
-        }
-        .popup-status.unavailable {
-          color: #f87171;
-          background: rgba(248,113,113,0.1);
-        }
-
-        /* 병상 섹션 */
         .popup-section-title {
           font-size: 10px;
           font-weight: 600;
@@ -928,13 +825,114 @@ export default function MapLibreMap({
           text-align: right;
         }
 
-        /* 업데이트 시간 */
+        /* 상태 및 업데이트 */
+        .popup-status {
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 500;
+          text-align: center;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .popup-status.available {
+          color: #4ade80;
+          background: rgba(74,222,128,0.1);
+        }
+        .popup-status.unavailable {
+          color: #f87171;
+          background: rgba(248,113,113,0.1);
+        }
         .popup-update {
           font-size: 10px;
           color: #6b7280;
           text-align: right;
           padding: 6px 12px 8px;
           border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* ==================== 라이트 모드 ==================== */
+        .popup-light {
+          color-scheme: light;
+        }
+
+        /* 라이트 모드 - 팝업 배경 (MapLibre popup content) */
+        .popup-light {
+          background: #ffffff !important;
+        }
+
+        /* 라이트 모드 - 헤더 */
+        .popup-light .popup-header {
+          background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+        }
+        .popup-light .popup-badge {
+          color: #64748b;
+          background: rgba(100, 116, 139, 0.12);
+        }
+        .popup-light .popup-name {
+          color: #1f2937;
+        }
+
+        /* 라이트 모드 - 위치 정보 */
+        .popup-light .popup-info-section {
+          padding: 8px 12px;
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+          background: rgba(0,0,0,0.02);
+        }
+        .popup-light .popup-info-text {
+          color: #4b5563;
+        }
+        .popup-light .popup-info-icon {
+          opacity: 0.7;
+        }
+        .popup-light .popup-coords {
+          color: #9ca3af;
+        }
+
+        /* 라이트 모드 - 병상 섹션 */
+        .popup-light .popup-section {
+          padding: 10px 12px;
+          background: rgba(0,0,0,0.02);
+        }
+        .popup-light .popup-section-title {
+          color: #4b5563;
+        }
+        .popup-light .popup-bed-item {
+          background: rgba(0,0,0,0.04);
+          border: 1px solid rgba(0,0,0,0.06);
+        }
+        .popup-light .popup-bed-label {
+          color: #6b7280;
+        }
+        .popup-light .popup-bed-total {
+          color: #9ca3af;
+        }
+
+        /* 라이트 모드 - 점유율 */
+        .popup-light .popup-occupancy {
+          border-top: 1px solid rgba(0,0,0,0.08);
+        }
+        .popup-light .popup-occupancy-label {
+          color: #6b7280;
+        }
+        .popup-light .popup-occupancy-bar {
+          background: rgba(0,0,0,0.08);
+        }
+
+        /* 라이트 모드 - 상태 */
+        .popup-light .popup-status {
+          border-top: 1px solid rgba(0,0,0,0.08);
+        }
+        .popup-light .popup-update {
+          color: #9ca3af;
+          border-top: 1px solid rgba(0,0,0,0.08);
+        }
+
+        /* 라이트 모드 - 스크롤바 */
+        .popup-light::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.2);
+        }
+        .popup-light::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 0, 0, 0.3);
         }
 
         /* 지도 컨트롤 */
