@@ -36,7 +36,7 @@ import { SEVERE_TYPES } from "@/lib/constants/dger";
 type MobilePanelType = "filter" | "list" | null;
 
 // 지도 모드 타입
-type MapModeType = "svg" | "maplibre";
+type MapModeType = "svg" | "maptiler";
 
 type EmergencyClassification = "권역응급의료센터" | "지역응급의료센터" | "지역응급의료기관";
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
@@ -86,7 +86,7 @@ export function MapDashboard() {
   const [selectedSevereType, setSelectedSevereType] = useState<SevereTypeKey | null>(null);  // 선택된 27개 중증질환
   const [searchQuery, setSearchQuery] = useState<string>("");  // 병원명 검색어
   const [mobilePanel, setMobilePanel] = useState<MobilePanelType>(null);  // 모바일 패널 상태
-  const [mapMode, setMapMode] = useState<MapModeType>("maplibre");  // 지도 모드 (기본: MapLibre)
+  const [mapMode, setMapMode] = useState<MapModeType>("maptiler");  // 지도 모드 (기본: Maptiler)
 
   const hospitalListRef = useRef<HTMLDivElement>(null);
 
@@ -410,14 +410,14 @@ export function MapDashboard() {
           {/* 지도 모드 토글 - 데스크탑 */}
           <div className={`hidden md:flex items-center gap-1 rounded-lg p-0.5 ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
             <button
-              onClick={() => setMapMode("maplibre")}
+              onClick={() => setMapMode("maptiler")}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                mapMode === "maplibre"
+                mapMode === "maptiler"
                   ? "bg-cyan-600 text-white"
                   : isDark ? "text-gray-400 hover:text-gray-300" : "text-gray-600 hover:text-gray-500"
               }`}
             >
-              실시간 지도
+              Maptiler
             </button>
             <button
               onClick={() => setMapMode("svg")}
@@ -427,7 +427,7 @@ export function MapDashboard() {
                   : isDark ? "text-gray-400 hover:text-gray-300" : "text-gray-600 hover:text-gray-500"
               }`}
             >
-              레거시
+              SVG
             </button>
           </div>
 
@@ -673,7 +673,7 @@ export function MapDashboard() {
 
         {/* Map */}
         <main className="flex-1 relative min-h-0" style={{ minHeight: 0 }}>
-          {mapMode === "maplibre" ? (
+          {mapMode === "maptiler" ? (
             <MapLibreMap
               hospitals={filteredHospitals}
               bedDataMap={bedDataMap}
