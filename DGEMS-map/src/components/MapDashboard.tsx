@@ -1,13 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { getAllData, getHospitals, getDiseases, getMeta } from "@/lib/data";
 import { DAYS_OF_WEEK } from "@/lib/constants";
 import type { DayOfWeek, AvailabilityStatus, Hospital } from "@/types";
@@ -459,22 +453,17 @@ export function MapDashboard() {
             {/* 자원조사 44개 */}
             <div>
               <label className={`text-[9px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>자원조사 44개</label>
-              <Select
-                value={selectedDisease || "none"}
-                onValueChange={(v) => setSelectedDisease(v === "none" ? null : v)}
-              >
-                <SelectTrigger className={`h-7 text-xs border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
-                  <SelectValue placeholder="선택..." />
-                </SelectTrigger>
-                <SelectContent className={`max-h-64 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                  <SelectItem value="none" className={`text-xs ${isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`}>전체</SelectItem>
-                  {diseases.map((d) => (
-                    <SelectItem key={d.id} value={d.name} className={`text-xs ${isDark ? 'text-white hover:bg-gray-700' : 'text-gray-900 hover:bg-gray-100'}`}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                options={[
+                  { value: "", label: "전체" },
+                  ...diseases.map((d) => ({ value: d.name, label: d.name })),
+                ]}
+                value={selectedDisease || ""}
+                onValueChange={(v) => setSelectedDisease(v || null)}
+                placeholder="선택..."
+                triggerClassName={`h-7 text-xs border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+              />
             </div>
             {/* 실시간 27개 */}
             <div>
@@ -482,22 +471,17 @@ export function MapDashboard() {
                 <label className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>실시간 27개</label>
                 {severeLoading && <span className="text-[9px] text-orange-400">로딩...</span>}
               </div>
-              <Select
-                value={selectedSevereType || "none"}
-                onValueChange={(v) => setSelectedSevereType(v === "none" ? null : v as SevereTypeKey)}
-              >
-                <SelectTrigger className={`h-7 text-xs border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
-                  <SelectValue placeholder="선택..." />
-                </SelectTrigger>
-                <SelectContent className={`max-h-64 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                  <SelectItem value="none" className={`text-xs ${isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`}>전체</SelectItem>
-                  {SEVERE_TYPES.map((type) => (
-                    <SelectItem key={type.key} value={type.key} className={`text-xs ${isDark ? 'text-white hover:bg-gray-700' : 'text-gray-900 hover:bg-gray-100'}`}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                options={[
+                  { value: "", label: "전체" },
+                  ...SEVERE_TYPES.map((type) => ({ value: type.key, label: type.label })),
+                ]}
+                value={selectedSevereType || ""}
+                onValueChange={(v) => setSelectedSevereType(v ? (v as SevereTypeKey) : null)}
+                placeholder="선택..."
+                triggerClassName={`h-7 text-xs border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+              />
             </div>
             {/* 통계 표시 */}
             {(stats || severeStats) && (
