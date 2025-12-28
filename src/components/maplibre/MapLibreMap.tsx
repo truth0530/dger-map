@@ -32,6 +32,7 @@ interface MapLibreMapProps {
   hoveredHospitalCode: string | null;
   onHospitalHover?: (code: string | null) => void;
   onHospitalClick?: (hospital: Hospital) => void;
+  onSwitchToLeaflet?: () => void;
 }
 
 export default function MapLibreMap({
@@ -45,6 +46,7 @@ export default function MapLibreMap({
   hoveredHospitalCode,
   onHospitalHover,
   onHospitalClick,
+  onSwitchToLeaflet,
 }: MapLibreMapProps) {
   const { isDark } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -76,22 +78,15 @@ export default function MapLibreMap({
   }, [mapStyleMode, isDark]);
 
   // 필터링된 병원 목록
+  // NOTE: MapDashboard에서 이미 selectedRegion과 selectedClassifications로 필터링됨
+  // 여기서는 좌표가 있는 병원만 추가로 필터링
   const filteredHospitals = useMemo(() => {
     return hospitals.filter(h => {
       // 좌표가 없는 병원 제외
       if (!h.lat || !h.lng) return false;
-
-      // 지역 필터
-      if (selectedRegion !== 'all' && h.region !== selectedRegion) return false;
-
-      // 기관분류 필터
-      if (selectedClassifications.length > 0 && h.classification) {
-        if (!selectedClassifications.includes(h.classification)) return false;
-      }
-
       return true;
     });
-  }, [hospitals, selectedRegion, selectedClassifications]);
+  }, [hospitals]);
 
   // 마커 HTML 생성 (공통 유틸 사용)
   const createMarkerElementCallback = useCallback((hospital: Hospital, isHovered: boolean): HTMLElement => {
@@ -529,8 +524,30 @@ export default function MapLibreMap({
         </div>
       )}
 
-      {/* 지도 컨트롤 그룹 (스타일 토글 + 줌 + 전체화면) */}
+      {/* 지도 컨트롤 그룹 (맵 전환 + 스타일 토글 + 줌 + 전체화면) */}
       <div className={`absolute top-4 right-4 z-20 flex items-center gap-2 rounded-lg shadow-lg border p-1.5 ${isDark ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-gray-300/50'}`}>
+        {/* MapTiler/Leaflet 전환 */}
+        <div className="flex items-center">
+          <button
+            className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${isDark ? 'bg-cyan-600 text-white' : 'bg-cyan-500 text-white'}`}
+            title="현재: MapTiler"
+          >
+            MapTiler
+          </button>
+          {onSwitchToLeaflet && (
+            <button
+              onClick={onSwitchToLeaflet}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${isDark ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200/80'}`}
+              title="Leaflet으로 전환"
+            >
+              Leaflet
+            </button>
+          )}
+        </div>
+
+        {/* 구분선 */}
+        <div className={`w-px h-5 ${isDark ? 'bg-gray-700/50' : 'bg-gray-400/50'}`} />
+
         {/* 스타일 토글 버튼 */}
         <div className="relative group">
           <button

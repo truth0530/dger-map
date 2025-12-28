@@ -393,30 +393,23 @@ button.border, [class*="border"] {
   @apply flex items-center p-6 pt-0;
 }
 
-/* 입력 필드 스타일 */
-input, textarea, select {
-  @apply h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+/* 입력 필드 스타일 - height 제거 (컴포넌트에서 제어) */
+input, textarea {
+  @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 /* 라이트 모드 입력 필드 */
 html.light input,
-html.light textarea,
-html.light select {
+html.light textarea {
   @apply bg-white border-gray-300 text-gray-900 placeholder:text-gray-500;
 }
 
 html.light input:focus,
-html.light textarea:focus,
-html.light select:focus {
+html.light textarea:focus {
   @apply border-primary ring-primary;
 }
 
-/* 선택 드롭다운 */
-[role="combobox"],
-[class*="Select"],
-[class*="select"] {
-  @apply h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
-}
+/* 선택 드롭다운 - height 제거 (컴포넌트에서 size prop으로 제어) */
 
 /* Select 아이템 컴팩트 스타일 */
 [data-slot="select-item"] {

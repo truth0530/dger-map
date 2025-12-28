@@ -28,6 +28,7 @@ export interface ComboboxProps {
   className?: string
   triggerClassName?: string
   contentClassName?: string
+  size?: "xs" | "sm" | "default"
 }
 
 const Combobox = React.forwardRef<HTMLButtonElement, ComboboxProps>(
@@ -41,6 +42,7 @@ const Combobox = React.forwardRef<HTMLButtonElement, ComboboxProps>(
       className,
       triggerClassName,
       contentClassName,
+      size = "default",
     },
     ref
   ) => {
@@ -57,6 +59,7 @@ const Combobox = React.forwardRef<HTMLButtonElement, ComboboxProps>(
           <Button
             ref={ref}
             variant="outline"
+            size={size}
             role="combobox"
             aria-expanded={open}
             disabled={disabled}
@@ -66,7 +69,7 @@ const Combobox = React.forwardRef<HTMLButtonElement, ComboboxProps>(
             )}
           >
             <span className="truncate">{selectedLabel}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronsUpDown className={cn("ml-1 shrink-0 opacity-50", size === "xs" ? "h-3 w-3" : "h-4 w-4")} />
           </Button>
         </PopoverTrigger>
         <PopoverContent className={cn("w-full p-0", contentClassName)} align="start">
