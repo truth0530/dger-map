@@ -467,11 +467,40 @@ export function MapDashboard() {
     }
   }, [fetchEmergencyMessages]);
 
-  // 사이드바에 표시할 지역명
-  const getSidebarRegionLabel = (): string => {
-    if (selectedRegion === "all") return "대구";  // 전국 선택 시 대구 병원만 표시
-    const region = REGIONS.find((r) => r.value === selectedRegion);
-    return region?.label || selectedRegion;
+  // 사이드바에 표시할 필터 조건 요약
+  const getFilterSummary = (): string => {
+    const parts: string[] = [];
+
+    // 1. 지역
+    if (selectedRegion === "all") {
+      parts.push("대구");
+    } else {
+      const region = REGIONS.find((r) => r.value === selectedRegion);
+      parts.push(region?.label || selectedRegion);
+    }
+
+    // 2. 요일 (질환 선택 시에만)
+    if (selectedDiseaseCategory) {
+      parts.push(`${selectedDay}요일`);
+    }
+
+    // 3. 질환 대분류
+    if (selectedDiseaseCategory) {
+      const category = DISEASE_CATEGORIES.find((c) => c.key === selectedDiseaseCategory);
+      if (category) {
+        parts.push(category.label);
+      }
+    }
+
+    // 4. 실시간 중증질환
+    if (selectedSevereType) {
+      const severe = SEVERE_TYPES.find((t) => t.key === selectedSevereType);
+      if (severe) {
+        parts.push(severe.label);
+      }
+    }
+
+    return parts.join(", ");
   };
 
   // 기관종류 약어 변환
@@ -481,6 +510,25 @@ export function MapDashboard() {
       case "지역응급의료센터": return "센터";
       case "지역응급의료기관": return "기관";
       default: return "";
+    }
+  };
+
+  // 기관종류 아이콘 렌더링 (모양으로 구분)
+  const renderClassificationIcon = (shortClass: string, isDarkMode: boolean) => {
+    const fillClass = isDarkMode ? "fill-gray-400" : "fill-gray-500";
+    switch (shortClass) {
+      case "권역":
+        return <span className={`w-2.5 h-2.5 shrink-0 ${isDarkMode ? "bg-gray-400" : "bg-gray-500"}`} />;
+      case "센터":
+        return <span className={`w-2.5 h-2.5 shrink-0 rounded-full ${isDarkMode ? "bg-gray-400" : "bg-gray-500"}`} />;
+      case "기관":
+        return (
+          <svg className={`w-2.5 h-2.5 shrink-0 ${fillClass}`} viewBox="0 0 10 10">
+            <polygon points="5,0 10,10 0,10" />
+          </svg>
+        );
+      default:
+        return null;
     }
   };
 
@@ -526,47 +574,86 @@ export function MapDashboard() {
         {/* 좌측 필터 사이드바 */}
         <aside className={`hidden md:flex w-48 flex-col ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
           <div className="flex-1 overflow-y-auto">
-          {/* 지역/요일 선택 */}
-          <div className={`px-2 py-1.5 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-            <div className="grid grid-cols-2 gap-1.5">
-              <div>
+          {/* 지역 + 기관분류 */}
+          <div className="px-2 py-1.5">
+            <div className="flex items-end gap-1">
+              <div className="w-14 shrink-0">
                 <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
                 <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
-                  <SelectTrigger size="xs" className={`border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
+                  <SelectTrigger size="xs" className={`[&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
                     {REGIONS.map((r) => (
-                      <SelectItem key={r.value} value={r.value} className={`text-[10px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <SelectItem key={r.value} value={r.value} className={`text-[9px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         {r.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>요일</label>
+              <div className="flex-1 min-w-0">
+                <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
+                <div className="flex gap-0.5 items-center">
+                  <button
+                    onClick={() => toggleClassification("권역응급의료센터")}
+                    className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
+                      selectedClassifications.includes("권역응급의료센터")
+                        ? "bg-cyan-500/20 text-white"
+                        : "text-gray-500 hover:text-gray-400"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                    권역
+                  </button>
+                  <button
+                    onClick={() => toggleClassification("지역응급의료센터")}
+                    className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
+                      selectedClassifications.includes("지역응급의료센터")
+                        ? "bg-cyan-500/20 text-white"
+                        : "text-gray-500 hover:text-gray-400"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                    센터
+                  </button>
+                  <button
+                    onClick={() => toggleClassification("지역응급의료기관")}
+                    className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
+                      selectedClassifications.includes("지역응급의료기관")
+                        ? "bg-cyan-500/20 text-white"
+                        : "text-gray-500 hover:text-gray-400"
+                    }`}
+                  >
+                    <svg className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : "fill-gray-500"}`} viewBox="0 0 10 10">
+                      <polygon points="5,0 10,10 0,10" />
+                    </svg>
+                    기관
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 질환 선택 */}
+          <div className="px-2 py-1.5 space-y-1.5">
+            {/* 42개 자원조사 */}
+            <div>
+              <div className="flex items-center justify-between mb-0.5">
+                <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>중증자원조사 42개</label>
                 <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
-                  <SelectTrigger size="xs" className={`border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
+                  <SelectTrigger size="xs" className={`w-20 [&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
                     {DAYS_OF_WEEK.map((day) => (
-                      <SelectItem key={day} value={day} className={`text-[10px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <SelectItem key={day} value={day} className={`text-[9px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         {day}요일
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </div>
-
-          {/* 질환 선택 */}
-          <div className={`px-2 py-1.5 border-b space-y-1.5 ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-            {/* 42개 자원조사 */}
-            <div>
-              <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>자원조사 42개</label>
               <Combobox
                 options={[
                   { value: "", label: "전체" },
@@ -576,7 +663,7 @@ export function MapDashboard() {
                 onValueChange={(v) => handleCategoryChange(v || null)}
                 placeholder="대분류 선택..."
                 size="xs"
-                triggerClassName={`border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                triggerClassName={`${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}
                 contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
               />
               {currentCategory && currentCategory.subcategories.length > 0 && (
@@ -587,7 +674,7 @@ export function MapDashboard() {
                       onClick={() => toggleDiseaseSubcategory(sub.key)}
                       className={`text-[8px] px-1 py-0.5 rounded transition-colors ${
                         selectedDiseaseSubcategories.has(sub.key)
-                          ? "bg-cyan-500/20 text-cyan-400"
+                          ? "bg-cyan-500/20 text-white"
                           : "text-gray-500 hover:text-gray-400"
                       }`}
                     >
@@ -600,7 +687,7 @@ export function MapDashboard() {
                 <button
                   onClick={() => selectedDiseaseCategory && toggleStatus("24시간")}
                   disabled={!selectedDiseaseCategory}
-                  className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
                     !selectedDiseaseCategory
                       ? "text-gray-700 cursor-not-allowed"
                       : selectedStatus.includes("24시간")
@@ -613,7 +700,7 @@ export function MapDashboard() {
                 <button
                   onClick={() => selectedDiseaseCategory && toggleStatus("주간")}
                   disabled={!selectedDiseaseCategory}
-                  className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
                     !selectedDiseaseCategory
                       ? "text-gray-700 cursor-not-allowed"
                       : selectedStatus.includes("주간")
@@ -626,7 +713,7 @@ export function MapDashboard() {
                 <button
                   onClick={() => selectedDiseaseCategory && toggleStatus("야간")}
                   disabled={!selectedDiseaseCategory}
-                  className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
                     !selectedDiseaseCategory
                       ? "text-gray-700 cursor-not-allowed"
                       : selectedStatus.includes("야간")
@@ -641,7 +728,7 @@ export function MapDashboard() {
             {/* 실시간 27개 */}
             <div>
               <div className="flex items-center justify-between">
-                <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>실시간 27개</label>
+                <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>27개 실시간 중증질환</label>
                 {severeLoading && <span className="text-[8px] text-orange-400">로딩...</span>}
               </div>
               <Combobox
@@ -653,7 +740,7 @@ export function MapDashboard() {
                 onValueChange={(v) => setSelectedSevereType(v ? (v as SevereTypeKey) : null)}
                 placeholder="선택..."
                 size="xs"
-                triggerClassName={`border ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                triggerClassName={`${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}
                 contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
               />
             </div>
@@ -676,47 +763,10 @@ export function MapDashboard() {
             )}
           </div>
 
-          {/* 기관분류 */}
-          <div className={`px-2 py-1.5 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-            <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관분류</label>
-            <div className="flex flex-wrap gap-0.5">
-              <button
-                onClick={() => toggleClassification("권역응급의료센터")}
-                className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
-                  selectedClassifications.includes("권역응급의료센터")
-                    ? "bg-orange-500/20 text-orange-400"
-                    : "text-gray-500 hover:text-gray-400"
-                }`}
-              >
-                권역
-              </button>
-              <button
-                onClick={() => toggleClassification("지역응급의료센터")}
-                className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
-                  selectedClassifications.includes("지역응급의료센터")
-                    ? "bg-blue-500/20 text-blue-400"
-                    : "text-gray-500 hover:text-gray-400"
-                }`}
-              >
-                센터
-              </button>
-              <button
-                onClick={() => toggleClassification("지역응급의료기관")}
-                className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
-                  selectedClassifications.includes("지역응급의료기관")
-                    ? "bg-emerald-500/20 text-emerald-400"
-                    : "text-gray-500 hover:text-gray-400"
-                }`}
-              >
-                기관
-              </button>
-            </div>
-          </div>
-
           {/* 병상 */}
           <div className={`px-2 py-1.5 ${isDark ? '' : ''}`}>
             <div className="flex items-center justify-between">
-              <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>병상</label>
+              <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>실시간 병상정보</label>
               {bedLoading && <span className="text-[8px] text-orange-400">로딩...</span>}
             </div>
             <div className="flex flex-wrap gap-0.5 mt-0.5">
@@ -724,9 +774,9 @@ export function MapDashboard() {
                 <button
                   key={type}
                   onClick={() => toggleBedType(type)}
-                  className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
                     selectedBedTypes.has(type)
-                      ? "bg-cyan-500/20 text-cyan-400"
+                      ? "bg-cyan-500/20 text-white"
                       : "text-gray-500 hover:text-gray-400"
                   }`}
                 >
@@ -737,8 +787,8 @@ export function MapDashboard() {
             <div className="flex gap-1.5 mt-1">
               <button
                 onClick={() => toggleBedStatus("여유")}
-                className={`flex items-center gap-1 text-[9px] transition-colors ${
-                  selectedBedStatus.includes("여유") ? "text-green-400" : "text-gray-600"
+                className={`flex items-center gap-1 text-[8px] px-1 py-0.5 rounded transition-colors ${
+                  selectedBedStatus.includes("여유") ? "bg-green-500/20 text-green-400" : "text-gray-600 hover:text-gray-400"
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${selectedBedStatus.includes("여유") ? "bg-green-500" : "bg-gray-600"}`} />
@@ -746,8 +796,8 @@ export function MapDashboard() {
               </button>
               <button
                 onClick={() => toggleBedStatus("적정")}
-                className={`flex items-center gap-1 text-[9px] transition-colors ${
-                  selectedBedStatus.includes("적정") ? "text-blue-400" : "text-gray-600"
+                className={`flex items-center gap-1 text-[8px] px-1 py-0.5 rounded transition-colors ${
+                  selectedBedStatus.includes("적정") ? "bg-blue-500/20 text-blue-400" : "text-gray-600 hover:text-gray-400"
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${selectedBedStatus.includes("적정") ? "bg-blue-500" : "bg-gray-600"}`} />
@@ -755,8 +805,8 @@ export function MapDashboard() {
               </button>
               <button
                 onClick={() => toggleBedStatus("부족")}
-                className={`flex items-center gap-1 text-[9px] transition-colors ${
-                  selectedBedStatus.includes("부족") ? "text-red-400" : "text-gray-600"
+                className={`flex items-center gap-1 text-[8px] px-1 py-0.5 rounded transition-colors ${
+                  selectedBedStatus.includes("부족") ? "bg-red-500/20 text-red-400" : "text-gray-600 hover:text-gray-400"
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${selectedBedStatus.includes("부족") ? "bg-red-500" : "bg-gray-600"}`} />
@@ -769,7 +819,10 @@ export function MapDashboard() {
 
         {/* 병원 목록 사이드바 */}
         <aside className={`hidden md:flex w-56 flex-col border-x ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-100 border-gray-300'}`}>
-          <div className={`px-1.5 py-1 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
+          <div className="px-1.5 py-1 space-y-1">
+            <label className={`text-[10px] font-medium block ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              {getFilterSummary()} ({searchedHospitals.length})
+            </label>
             <div className="relative">
               <svg
                 className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}
@@ -784,7 +837,7 @@ export function MapDashboard() {
                 placeholder="병원명 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-5 pr-2 text-[10px] rounded focus:outline-none ${isDark ? 'bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-gray-600' : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-gray-400'}`}
+                className={`w-full h-5 pr-2 text-[10px] rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-transparent border-none text-gray-900 placeholder-gray-400'}`}
                 style={{ paddingLeft: '20px' }}
               />
               {searchQuery && (
@@ -798,11 +851,6 @@ export function MapDashboard() {
                 </button>
               )}
             </div>
-          </div>
-          <div className={`px-1.5 py-1 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-            <label className={`text-[10px] font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {getSidebarRegionLabel()} ({searchedHospitals.length}{searchQuery ? `/${filteredHospitals.length}` : ''})
-            </label>
           </div>
           <div
             ref={hospitalListRef}
@@ -832,12 +880,8 @@ export function MapDashboard() {
                   onMouseLeave={() => handleHospitalHover(null)}
                   onClick={() => handleHospitalHover(hospital.code)}
                 >
-                  <div className="flex items-center gap-0.5">
-                    {shortClass && (
-                      <span className={`shrink-0 text-[8px] px-0.5 rounded ${isDark ? (isHovered ? 'bg-gray-600 text-gray-200' : 'bg-gray-700 text-gray-400') : (isHovered ? 'bg-gray-300 text-gray-900' : 'bg-gray-200 text-gray-600')}`}>
-                        {shortClass}
-                      </span>
-                    )}
+                  <div className="flex items-center gap-1">
+                    {shortClass && renderClassificationIcon(shortClass, isDark)}
                     <span className={`font-medium truncate flex-1 ${isDark ? (isHovered ? 'text-white' : 'text-gray-200') : (isHovered ? 'text-gray-900' : 'text-gray-700')}`}>
                       {hospital.name}
                     </span>
@@ -905,12 +949,13 @@ export function MapDashboard() {
           </div>
           <div className="overflow-y-auto h-[calc(100%-48px)]">
             {/* 지역/요일 선택 */}
+            {/* 지역 + 기관분류 */}
             <div className="px-3 py-3 border-b border-gray-800">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] text-gray-500 mb-1 block">지역</label>
                   <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
-                    <SelectTrigger size="xs" className="bg-gray-800 border-gray-700 text-white">
+                    <SelectTrigger size="xs" className="bg-transparent border-none text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
@@ -923,19 +968,44 @@ export function MapDashboard() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-gray-500 mb-1 block">요일</label>
-                  <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
-                    <SelectTrigger size="xs" className="bg-gray-800 border-gray-700 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
-                      {DAYS_OF_WEEK.map((day) => (
-                        <SelectItem key={day} value={day} className="text-white">
-                          {day}요일
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <label className="text-[10px] text-gray-500 mb-1 block">기관</label>
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <button
+                      onClick={() => toggleClassification("권역응급의료센터")}
+                      className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                        selectedClassifications.includes("권역응급의료센터")
+                          ? "bg-cyan-500/20 text-white"
+                          : "text-gray-500 hover:text-gray-400"
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                      권역
+                    </button>
+                    <button
+                      onClick={() => toggleClassification("지역응급의료센터")}
+                      className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                        selectedClassifications.includes("지역응급의료센터")
+                          ? "bg-cyan-500/20 text-white"
+                          : "text-gray-500 hover:text-gray-400"
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                      센터
+                    </button>
+                    <button
+                      onClick={() => toggleClassification("지역응급의료기관")}
+                      className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                        selectedClassifications.includes("지역응급의료기관")
+                          ? "bg-cyan-500/20 text-white"
+                          : "text-gray-500 hover:text-gray-400"
+                      }`}
+                    >
+                      <svg className={`w-2.5 h-2.5 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : "fill-gray-500"}`} viewBox="0 0 10 10">
+                        <polygon points="5,0 10,10 0,10" />
+                      </svg>
+                      기관
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -944,12 +1014,26 @@ export function MapDashboard() {
             <div className="px-3 py-3 border-b border-gray-800">
               <div className="space-y-2">
                 <div>
-                  <label className="text-[10px] text-gray-500 mb-1 block">자원조사 42개</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] text-gray-500">중증자원조사 42개</label>
+                    <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
+                      <SelectTrigger size="xs" className="w-16 bg-transparent border-none text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {DAYS_OF_WEEK.map((day) => (
+                          <SelectItem key={day} value={day} className="text-white">
+                            {day}요일
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Select
                     value={selectedDiseaseCategory || "none"}
                     onValueChange={(v) => handleCategoryChange(v === "none" ? null : v)}
                   >
-                    <SelectTrigger size="xs" className="bg-gray-800 border-gray-700 text-white">
+                    <SelectTrigger size="xs" className="bg-transparent border-none text-white">
                       <SelectValue placeholder="대분류 선택..." />
                     </SelectTrigger>
                     <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
@@ -970,7 +1054,7 @@ export function MapDashboard() {
                           onClick={() => toggleDiseaseSubcategory(sub.key)}
                           className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
                             selectedDiseaseSubcategories.has(sub.key)
-                              ? "bg-cyan-500/20 text-cyan-400"
+                              ? "bg-cyan-500/20 text-white"
                               : "text-gray-500 hover:text-gray-400"
                           }`}
                         >
@@ -984,7 +1068,7 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("24시간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                      className={`text-[9px] px-2 py-1 rounded transition-colors ${
                         !selectedDiseaseCategory
                           ? "text-gray-700 cursor-not-allowed"
                           : selectedStatus.includes("24시간")
@@ -997,7 +1081,7 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("주간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                      className={`text-[9px] px-2 py-1 rounded transition-colors ${
                         !selectedDiseaseCategory
                           ? "text-gray-700 cursor-not-allowed"
                           : selectedStatus.includes("주간")
@@ -1010,7 +1094,7 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("야간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                      className={`text-[9px] px-2 py-1 rounded transition-colors ${
                         !selectedDiseaseCategory
                           ? "text-gray-700 cursor-not-allowed"
                           : selectedStatus.includes("야간")
@@ -1023,12 +1107,12 @@ export function MapDashboard() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-gray-500 mb-1 block">실시간 27개</label>
+                  <label className="text-[10px] text-gray-500 mb-1 block">27개 실시간 중증질환</label>
                   <Select
                     value={selectedSevereType || "none"}
                     onValueChange={(v) => setSelectedSevereType(v === "none" ? null : v as SevereTypeKey)}
                   >
-                    <SelectTrigger size="xs" className="bg-gray-800 border-gray-700 text-white">
+                    <SelectTrigger size="xs" className="bg-transparent border-none text-white">
                       <SelectValue placeholder="선택..." />
                     </SelectTrigger>
                     <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
@@ -1044,47 +1128,10 @@ export function MapDashboard() {
               </div>
             </div>
 
-            {/* 기관분류 필터 */}
-            <div className="px-3 py-3 border-b border-gray-800">
-              <label className="text-[10px] text-gray-500 mb-2 block">기관분류</label>
-              <div className="flex flex-wrap gap-1">
-                <button
-                  onClick={() => toggleClassification("권역응급의료센터")}
-                  className={`text-[10px] px-2 py-1 rounded transition-colors ${
-                    selectedClassifications.includes("권역응급의료센터")
-                      ? "bg-orange-500/20 text-orange-400"
-                      : "text-gray-500 hover:text-gray-400"
-                  }`}
-                >
-                  권역
-                </button>
-                <button
-                  onClick={() => toggleClassification("지역응급의료센터")}
-                  className={`text-[10px] px-2 py-1 rounded transition-colors ${
-                    selectedClassifications.includes("지역응급의료센터")
-                      ? "bg-blue-500/20 text-blue-400"
-                      : "text-gray-500 hover:text-gray-400"
-                  }`}
-                >
-                  센터
-                </button>
-                <button
-                  onClick={() => toggleClassification("지역응급의료기관")}
-                  className={`text-[10px] px-2 py-1 rounded transition-colors ${
-                    selectedClassifications.includes("지역응급의료기관")
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "text-gray-500 hover:text-gray-400"
-                  }`}
-                >
-                  기관
-                </button>
-              </div>
-            </div>
-
             {/* 병상 필터 (유형 + 상태) */}
             <div className="px-3 py-3">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-[10px] text-gray-500">병상</label>
+                <label className="text-[10px] text-gray-500">실시간 병상정보</label>
                 {bedLoading && <span className="text-[9px] text-orange-400">로딩...</span>}
               </div>
               {/* 병상 유형 */}
@@ -1093,9 +1140,9 @@ export function MapDashboard() {
                   <button
                     key={type}
                     onClick={() => toggleBedType(type)}
-                    className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                    className={`text-[9px] px-2 py-1 rounded transition-colors ${
                       selectedBedTypes.has(type)
-                        ? "bg-cyan-500/20 text-cyan-400"
+                        ? "bg-cyan-500/20 text-white"
                         : "text-gray-500 hover:text-gray-400"
                     }`}
                   >
@@ -1107,8 +1154,8 @@ export function MapDashboard() {
               <div className="flex gap-2">
                 <button
                   onClick={() => toggleBedStatus("여유")}
-                  className={`flex items-center gap-1.5 text-[10px] transition-colors ${
-                    selectedBedStatus.includes("여유") ? "text-green-400" : "text-gray-600"
+                  className={`flex items-center gap-1.5 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("여유") ? "bg-green-500/20 text-green-400" : "text-gray-600 hover:text-gray-400"
                   }`}
                 >
                   <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("여유") ? "bg-green-500" : "bg-gray-600"}`} />
@@ -1116,8 +1163,8 @@ export function MapDashboard() {
                 </button>
                 <button
                   onClick={() => toggleBedStatus("적정")}
-                  className={`flex items-center gap-1.5 text-[10px] transition-colors ${
-                    selectedBedStatus.includes("적정") ? "text-blue-400" : "text-gray-600"
+                  className={`flex items-center gap-1.5 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("적정") ? "bg-blue-500/20 text-blue-400" : "text-gray-600 hover:text-gray-400"
                   }`}
                 >
                   <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("적정") ? "bg-blue-500" : "bg-gray-600"}`} />
@@ -1125,8 +1172,8 @@ export function MapDashboard() {
                 </button>
                 <button
                   onClick={() => toggleBedStatus("부족")}
-                  className={`flex items-center gap-1.5 text-[10px] transition-colors ${
-                    selectedBedStatus.includes("부족") ? "text-red-400" : "text-gray-600"
+                  className={`flex items-center gap-1.5 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("부족") ? "bg-red-500/20 text-red-400" : "text-gray-600 hover:text-gray-400"
                   }`}
                 >
                   <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("부족") ? "bg-red-500" : "bg-gray-600"}`} />
@@ -1144,7 +1191,7 @@ export function MapDashboard() {
           }`}
         >
           <div className={`flex items-center justify-between p-2 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-            <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{getSidebarRegionLabel()} 병원 ({searchedHospitals.length})</span>
+            <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{getFilterSummary()} ({searchedHospitals.length})</span>
             <button onClick={closeMobilePanel} className={`p-1 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1167,7 +1214,7 @@ export function MapDashboard() {
                 placeholder="병원명 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-gray-600' : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-gray-400'}`}
+                className={`w-full h-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-transparent border-none text-gray-900 placeholder-gray-400'}`}
                 style={{ paddingLeft: '28px' }}
               />
               {searchQuery && (
@@ -1205,11 +1252,7 @@ export function MapDashboard() {
                   }}
                 >
                   <div className="flex items-center gap-1">
-                    {shortClass && (
-                      <span className={`shrink-0 text-[9px] px-1 py-0.5 rounded ${isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
-                        {shortClass}
-                      </span>
-                    )}
+                    {shortClass && renderClassificationIcon(shortClass, isDark)}
                     <span className={`font-medium truncate flex-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
                       {hospital.name}
                     </span>

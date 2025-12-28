@@ -69,7 +69,7 @@ const Combobox = React.forwardRef<HTMLButtonElement, ComboboxProps>(
             )}
           >
             <span className="truncate">{selectedLabel}</span>
-            <ChevronsUpDown className={cn("ml-1 shrink-0 opacity-50", size === "xs" ? "h-3 w-3" : "h-4 w-4")} />
+            <ChevronsUpDown className={cn("ml-1 shrink-0 opacity-50", size === "xs" ? "h-2 w-2" : "h-4 w-4")} />
           </Button>
         </PopoverTrigger>
         <PopoverContent className={cn("w-full p-0", contentClassName)} align="start">
