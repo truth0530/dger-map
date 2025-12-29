@@ -39,14 +39,15 @@ const LeafletMap = dynamic(() => import('@/components/maplibre/LeafletMap'), {
   ),
 });
 
-const KakaoMap = dynamic(() => import('@/components/maplibre/KakaoMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-gray-900">
-      <div className="text-gray-400 text-sm">카카오맵 로딩 중...</div>
-    </div>
-  ),
-});
+// TODO: 카카오맵 API 심사 승인 후 주석 해제
+// const KakaoMap = dynamic(() => import('@/components/maplibre/KakaoMap'), {
+//   ssr: false,
+//   loading: () => (
+//     <div className="w-full h-full flex items-center justify-center bg-gray-900">
+//       <div className="text-gray-400 text-sm">카카오맵 로딩 중...</div>
+//     </div>
+//   ),
+// });
 
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
 
@@ -71,7 +72,7 @@ interface HybridMapProps {
   onBackToNational: () => void;
 }
 
-type MapLayerType = 'maptiler' | 'leaflet' | 'kakao';
+type MapLayerType = 'maptiler' | 'leaflet'; // | 'kakao' - 심사 승인 후 활성화
 
 export default function HybridMap({
   hospitals,
@@ -123,7 +124,7 @@ export default function HybridMap({
           onHospitalHover={onHospitalHover}
           onHospitalClick={onHospitalClick}
           onSwitchToLeaflet={() => setMapLayer('leaflet')}
-          onSwitchToKakao={() => setMapLayer('kakao')}
+          // onSwitchToKakao={() => setMapLayer('kakao')} // 심사 승인 후 활성화
         />
       )}
 
@@ -143,11 +144,11 @@ export default function HybridMap({
           onHospitalHover={onHospitalHover}
           onHospitalClick={onHospitalClick}
           onSwitchToMaptiler={() => setMapLayer('maptiler')}
-          onSwitchToKakao={() => setMapLayer('kakao')}
+          // onSwitchToKakao={() => setMapLayer('kakao')} // 심사 승인 후 활성화
         />
       )}
 
-      {/* Kakao 지도 레이어 */}
+      {/* TODO: 카카오맵 API 심사 승인 후 주석 해제
       {mapLayer === 'kakao' && (
         <KakaoMap
           hospitals={filteredHospitals}
@@ -166,6 +167,7 @@ export default function HybridMap({
           onSwitchToLeaflet={() => setMapLayer('leaflet')}
         />
       )}
+      */}
 
 
       {/* MapLibre 내부 컨트롤 (Maptiler 레이어일 때만 표시) */}
