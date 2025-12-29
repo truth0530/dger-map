@@ -492,7 +492,7 @@ export function KoreaGugunMap({
 
               {/* 컨텐츠 영역 */}
               <div className="p-3 space-y-2.5">
-                {/* 질환 가용성 (44개 질환) */}
+                {/* 질환 가용성 (42개 질환) */}
                 {selectedDisease && hoveredHospital.hasDiseaseData && diseaseStatus && (
                   <div className={`flex items-center justify-between rounded-lg px-2.5 py-2 transition-colors ${isDark ? 'bg-gray-800/50' : 'bg-gray-200/50'}`}>
                     <span className={`text-[11px] truncate flex-1 mr-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{selectedDisease}</span>

@@ -13,6 +13,7 @@ import dynamic from 'next/dynamic';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { createMarkerElement } from '@/lib/utils/markerRenderer';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
+import { getCategoryByKey } from '@/lib/constants/diseaseCategories';
 import type { Hospital, HospitalDiseaseData, DayOfWeek, AvailabilityStatus } from '@/types';
 import type { HospitalBedData } from '@/lib/hooks/useBedData';
 import type { HospitalSevereData } from '@/lib/hooks/useSevereData';
@@ -47,6 +48,7 @@ interface HybridMapProps {
   emergencyMessages?: Map<string, ClassifiedMessages>;
   selectedRegion: string;
   selectedSevereType?: SevereTypeKey | null;
+  selectedDiseaseCategory?: string | null;  // 42개 중증자원조사 대분류 선택
   selectedClassifications: string[];
   hoveredHospitalCode: string | null;
   onHospitalHover?: (code: string | null) => void;
@@ -69,6 +71,7 @@ export default function HybridMap({
   emergencyMessages,
   selectedRegion,
   selectedSevereType,
+  selectedDiseaseCategory,
   selectedClassifications,
   hoveredHospitalCode,
   onHospitalHover,
@@ -104,6 +107,7 @@ export default function HybridMap({
           emergencyMessages={emergencyMessages}
           selectedRegion={selectedRegion}
           selectedSevereType={selectedSevereType}
+          selectedDiseaseCategory={selectedDiseaseCategory}
           selectedClassifications={selectedClassifications}
           hoveredHospitalCode={hoveredHospitalCode}
           onHospitalHover={onHospitalHover}
@@ -121,6 +125,7 @@ export default function HybridMap({
           emergencyMessages={emergencyMessages}
           selectedRegion={selectedRegion}
           selectedSevereType={selectedSevereType}
+          selectedDiseaseCategory={selectedDiseaseCategory}
           selectedClassifications={selectedClassifications}
           hoveredHospitalCode={hoveredHospitalCode}
           onHospitalHover={onHospitalHover}
@@ -128,12 +133,6 @@ export default function HybridMap({
           onSwitchToMaptiler={() => setMapLayer('maptiler')}
         />
       )}
-
-      {/* 병원 수 표시 */}
-      <div className={`absolute top-4 left-4 z-50 backdrop-blur-sm rounded-lg shadow-md border px-3 py-2 pointer-events-auto ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white border-gray-400 shadow-gray-300/50'}`} style={{ top: '1rem', left: '1rem' }}>
-        <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>병원 </span>
-        <span className={`font-semibold text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{filteredHospitals.length}</span>
-      </div>
 
 
       {/* MapLibre 내부 컨트롤 (Maptiler 레이어일 때만 표시) */}

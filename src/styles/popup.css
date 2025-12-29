@@ -1,13 +1,11 @@
-/* ======================== 공통 팝업 스타일 ======================== */
-
-/* ==================== 다크 모드 (기본) ==================== */
+/* ======================== 컴팩트 팝업 스타일 (B옵션) ======================== */
 
 /* MapLibre 팝업 컨테이너 */
 .maplibre-popup-custom .maplibregl-popup-content {
   padding: 0;
   background: #1f2937;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
   border: 1px solid rgba(255,255,255,0.1);
   overflow: hidden;
 }
@@ -17,386 +15,47 @@
 }
 
 /* Leaflet 팝업 컨테이너 */
-.leaflet-popup-custom.leaflet-popup {
-  background: transparent;
-  border: none;
-  box-shadow: none;
+.leaflet-popup-custom .leaflet-popup-content-wrapper {
   padding: 0;
+  background: #1f2937;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
 }
 
 .leaflet-popup-custom .leaflet-popup-content {
   margin: 0;
   padding: 0;
-  background: #1f2937;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2);
-  border: 1px solid rgba(255,255,255,0.1);
-  overflow: hidden;
   color: #f1f5f9;
 }
 
 .leaflet-popup-custom .leaflet-popup-tip {
-  border-top-color: #1f2937;
+  background: #1f2937;
+  border: none;
+  box-shadow: none;
 }
 
 .leaflet-popup-custom .leaflet-popup-close-button {
-  color: #d1d5db;
-  opacity: 0.7;
+  display: none;
 }
 
-.leaflet-popup-custom .leaflet-popup-close-button:hover {
-  opacity: 1;
-}
-
-/* 팝업 내용 */
+/* 팝업 내용 - 컴팩트 */
 .popup-content {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  min-width: 240px;
-  max-width: 300px;
-  max-height: 500px;
-  overflow-y: auto;
 }
 
-.popup-content::-webkit-scrollbar {
-  width: 4px;
-}
-
-.popup-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.popup-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
-}
-
-.popup-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
-
-/* 헤더 */
-.popup-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-.popup-badge {
-  font-size: 10px;
-  font-weight: 600;
-  color: #94a3b8;
-  background: rgba(148,163,184,0.15);
-  padding: 3px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-  cursor: help;
-}
-
-.popup-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #f1f5f9;
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-/* 위치 정보 섹션 */
-.popup-info-section {
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  background: rgba(30, 41, 59, 0.3);
-}
-
-.popup-info-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.popup-info-row:last-child {
-  margin-bottom: 0;
-}
-
-.popup-info-icon {
-  font-size: 12px;
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: #94a3b8;
-}
-
-.popup-info-text {
-  color: #e2e8f0;
-  flex: 1;
-  word-break: break-word;
-}
-
-.popup-tel {
-  font-family: 'Courier New', monospace;
-  letter-spacing: 0.5px;
-  color: #cbd5e1;
-}
-
-.popup-coords {
-  font-family: 'Courier New', monospace;
-  font-size: 10px;
-  color: #94a3b8;
-}
-
-/* 병상 섹션 */
-.popup-section {
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-.popup-section-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
-}
-
-.popup-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-}
-
-.popup-bed-item {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  background: rgba(30, 41, 59, 0.8);
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-.popup-bed-label {
-  font-size: 10px;
-  color: #cbd5e1;
-  min-width: 32px;
-  font-weight: 500;
-}
-
-.popup-bed-value {
-  font-size: 15px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: #f1f5f9;
-}
-
-.popup-bed-total {
-  font-size: 9px;
-  color: #94a3b8;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 점유율 바 */
-.popup-occupancy {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-top: 1px solid rgba(255,255,255,0.05);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  background: rgba(30, 41, 59, 0.4);
-}
-
-.popup-occupancy-label {
-  font-size: 10px;
-  color: #cbd5e1;
-  min-width: 32px;
-  font-weight: 500;
-}
-
-.popup-occupancy-bar {
-  flex: 1;
-  height: 8px;
-  background: rgba(255,255,255,0.15);
-  border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.1);
-}
-
-.popup-occupancy-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-.popup-occupancy-value {
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  min-width: 36px;
-  text-align: right;
-  color: #f1f5f9;
-}
-
-/* 상태 및 업데이트 */
-.popup-status {
-  padding: 10px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
-  border-top: 1px solid rgba(255,255,255,0.05);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-.popup-status.available {
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.15);
-}
-
-.popup-status.unavailable {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.15);
-}
-
-.popup-update {
-  font-size: 10px;
-  color: #94a3b8;
-  text-align: right;
-  padding: 8px 12px;
-  border-top: 1px solid rgba(255,255,255,0.05);
-  background: rgba(15, 23, 42, 0.5);
-}
-
-/* ==================== 라이트 모드 ==================== */
-
-.popup-light {
-  color-scheme: light;
-}
-
-/* 라이트 모드 - 팝업 배경 */
-.popup-light,
+/* 라이트 모드 지원 */
 .popup-light .maplibregl-popup-content,
-.popup-light .leaflet-popup-content {
+.popup-light .leaflet-popup-content-wrapper {
   background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
 
-.popup-light .maplibregl-popup-tip,
-.popup-light .leaflet-popup-tip {
+.popup-light .maplibregl-popup-tip {
   border-top-color: #ffffff;
 }
 
-.popup-light .maplibregl-popup-content {
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
-}
-
-.popup-light .leaflet-popup-content {
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
-}
-
-/* 라이트 모드 - 헤더 */
-.popup-light .popup-header {
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-}
-
-.popup-light .popup-badge {
-  color: #64748b;
-  background: rgba(100, 116, 139, 0.12);
-}
-
-.popup-light .popup-name {
-  color: #1f2937;
-}
-
-/* 라이트 모드 - 위치 정보 */
-.popup-light .popup-info-section {
-  background: rgba(0,0,0,0.02);
-  border-bottom: 1px solid rgba(0,0,0,0.05);
-}
-
-.popup-light .popup-info-text {
-  color: #374151;
-}
-
-.popup-light .popup-coords {
-  color: #6b7280;
-}
-
-/* 라이트 모드 - 섹션 제목 */
-.popup-light .popup-section-title {
-  color: #4b5563;
-}
-
-/* 라이트 모드 - 병상 항목 */
-.popup-light .popup-bed-item {
-  background: rgba(0,0,0,0.04);
-}
-
-.popup-light .popup-bed-label {
-  color: #6b7280;
-}
-
-.popup-light .popup-bed-value {
-  color: #1f2937;
-}
-
-.popup-light .popup-bed-total {
-  color: #4b5563;
-}
-
-/* 라이트 모드 - 점유율 */
-.popup-light .popup-occupancy {
-  border-top: 1px solid rgba(0,0,0,0.05);
-}
-
-.popup-light .popup-occupancy-label {
-  color: #6b7280;
-}
-
-.popup-light .popup-occupancy-bar {
-  background: rgba(0,0,0,0.08);
-}
-
-.popup-light .popup-occupancy-value {
-  color: #1f2937;
-}
-
-/* 라이트 모드 - 상태 */
-.popup-light .popup-status {
-  border-top: 1px solid rgba(0,0,0,0.05);
-}
-
-/* 라이트 모드 - 업데이트 */
-.popup-light .popup-update {
-  color: #4b5563;
-  border-top: 1px solid rgba(0,0,0,0.05);
-}
-
-/* 라이트 모드 - 스크롤바 */
-.popup-light .popup-content::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-}
-
-.popup-light .popup-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-/* 라이트 모드 - Leaflet close button */
-.popup-light .leaflet-popup-close-button {
-  color: #1f2937;
-  opacity: 0.6;
-}
-
-.popup-light .leaflet-popup-close-button:hover {
-  opacity: 0.9;
+.popup-light .leaflet-popup-tip {
+  background: #ffffff;
 }

@@ -649,7 +649,7 @@ export function KoreaSidoMap({
 
               {/* 컨텐츠 영역 */}
               <div className="p-3 space-y-2.5">
-                {/* 질환 가용성 (44개 질환) */}
+                {/* 질환 가용성 (42개 질환) */}
                 {selectedDisease && hoveredHospital.hasDiseaseData && diseaseStatus && (
                   <div className="flex items-center justify-between bg-gray-800/50 rounded-lg px-2.5 py-2">
                     <span className="text-[11px] text-gray-400 truncate flex-1 mr-2">{selectedDisease}</span>

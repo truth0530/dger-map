@@ -80,8 +80,10 @@ export default function Navigation() {
               })}
             </div>
 
-            {/* 테마 토글 */}
-            <ThemeToggle />
+            {/* 테마 토글 - 아래로 위치 조정 */}
+            <div className="mt-3">
+              <ThemeToggle />
+            </div>
 
           </div>
         </div>

@@ -14,6 +14,8 @@ import { DAYS_OF_WEEK } from "@/lib/constants";
 import type { DayOfWeek, AvailabilityStatus, Hospital } from "@/types";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import dynamic from "next/dynamic";
+import { shortenHospitalName } from "@/lib/utils/hospitalUtils";
+import { OccupancyBattery } from "@/components/ui/OccupancyBattery";
 
 // HybridMap은 클라이언트에서만 로드 (MapLibre + SVG 토글)
 const HybridMap = dynamic(() => import("@/components/maplibre/HybridMap"), {
@@ -31,6 +33,7 @@ import { mapSidoName } from "@/lib/utils/regionMapping";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { DISEASE_CATEGORIES, getCategoryByKey, getDiseaseNamesByCategory } from "@/lib/constants/diseaseCategories";
+import { parseMessage } from "@/lib/utils/messageClassifier";
 
 // 모바일 사이드바 상태
 type MobilePanelType = "filter" | "list" | null;
@@ -86,6 +89,22 @@ export function MapDashboard() {
   const [selectedSevereType, setSelectedSevereType] = useState<SevereTypeKey | null>(null);  // 선택된 27개 중증질환
   const [searchQuery, setSearchQuery] = useState<string>("");  // 병원명 검색어
   const [mobilePanel, setMobilePanel] = useState<MobilePanelType>(null);  // 모바일 패널 상태
+  const [expandedHospitalCode, setExpandedHospitalCode] = useState<string | null>(null);  // 확장된 병원 코드
+
+  // 아코디언 상태 관리
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["region", "disease", "bed"]));
+
+  const toggleSection = useCallback((section: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) {
+        next.delete(section);
+      } else {
+        next.add(section);
+      }
+      return next;
+    });
+  }, []);
 
   const hospitalListRef = useRef<HTMLDivElement>(null);
 
@@ -574,245 +593,283 @@ export function MapDashboard() {
         {/* 좌측 필터 사이드바 */}
         <aside className={`hidden md:flex w-48 flex-col ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
           <div className="flex-1 overflow-y-auto">
-          {/* 지역 + 기관분류 */}
-          <div className="px-2 py-1.5">
-            <div className="flex items-end gap-1">
-              <div className="w-14 shrink-0">
-                <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
-                <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
-                  <SelectTrigger size="xs" className={`[&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
-                    {REGIONS.map((r) => (
-                      <SelectItem key={r.value} value={r.value} className={`text-[9px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        {r.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 min-w-0">
-                <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
-                <div className="flex gap-0.5 items-center">
-                  <button
-                    onClick={() => toggleClassification("권역응급의료센터")}
-                    className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
-                      selectedClassifications.includes("권역응급의료센터")
-                        ? "bg-cyan-500/20 text-white"
-                        : "text-gray-500 hover:text-gray-400"
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
-                    권역
-                  </button>
-                  <button
-                    onClick={() => toggleClassification("지역응급의료센터")}
-                    className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
-                      selectedClassifications.includes("지역응급의료센터")
-                        ? "bg-cyan-500/20 text-white"
-                        : "text-gray-500 hover:text-gray-400"
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
-                    센터
-                  </button>
-                  <button
-                    onClick={() => toggleClassification("지역응급의료기관")}
-                    className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
-                      selectedClassifications.includes("지역응급의료기관")
-                        ? "bg-cyan-500/20 text-white"
-                        : "text-gray-500 hover:text-gray-400"
-                    }`}
-                  >
-                    <svg className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : "fill-gray-500"}`} viewBox="0 0 10 10">
-                      <polygon points="5,0 10,10 0,10" />
-                    </svg>
-                    기관
-                  </button>
+          {/* 지역 + 기관분류 - 아코디언 */}
+          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
+            <button
+              onClick={() => toggleSection("region")}
+              className={`w-full px-2 py-1.5 flex items-center justify-between text-[9px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-800'}`}
+            >
+              <span>지역 / 기관</span>
+              <svg className={`w-3 h-3 transition-transform ${expandedSections.has("region") ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {expandedSections.has("region") && (
+              <div className="px-2 pb-2">
+                <div className="flex items-end gap-1">
+                  <div className="w-14 shrink-0">
+                    <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
+                    <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
+                      <SelectTrigger size="xs" className={`[&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
+                        {REGIONS.map((r) => (
+                          <SelectItem key={r.value} value={r.value} className={`text-[9px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {r.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
+                    <div className="flex gap-0.5 items-center">
+                      <button
+                        onClick={() => toggleClassification("권역응급의료센터")}
+                        className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
+                          selectedClassifications.includes("권역응급의료센터")
+                            ? "bg-cyan-500/20 text-white"
+                            : "text-gray-500 hover:text-gray-400"
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                        권역
+                      </button>
+                      <button
+                        onClick={() => toggleClassification("지역응급의료센터")}
+                        className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
+                          selectedClassifications.includes("지역응급의료센터")
+                            ? "bg-cyan-500/20 text-white"
+                            : "text-gray-500 hover:text-gray-400"
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                        센터
+                      </button>
+                      <button
+                        onClick={() => toggleClassification("지역응급의료기관")}
+                        className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
+                          selectedClassifications.includes("지역응급의료기관")
+                            ? "bg-cyan-500/20 text-white"
+                            : "text-gray-500 hover:text-gray-400"
+                        }`}
+                      >
+                        <svg className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : "fill-gray-500"}`} viewBox="0 0 10 10">
+                          <polygon points="5,0 10,10 0,10" />
+                        </svg>
+                        기관
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* 질환 선택 */}
-          <div className="px-2 py-1.5 space-y-1.5">
-            {/* 42개 자원조사 */}
-            <div>
-              <div className="flex items-center justify-between mb-0.5">
-                <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>중증자원조사 42개</label>
-                <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
-                  <SelectTrigger size="xs" className={`w-20 [&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
-                    {DAYS_OF_WEEK.map((day) => (
-                      <SelectItem key={day} value={day} className={`text-[9px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        {day}요일
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Combobox
-                options={[
-                  { value: "", label: "전체" },
-                  ...DISEASE_CATEGORIES.map((cat) => ({ value: cat.key, label: cat.label })),
-                ]}
-                value={selectedDiseaseCategory || ""}
-                onValueChange={(v) => handleCategoryChange(v || null)}
-                placeholder="대분류 선택..."
-                size="xs"
-                triggerClassName={`${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}
-                contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-              />
-              {currentCategory && currentCategory.subcategories.length > 0 && (
-                <div className="flex flex-wrap gap-0.5 mt-1">
-                  {currentCategory.subcategories.map((sub) => (
+          {/* 질환 선택 - 아코디언 */}
+          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
+            <button
+              onClick={() => toggleSection("disease")}
+              className={`w-full px-2 py-1.5 flex items-center justify-between text-[9px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-800'}`}
+            >
+              <span>질환 필터</span>
+              <svg className={`w-3 h-3 transition-transform ${expandedSections.has("disease") ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {expandedSections.has("disease") && (
+              <div className="px-2 pb-2 space-y-1.5">
+                {/* 42개 자원조사 */}
+                <div>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>중증자원조사 42개</label>
+                    <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
+                      <SelectTrigger size="xs" className={`w-20 [&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
+                        {DAYS_OF_WEEK.map((day) => (
+                          <SelectItem key={day} value={day} className={`text-[9px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {day}요일
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Combobox
+                    options={[
+                      { value: "", label: "전체" },
+                      ...DISEASE_CATEGORIES.map((cat) => ({ value: cat.key, label: cat.label })),
+                    ]}
+                    value={selectedDiseaseCategory || ""}
+                    onValueChange={(v) => handleCategoryChange(v || null)}
+                    placeholder="대분류 선택..."
+                    size="xs"
+                    triggerClassName={`${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}
+                    contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                  />
+                  {currentCategory && currentCategory.subcategories.length > 0 && (
+                    <div className="flex flex-wrap gap-0.5 mt-1">
+                      {currentCategory.subcategories.map((sub) => (
+                        <button
+                          key={sub.key}
+                          onClick={() => toggleDiseaseSubcategory(sub.key)}
+                          className={`text-[8px] px-1 py-0.5 rounded transition-colors ${
+                            selectedDiseaseSubcategories.has(sub.key)
+                              ? "bg-cyan-500/20 text-white"
+                              : "text-gray-500 hover:text-gray-400"
+                          }`}
+                        >
+                          {sub.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-0.5 mt-1">
                     <button
-                      key={sub.key}
-                      onClick={() => toggleDiseaseSubcategory(sub.key)}
-                      className={`text-[8px] px-1 py-0.5 rounded transition-colors ${
-                        selectedDiseaseSubcategories.has(sub.key)
-                          ? "bg-cyan-500/20 text-white"
-                          : "text-gray-500 hover:text-gray-400"
+                      onClick={() => selectedDiseaseCategory && toggleStatus("24시간")}
+                      disabled={!selectedDiseaseCategory}
+                      className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                        !selectedDiseaseCategory
+                          ? "text-gray-700 cursor-not-allowed"
+                          : selectedStatus.includes("24시간")
+                            ? "border border-green-500 text-green-400"
+                            : "text-gray-500 hover:text-gray-400"
                       }`}
                     >
-                      {sub.label}
+                      24h
                     </button>
-                  ))}
+                    <button
+                      onClick={() => selectedDiseaseCategory && toggleStatus("주간")}
+                      disabled={!selectedDiseaseCategory}
+                      className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                        !selectedDiseaseCategory
+                          ? "text-gray-700 cursor-not-allowed"
+                          : selectedStatus.includes("주간")
+                            ? "border border-blue-500 text-blue-400"
+                            : "text-gray-500 hover:text-gray-400"
+                      }`}
+                    >
+                      주간
+                    </button>
+                    <button
+                      onClick={() => selectedDiseaseCategory && toggleStatus("야간")}
+                      disabled={!selectedDiseaseCategory}
+                      className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                        !selectedDiseaseCategory
+                          ? "text-gray-700 cursor-not-allowed"
+                          : selectedStatus.includes("야간")
+                            ? "border border-purple-500 text-purple-400"
+                            : "text-gray-500 hover:text-gray-400"
+                      }`}
+                    >
+                      야간
+                    </button>
+                  </div>
                 </div>
-              )}
-              <div className="flex flex-wrap gap-0.5 mt-1">
-                <button
-                  onClick={() => selectedDiseaseCategory && toggleStatus("24시간")}
-                  disabled={!selectedDiseaseCategory}
-                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
-                    !selectedDiseaseCategory
-                      ? "text-gray-700 cursor-not-allowed"
-                      : selectedStatus.includes("24시간")
-                        ? "border border-green-500 text-green-400"
-                        : "text-gray-500 hover:text-gray-400"
-                  }`}
-                >
-                  24h
-                </button>
-                <button
-                  onClick={() => selectedDiseaseCategory && toggleStatus("주간")}
-                  disabled={!selectedDiseaseCategory}
-                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
-                    !selectedDiseaseCategory
-                      ? "text-gray-700 cursor-not-allowed"
-                      : selectedStatus.includes("주간")
-                        ? "border border-blue-500 text-blue-400"
-                        : "text-gray-500 hover:text-gray-400"
-                  }`}
-                >
-                  주간
-                </button>
-                <button
-                  onClick={() => selectedDiseaseCategory && toggleStatus("야간")}
-                  disabled={!selectedDiseaseCategory}
-                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
-                    !selectedDiseaseCategory
-                      ? "text-gray-700 cursor-not-allowed"
-                      : selectedStatus.includes("야간")
-                        ? "border border-purple-500 text-purple-400"
-                        : "text-gray-500 hover:text-gray-400"
-                  }`}
-                >
-                  야간
-                </button>
-              </div>
-            </div>
-            {/* 실시간 27개 */}
-            <div>
-              <div className="flex items-center justify-between">
-                <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>27개 실시간 중증질환</label>
-                {severeLoading && <span className="text-[8px] text-orange-400">로딩...</span>}
-              </div>
-              <Combobox
-                options={[
-                  { value: "", label: "전체" },
-                  ...SEVERE_TYPES.map((type) => ({ value: type.key, label: type.label })),
-                ]}
-                value={selectedSevereType || ""}
-                onValueChange={(v) => setSelectedSevereType(v ? (v as SevereTypeKey) : null)}
-                placeholder="선택..."
-                size="xs"
-                triggerClassName={`${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}
-                contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-              />
-            </div>
-            {(stats || severeStats) && (
-              <div className="flex items-center gap-2 text-[9px]">
-                {stats && (
-                  <>
-                    <span className="text-green-400">{stats.h24}</span>
-                    <span className="text-blue-400">{stats.day}</span>
-                    <span className="text-purple-400">{stats.night}</span>
-                  </>
-                )}
-                {severeStats && (
-                  <>
-                    <span className="text-green-400">{severeStats.available}</span>
-                    <span className="text-red-400">{severeStats.unavailable}</span>
-                  </>
+                {/* 실시간 27개 */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>27개 실시간 중증질환</label>
+                    {severeLoading && <span className="text-[8px] text-orange-400">로딩...</span>}
+                  </div>
+                  <Combobox
+                    options={[
+                      { value: "", label: "전체" },
+                      ...SEVERE_TYPES.map((type) => ({ value: type.key, label: type.label })),
+                    ]}
+                    value={selectedSevereType || ""}
+                    onValueChange={(v) => setSelectedSevereType(v ? (v as SevereTypeKey) : null)}
+                    placeholder="선택..."
+                    size="xs"
+                    triggerClassName={`${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}
+                    contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                  />
+                </div>
+                {(stats || severeStats) && (
+                  <div className="flex items-center gap-2 text-[9px]">
+                    {stats && (
+                      <>
+                        <span className="text-green-400">{stats.h24}</span>
+                        <span className="text-blue-400">{stats.day}</span>
+                        <span className="text-purple-400">{stats.night}</span>
+                      </>
+                    )}
+                    {severeStats && (
+                      <>
+                        <span className="text-green-400">{severeStats.available}</span>
+                        <span className="text-red-400">{severeStats.unavailable}</span>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* 병상 */}
-          <div className={`px-2 py-1.5 ${isDark ? '' : ''}`}>
-            <div className="flex items-center justify-between">
-              <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>실시간 병상정보</label>
-              {bedLoading && <span className="text-[8px] text-orange-400">로딩...</span>}
-            </div>
-            <div className="flex flex-wrap gap-0.5 mt-0.5">
-              {(Object.entries(BED_TYPE_CONFIG) as [BedType, typeof BED_TYPE_CONFIG[BedType]][]).map(([type, config]) => (
-                <button
-                  key={type}
-                  onClick={() => toggleBedType(type)}
-                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
-                    selectedBedTypes.has(type)
-                      ? "bg-cyan-500/20 text-white"
-                      : "text-gray-500 hover:text-gray-400"
-                  }`}
-                >
-                  {config.shortLabel}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-1.5 mt-1">
-              <button
-                onClick={() => toggleBedStatus("여유")}
-                className={`flex items-center gap-1 text-[8px] px-1 py-0.5 rounded transition-colors ${
-                  selectedBedStatus.includes("여유") ? "bg-green-500/20 text-green-400" : "text-gray-600 hover:text-gray-400"
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${selectedBedStatus.includes("여유") ? "bg-green-500" : "bg-gray-600"}`} />
-                여유
-              </button>
-              <button
-                onClick={() => toggleBedStatus("적정")}
-                className={`flex items-center gap-1 text-[8px] px-1 py-0.5 rounded transition-colors ${
-                  selectedBedStatus.includes("적정") ? "bg-blue-500/20 text-blue-400" : "text-gray-600 hover:text-gray-400"
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${selectedBedStatus.includes("적정") ? "bg-blue-500" : "bg-gray-600"}`} />
-                적정
-              </button>
-              <button
-                onClick={() => toggleBedStatus("부족")}
-                className={`flex items-center gap-1 text-[8px] px-1 py-0.5 rounded transition-colors ${
-                  selectedBedStatus.includes("부족") ? "bg-red-500/20 text-red-400" : "text-gray-600 hover:text-gray-400"
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${selectedBedStatus.includes("부족") ? "bg-red-500" : "bg-gray-600"}`} />
-                부족
-              </button>
-            </div>
+          {/* 병상 - 아코디언 */}
+          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
+            <button
+              onClick={() => toggleSection("bed")}
+              className={`w-full px-2 py-1.5 flex items-center justify-between text-[9px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-800'}`}
+            >
+              <span className="flex items-center gap-1">
+                병상 정보
+                {bedLoading && <span className="text-[8px] text-orange-400">로딩...</span>}
+              </span>
+              <svg className={`w-3 h-3 transition-transform ${expandedSections.has("bed") ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {expandedSections.has("bed") && (
+              <div className="px-2 pb-2">
+                <div className="flex flex-wrap gap-0.5">
+                  {(Object.entries(BED_TYPE_CONFIG) as [BedType, typeof BED_TYPE_CONFIG[BedType]][]).map(([type, config]) => (
+                    <button
+                      key={type}
+                      onClick={() => toggleBedType(type)}
+                      className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                        selectedBedTypes.has(type)
+                          ? "bg-cyan-500/20 text-white"
+                          : "text-gray-500 hover:text-gray-400"
+                      }`}
+                    >
+                      {config.shortLabel}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1.5 mt-1.5">
+                  <button
+                    onClick={() => toggleBedStatus("여유")}
+                    className={`flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                      selectedBedStatus.includes("여유") ? "bg-green-600/40 text-green-300 font-medium" : "text-gray-500 hover:text-gray-400"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("여유") ? "bg-green-500" : "bg-gray-600"}`} />
+                    여유
+                  </button>
+                  <button
+                    onClick={() => toggleBedStatus("적정")}
+                    className={`flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                      selectedBedStatus.includes("적정") ? "bg-yellow-600/40 text-yellow-300 font-medium" : "text-gray-500 hover:text-gray-400"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("적정") ? "bg-yellow-500" : "bg-gray-600"}`} />
+                    적정
+                  </button>
+                  <button
+                    onClick={() => toggleBedStatus("부족")}
+                    className={`flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                      selectedBedStatus.includes("부족") ? "bg-red-600/40 text-red-300 font-medium" : "text-gray-500 hover:text-gray-400"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("부족") ? "bg-red-500" : "bg-gray-600"}`} />
+                    부족
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           </div>
         </aside>
@@ -860,6 +917,8 @@ export function MapDashboard() {
               const status = getHospitalStatus(hospital);
               const isHovered = hoveredHospitalCode === hospital.code;
               const shortClass = getClassificationShort(hospital.classification);
+              const bedInfo = bedDataMap.get(hospital.code);
+              const occupancyRate = bedInfo?.occupancyRate ?? null;
 
               const severeInfo = selectedSevereType ? severeDataMap.get(hospital.code) : null;
               const severeStatus = severeInfo ? (severeInfo.severeStatus[selectedSevereType!] || '').trim().toUpperCase() : null;
@@ -869,22 +928,64 @@ export function MapDashboard() {
                 ? (isHovered ? "bg-green-500/30 border-green-400" : "bg-green-500/20 border-green-500/40")
                 : getStatusBgColor(status, isHovered, isDark);
 
+              const isExpanded = expandedHospitalCode === hospital.code;
+              const msgData = emergencyMessages.get(hospital.code);
+
+              // 진료제한 항목 수집
+              const urgentItems: { label: string; content: string }[] = [];
+              if (msgData?.emergency) {
+                msgData.emergency.forEach(item => {
+                  const parsed = parseMessage(item.msg, item.symTypCod);
+                  if (parsed.status.color === 'red') {
+                    urgentItems.push({ label: parsed.department, content: parsed.details || '진료불가' });
+                  }
+                });
+              }
+              if (msgData?.allDiseases) {
+                msgData.allDiseases.forEach(disease => {
+                  if (disease.content.includes('불가') || disease.content.includes('중단')) {
+                    const displayName = disease.displayName.replace(/\[.*?\]\s*/, '');
+                    urgentItems.push({ label: displayName, content: disease.content });
+                  }
+                });
+              }
+
+              // 진료 가능 질환 목록 (severeDataMap에서 직접 조회)
+              const hospitalSevereData = severeDataMap.get(hospital.code);
+              const availableDiseases = hospitalSevereData?.severeStatus
+                ? Object.entries(hospitalSevereData.severeStatus)
+                    .filter(([, status]) => status === 'Y')
+                    .map(([key]) => SEVERE_TYPES.find(t => t.key === key))
+                    .filter((t): t is typeof SEVERE_TYPES[0] => !!t)
+                : [];
+
               return (
                 <div
                   key={hospital.code}
                   data-hospital-code={hospital.code}
-                  className={`px-1 py-0.5 rounded border text-[10px] cursor-pointer transition-all duration-200 ${bgClass} ${
+                  className={`rounded border text-[11px] cursor-pointer transition-all duration-200 ${bgClass} ${
                     isHovered ? (isDark ? 'ring-1 ring-white/30' : 'ring-1 ring-gray-400/30') : ''
                   }`}
                   onMouseEnter={() => handleHospitalHover(hospital.code)}
                   onMouseLeave={() => handleHospitalHover(null)}
-                  onClick={() => handleHospitalHover(hospital.code)}
                 >
-                  <div className="flex items-center gap-1">
+                  {/* 헤더 (클릭 시 아코디언 토글) */}
+                  <div
+                    className="flex items-center gap-1 px-1 py-0.5"
+                    onClick={() => setExpandedHospitalCode(isExpanded ? null : hospital.code)}
+                  >
                     {shortClass && renderClassificationIcon(shortClass, isDark)}
-                    <span className={`font-medium truncate flex-1 ${isDark ? (isHovered ? 'text-white' : 'text-gray-200') : (isHovered ? 'text-gray-900' : 'text-gray-700')}`}>
-                      {hospital.name}
+                    <span
+                      className={`font-medium truncate flex-1 ${isDark ? (isHovered ? 'text-white' : 'text-gray-200') : (isHovered ? 'text-gray-900' : 'text-gray-700')}`}
+                      title={hospital.name}
+                    >
+                      {shortenHospitalName(hospital.name)}
                     </span>
+                    {occupancyRate !== null && (
+                      <div className="shrink-0 scale-[0.65] origin-right">
+                        <OccupancyBattery rate={occupancyRate} isDark={isDark} size="small" />
+                      </div>
+                    )}
                     {selectedSevereType && isSevereAvailable ? (
                       <span className="shrink-0 text-[9px] text-green-400">가능</span>
                     ) : status && !selectedSevereType ? (
@@ -892,7 +993,66 @@ export function MapDashboard() {
                         {status}
                       </span>
                     ) : null}
+                    <svg
+                      className={`w-3 h-3 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''} ${isDark ? 'text-gray-500' : 'text-gray-400'}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </div>
+
+                  {/* 확장된 상세 정보 */}
+                  {isExpanded && (
+                    <div className={`px-1.5 py-1 border-t space-y-1 ${isDark ? 'border-gray-700 bg-gray-800/50' : 'border-gray-300 bg-gray-50'}`}>
+                      {/* 병상 현황 */}
+                      {bedInfo && (
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>응급실</span>
+                          <span className={`text-[10px] font-semibold ${
+                            (bedInfo.hvec ?? 0) > 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>{bedInfo.hvec ?? 0}</span>
+                          <span className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>/ {bedInfo.hvs01 ?? 0}</span>
+                          <span className="flex-1" />
+                          {bedInfo.hvidate && (
+                            <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                              {bedInfo.hvidate.slice(0, 4)}-{bedInfo.hvidate.slice(4, 6)}-{bedInfo.hvidate.slice(6, 8)} {bedInfo.hvidate.slice(8, 10)}:{bedInfo.hvidate.slice(10, 12)} 기준
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 수용가능(실시간) */}
+                      <div>
+                        <div className={`text-[9px] mb-0.5 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                          수용가능(실시간) ({availableDiseases.length})
+                        </div>
+                        {availableDiseases.length > 0 ? (
+                          <div className={`text-[9px] leading-relaxed ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                            {availableDiseases.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ')}
+                          </div>
+                        ) : (
+                          <div className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>없음</div>
+                        )}
+                      </div>
+
+                      {/* 진료 제한 (있을 때만 표시) */}
+                      {urgentItems.length > 0 && (
+                        <div className={`p-1 rounded ${isDark ? 'bg-red-900/20' : 'bg-red-50'}`}>
+                          <div className={`text-[9px] mb-0.5 font-medium ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                            진료제한 ({urgentItems.length})
+                          </div>
+                          {urgentItems.map((item, idx) => (
+                            <div key={idx} className="flex gap-1 text-[9px] leading-relaxed">
+                              <span className={`font-medium shrink-0 ${isDark ? 'text-red-400' : 'text-red-600'}`}>{item.label}</span>
+                              <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{item.content}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -913,6 +1073,7 @@ export function MapDashboard() {
             emergencyMessages={emergencyMessages}
             selectedRegion={selectedRegion}
             selectedSevereType={selectedSevereType}
+            selectedDiseaseCategory={selectedDiseaseCategory}
             selectedClassifications={selectedClassifications}
             hoveredHospitalCode={hoveredHospitalCode}
             onHospitalHover={handleHospitalHover}
@@ -1241,11 +1402,13 @@ export function MapDashboard() {
               const bgClass = selectedSevereType
                 ? (isHovered ? "bg-green-500/30 border-green-400" : "bg-green-500/20 border-green-500/40")
                 : getStatusBgColor(status, isHovered, isDark);
+              const bedInfo = bedDataMap.get(hospital.code);
+              const occupancyRate = bedInfo?.occupancyRate ?? null;
 
               return (
                 <div
                   key={hospital.code}
-                  className={`px-1.5 py-1 rounded border text-[11px] cursor-pointer transition-all duration-200 ${bgClass}`}
+                  className={`px-1.5 py-1 rounded border text-xs cursor-pointer transition-all duration-200 ${bgClass}`}
                   onClick={() => {
                     handleHospitalHover(hospital.code);
                     closeMobilePanel();
@@ -1253,9 +1416,17 @@ export function MapDashboard() {
                 >
                   <div className="flex items-center gap-1">
                     {shortClass && renderClassificationIcon(shortClass, isDark)}
-                    <span className={`font-medium truncate flex-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                      {hospital.name}
+                    <span
+                      className={`font-medium truncate flex-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}
+                      title={hospital.name}
+                    >
+                      {shortenHospitalName(hospital.name)}
                     </span>
+                    {occupancyRate !== null && (
+                      <div className="shrink-0 scale-[0.65] origin-right">
+                        <OccupancyBattery rate={occupancyRate} isDark={isDark} size="small" />
+                      </div>
+                    )}
                     {selectedSevereType && isSevereAvailable ? (
                       <span className="shrink-0 text-[10px] text-green-400">가능</span>
                     ) : status && !selectedSevereType ? (
