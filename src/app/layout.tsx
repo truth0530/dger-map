@@ -5,6 +5,7 @@ import "./globals.css";
 import Navigation from "@/components/layout/Navigation";
 import Footer from "@/components/layout/Footer";
 import { Providers } from "@/lib/providers/Providers";
+import GaPageView from "@/components/analytics/GaPageView";
 
 const notoSansKR = Noto_Sans_KR({
   variable: "--font-noto-sans-kr",
@@ -51,12 +52,13 @@ export default function RootLayout({
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', '${GA_TRACKING_ID}');
+            gtag('config', '${GA_TRACKING_ID}', { send_page_view: false });
           `}
         </Script>
       </head>
       <body className={`${notoSansKR.variable} font-sans antialiased`}>
         <Providers>
+          <GaPageView />
           <div className="flex flex-col min-h-screen">
             <Navigation />
             <main id="main-content" className="flex-1" role="main">

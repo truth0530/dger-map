@@ -78,6 +78,10 @@
 - GA Measurement ID 유지 시 데이터 연속성은 확보됨
 - 단, 페이지 경로 변경으로 리포트 상 새 페이지로 집계될 수 있음
 - 실시간/DebugView로 수집 여부 확인 필요
+ - Virtual Pageview 적용 시:
+   - `send_page_view: false`로 자동 전송 차단 필요
+   - `page_path`는 구 경로로 매핑, `page_location`은 실제 URL 유지 권장
+   - 신규 경로(`/map` 등)는 매핑 여부 정책 수립 필요
 
 ---
 
@@ -447,6 +451,7 @@ dger-api에서 Railway 관련 코드를 dger-map으로 가져옴.
 ### 11.5 분석/SEO
 - [x] GA 스크립트/ID 설정 존재
 - [ ] GA 수집 확인 (실시간/DebugView)
+- [ ] Virtual Pageview 중복 집계 방지 확인
 - [x] 네이버 사이트 인증 메타 존재
 - [ ] Search Console 크롤링 오류 확인
 
@@ -461,6 +466,7 @@ dger-api에서 Railway 관련 코드를 dger-map으로 가져옴.
 ### 12.1 외부 의존성 실가동
 - [ ] MapTiler 지도 로딩 확인 (데스크탑/모바일)
 - [ ] GA 실시간/DebugView 이벤트 수집 확인
+- [ ] GA 페이지 경로 매핑 동작 확인 (구 경로로 집계)
 - [ ] Google Sheets 피드백 작성/조회/삭제 전 과정 확인
 - [ ] Vercel KV 활성화 시 평점 누적/재시작 후 지속성 확인
 
