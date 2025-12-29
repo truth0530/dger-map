@@ -726,11 +726,11 @@ export function MapDashboard() {
                       ))}
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-0.5 mt-1">
+                  <div className="flex gap-0.5 mt-1">
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("24시간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`text-[7px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
                         !selectedDiseaseCategory
                           ? "text-gray-700 cursor-not-allowed"
                           : selectedStatus.includes("24시간")
@@ -738,12 +738,12 @@ export function MapDashboard() {
                             : "text-gray-500 hover:text-gray-400"
                       }`}
                     >
-                      24h
+                      24h{stats ? `(${stats.h24})` : ''}
                     </button>
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("주간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`text-[7px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
                         !selectedDiseaseCategory
                           ? "text-gray-700 cursor-not-allowed"
                           : selectedStatus.includes("주간")
@@ -751,12 +751,12 @@ export function MapDashboard() {
                             : "text-gray-500 hover:text-gray-400"
                       }`}
                     >
-                      주간
+                      주간{stats ? `(${stats.day})` : ''}
                     </button>
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("야간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`text-[7px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
                         !selectedDiseaseCategory
                           ? "text-gray-700 cursor-not-allowed"
                           : selectedStatus.includes("야간")
@@ -764,7 +764,7 @@ export function MapDashboard() {
                             : "text-gray-500 hover:text-gray-400"
                       }`}
                     >
-                      야간
+                      야간{stats ? `(${stats.night})` : ''}
                     </button>
                   </div>
                 </div>
@@ -787,21 +787,10 @@ export function MapDashboard() {
                     contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
                   />
                 </div>
-                {(stats || severeStats) && (
-                  <div className="flex items-center gap-2 text-[9px]">
-                    {stats && (
-                      <>
-                        <span className="text-green-400">{stats.h24}</span>
-                        <span className="text-blue-400">{stats.day}</span>
-                        <span className="text-purple-400">{stats.night}</span>
-                      </>
-                    )}
-                    {severeStats && (
-                      <>
-                        <span className="text-green-400">{severeStats.available}</span>
-                        <span className="text-red-400">{severeStats.unavailable}</span>
-                      </>
-                    )}
+                {severeStats && (
+                  <div className="flex items-center gap-3 text-[8px]">
+                    <span className="text-green-400">가능 {severeStats.available}</span>
+                    <span className="text-red-400">불가 {severeStats.unavailable}</span>
                   </div>
                 )}
               </div>

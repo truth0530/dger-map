@@ -603,12 +603,6 @@ export default function MapLibreMap({
         </button>
       </div>
 
-      {/* 병원 수 표시 */}
-      <div className={`absolute top-4 left-4 z-10 backdrop-blur-sm rounded-lg shadow-lg border px-3 py-2 ${isDark ? 'bg-gray-900/95 border-gray-700/50' : 'bg-white/95 border-gray-300/50'}`}>
-        <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>병원 </span>
-        <span className={`font-semibold text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{filteredHospitals.length}</span>
-      </div>
-
       {/* 스타일 */}
       <style jsx global>{`
         /* 지도 컨트롤 */
