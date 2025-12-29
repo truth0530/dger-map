@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * MapLibre + Leaflet 하이브리드 지도
+ * MapLibre + Leaflet + Kakao 하이브리드 지도
  * - MapLibre 레이어 (벡터 타일 기반)
  * - Leaflet 레이어 (OpenStreetMap 기반)
- * - 공유 마커 레이어 (항상 표시)
- * - 토글로 MapLibre/Leaflet 전환
+ * - Kakao 레이어 (카카오맵 기반)
+ * - 토글로 MapLibre/Leaflet/Kakao 전환
  */
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
@@ -20,7 +20,7 @@ import type { HospitalSevereData } from '@/lib/hooks/useSevereData';
 import type { ClassifiedMessages } from '@/lib/utils/messageClassifier';
 import type { BedType } from '@/lib/constants/bedTypes';
 
-// MapLibre는 클라이언트에서만 로드
+// 지도 컴포넌트 동적 로드
 const MapLibreMap = dynamic(() => import('@/components/maplibre/MapLibreMap'), {
   ssr: false,
   loading: () => (
@@ -35,6 +35,15 @@ const LeafletMap = dynamic(() => import('@/components/maplibre/LeafletMap'), {
   loading: () => (
     <div className="w-full h-full flex items-center justify-center bg-gray-900">
       <div className="text-gray-400 text-sm">지도 로딩 중...</div>
+    </div>
+  ),
+});
+
+const KakaoMap = dynamic(() => import('@/components/maplibre/KakaoMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-gray-900">
+      <div className="text-gray-400 text-sm">카카오맵 로딩 중...</div>
     </div>
   ),
 });
@@ -62,7 +71,7 @@ interface HybridMapProps {
   onBackToNational: () => void;
 }
 
-type MapLayerType = 'maptiler' | 'leaflet';
+type MapLayerType = 'maptiler' | 'leaflet' | 'kakao';
 
 export default function HybridMap({
   hospitals,
@@ -114,6 +123,7 @@ export default function HybridMap({
           onHospitalHover={onHospitalHover}
           onHospitalClick={onHospitalClick}
           onSwitchToLeaflet={() => setMapLayer('leaflet')}
+          onSwitchToKakao={() => setMapLayer('kakao')}
         />
       )}
 
@@ -133,6 +143,27 @@ export default function HybridMap({
           onHospitalHover={onHospitalHover}
           onHospitalClick={onHospitalClick}
           onSwitchToMaptiler={() => setMapLayer('maptiler')}
+          onSwitchToKakao={() => setMapLayer('kakao')}
+        />
+      )}
+
+      {/* Kakao 지도 레이어 */}
+      {mapLayer === 'kakao' && (
+        <KakaoMap
+          hospitals={filteredHospitals}
+          bedDataMap={bedDataMap}
+          severeDataMap={severeDataMap}
+          emergencyMessages={emergencyMessages}
+          selectedRegion={selectedRegion}
+          selectedSevereType={selectedSevereType}
+          selectedDiseaseCategory={selectedDiseaseCategory}
+          selectedDiseases={selectedDiseases}
+          selectedClassifications={selectedClassifications}
+          hoveredHospitalCode={hoveredHospitalCode}
+          onHospitalHover={onHospitalHover}
+          onHospitalClick={onHospitalClick}
+          onSwitchToMaptiler={() => setMapLayer('maptiler')}
+          onSwitchToLeaflet={() => setMapLayer('leaflet')}
         />
       )}
 

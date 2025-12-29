@@ -36,6 +36,7 @@ interface MapLibreMapProps {
   onHospitalHover?: (code: string | null) => void;
   onHospitalClick?: (hospital: Hospital) => void;
   onSwitchToLeaflet?: () => void;
+  onSwitchToKakao?: () => void;
 }
 
 export default function MapLibreMap({
@@ -52,6 +53,7 @@ export default function MapLibreMap({
   onHospitalHover,
   onHospitalClick,
   onSwitchToLeaflet,
+  onSwitchToKakao,
 }: MapLibreMapProps) {
   const { isDark } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -539,7 +541,7 @@ export default function MapLibreMap({
 
       {/* 지도 컨트롤 그룹 (맵 전환 + 스타일 토글 + 줌 + 전체화면) */}
       <div className={`absolute top-4 right-4 z-20 flex items-center gap-2 rounded-lg shadow-lg border p-1.5 ${isDark ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-gray-300/50'}`}>
-        {/* MapTiler/Leaflet 전환 */}
+        {/* 지도 전환 */}
         <div className="flex items-center">
           <button
             className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${isDark ? 'bg-cyan-600 text-white' : 'bg-cyan-500 text-white'}`}
@@ -554,6 +556,15 @@ export default function MapLibreMap({
               title="Leaflet으로 전환"
             >
               Leaflet
+            </button>
+          )}
+          {onSwitchToKakao && (
+            <button
+              onClick={onSwitchToKakao}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${isDark ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200/80'}`}
+              title="카카오맵으로 전환"
+            >
+              카카오
             </button>
           )}
         </div>

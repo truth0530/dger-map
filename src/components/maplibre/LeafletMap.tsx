@@ -36,6 +36,7 @@ interface LeafletMapProps {
   onHospitalHover?: (code: string | null) => void;
   onHospitalClick?: (hospital: Hospital) => void;
   onSwitchToMaptiler?: () => void;
+  onSwitchToKakao?: () => void;
 }
 
 // 지역별 중심 좌표 및 확대 레벨
@@ -74,6 +75,7 @@ export default function LeafletMap({
   onHospitalHover,
   onHospitalClick,
   onSwitchToMaptiler,
+  onSwitchToKakao,
 }: LeafletMapProps) {
   const { isDark } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -563,7 +565,7 @@ export default function LeafletMap({
 
       {/* 지도 컨트롤 그룹 (맵 전환 + 타일 스타일) */}
       <div className={`absolute top-4 right-4 z-50 flex items-center gap-2 rounded-lg shadow-lg border p-1.5 pointer-events-auto ${isDark ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-gray-300/50'}`}>
-        {/* MapTiler/Leaflet 전환 */}
+        {/* MapTiler/Leaflet/Kakao 전환 */}
         <div className="flex items-center">
           {onSwitchToMaptiler && (
             <button
@@ -580,6 +582,15 @@ export default function LeafletMap({
           >
             Leaflet
           </button>
+          {onSwitchToKakao && (
+            <button
+              onClick={onSwitchToKakao}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${isDark ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200/80'}`}
+              title="카카오맵으로 전환"
+            >
+              카카오
+            </button>
+          )}
         </div>
 
         {/* 구분선 */}
