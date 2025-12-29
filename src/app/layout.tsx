@@ -42,6 +42,10 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
+        {/* Favicon & App Icons */}
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/manifest.json" />
+
         {/* Google Analytics */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`}
