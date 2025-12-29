@@ -216,3 +216,79 @@ export const DISEASE_STATS = {
   categoriesWithSubcategories: DISEASE_CATEGORIES.filter(c => c.subcategories.length > 0).length,
   categoriesOnlyMajor: DISEASE_CATEGORIES.filter(c => c.subcategories.length === 0).length,
 };
+
+/**
+ * 42개 대분류 → 27개 실시간 중증질환 매핑
+ * - 각 42개 대분류 key에 대응되는 27개 MKioskTy 키 목록
+ * - 매칭되는 질환이 없으면 빈 배열
+ */
+export const CATEGORY_TO_SEVERE_MAPPING: Record<string, string[]> = {
+  // 산부인과 응급 → 분만, 산과수술, 부인과수술
+  obstetrics: ['MKioskTy16', 'MKioskTy17', 'MKioskTy18'],
+
+  // 소아외과(복부) 응급수술 - 27개에 없음
+  pediatric_surgery: [],
+
+  // 정신과적 응급 입원 → 폐쇄병동입원
+  psychiatric: ['MKioskTy24'],
+
+  // 응급 뇌질환/수술 → 뇌경색, 거미막하출혈, 거미막하출혈 외
+  brain: ['MKioskTy2', 'MKioskTy3', 'MKioskTy4'],
+
+  // 응급 안면부·경부 질환 - 27개에 없음
+  facial_neck: [],
+
+  // 수술이 필요한 응급 안질환 → 안과적수술 응급
+  eye: ['MKioskTy25'],
+
+  // 체외막산소화장치(ECMO) - 27개에 없음
+  ecmo: [],
+
+  // 응급 기관지내시경 → 성인/영유아 기관지
+  bronchoscopy: ['MKioskTy13', 'MKioskTy14'],
+
+  // 응급 심혈관수술/시술 → 심근경색, 대동맥 흉부/복부
+  cardiovascular: ['MKioskTy1', 'MKioskTy5', 'MKioskTy6'],
+
+  // 응급 척추손상 수술 - 27개에 없음
+  spine: [],
+
+  // 응급 내시경(위장관) → 성인/영유아 위장관
+  gi_endoscopy: ['MKioskTy11', 'MKioskTy12'],
+
+  // 응급 소화기계 수술/시술 → 복부응급, 장중첩, 담낭담관
+  digestive_surgery: ['MKioskTy7', 'MKioskTy8', 'MKioskTy9', 'MKioskTy10'],
+
+  // 비뇨생식기 응급 - 27개에 없음
+  urogenital: [],
+
+  // 지속적 신대체요법(CRRT) → 응급투석 CRRT
+  crrt: ['MKioskTy23'],
+
+  // 혈액투석(HD) → 응급투석 HD
+  hemodialysis: ['MKioskTy22'],
+
+  // 저체중출생아 → 저체중출생아 집중치료
+  low_birth_weight: ['MKioskTy15'],
+
+  // 응급 미세수술 → 수족지접합, 수족지접합 외
+  microsurgery: ['MKioskTy20', 'MKioskTy21'],
+
+  // 저체온요법 - 27개에 없음
+  hypothermia: [],
+};
+
+/**
+ * 특정 42개 대분류에 매칭되는 27개 실시간 질환 키 목록 반환
+ */
+export function getMatchedSevereKeys(categoryKey: string): string[] {
+  return CATEGORY_TO_SEVERE_MAPPING[categoryKey] || [];
+}
+
+/**
+ * 특정 27개 질환 키가 42개 대분류에 매칭되는지 확인
+ */
+export function isSevereKeyMatchedToCategory(severeKey: string, categoryKey: string): boolean {
+  const matchedKeys = CATEGORY_TO_SEVERE_MAPPING[categoryKey];
+  return matchedKeys ? matchedKeys.includes(severeKey) : false;
+}

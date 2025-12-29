@@ -16,7 +16,7 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 import { parseMessage, getStatusColorClasses } from '@/lib/utils/messageClassifier';
 import { createMarkerElement } from '@/lib/utils/markerRenderer';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
-import { getCategoryByKey } from '@/lib/constants/diseaseCategories';
+import { getCategoryByKey, getMatchedSevereKeys } from '@/lib/constants/diseaseCategories';
 import type { Hospital } from '@/types';
 import type { HospitalBedData } from '@/lib/hooks/useBedData';
 import type { HospitalSevereData } from '@/lib/hooks/useSevereData';
@@ -30,6 +30,7 @@ interface MapLibreMapProps {
   selectedRegion: string;
   selectedSevereType?: string | null;
   selectedDiseaseCategory?: string | null;  // 42개 중증자원조사 대분류 선택
+  selectedDiseases?: Set<string>;  // 선택된 소분류 질환명들
   selectedClassifications: string[];
   hoveredHospitalCode: string | null;
   onHospitalHover?: (code: string | null) => void;
@@ -45,6 +46,7 @@ export default function MapLibreMap({
   selectedRegion,
   selectedSevereType,
   selectedDiseaseCategory,
+  selectedDiseases,
   selectedClassifications,
   hoveredHospitalCode,
   onHospitalHover,
@@ -188,10 +190,20 @@ export default function MapLibreMap({
     if (selectedDiseaseCategory) {
       const category = getCategoryByKey(selectedDiseaseCategory);
       if (category) {
+        // 소분류 목록 (선택된 소분류만 표시, 대분류만 있는 경우 대분류 label 사용)
+        const subcategoryLabels = category.subcategories.length > 0
+          ? (selectedDiseases && selectedDiseases.size > 0
+              ? category.subcategories
+                  .filter(sub => selectedDiseases.has(sub.key))
+                  .map(sub => sub.label).join(', ')
+              : category.subcategories.map(sub => sub.label).join(', '))
+          : category.label;
+
         content += `
-          <div style="padding:4px 12px;background:${isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(219,234,254,0.8)'};border-bottom:1px solid ${c.border};">
+          <div style="padding:6px 12px;background:${isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(219,234,254,0.8)'};border-bottom:1px solid ${c.border};">
             <div style="font-size:11px;font-weight:600;color:${isDarkMode ? '#60a5fa' : '#2563eb'};">${category.label}</div>
-            <div style="font-size:9px;color:${c.muted};text-align:right;">25년 9월말 DGEMS 자원조사 기준</div>
+            <div style="font-size:9px;color:${c.muted};margin-top:2px;line-height:1.4;">${subcategoryLabels}</div>
+            <div style="font-size:8px;color:${c.muted};text-align:right;margin-top:2px;opacity:0.7;">25년 9월말 DGEMS 자원조사 기준</div>
           </div>
         `;
       }
@@ -246,16 +258,41 @@ export default function MapLibreMap({
         .filter((t): t is typeof SEVERE_TYPES[0] => !!t);
 
       if (availableDiseases.length > 0) {
-        const displayCount = Math.min(6, availableDiseases.length);
-        const labels = availableDiseases.slice(0, displayCount).map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
-        const more = availableDiseases.length > displayCount ? ` +${availableDiseases.length - displayCount}` : '';
+        // 42개 대분류가 선택된 경우 매칭된 질환과 나머지를 구분
+        const matchedSevereKeys = selectedDiseaseCategory ? getMatchedSevereKeys(selectedDiseaseCategory) : [];
+        const hasMatchedFilter = matchedSevereKeys.length > 0;
 
-        content += `
-          <div style="padding:8px 12px;border-bottom:1px solid ${c.border};">
-            <div style="font-size:10px;color:${c.muted};margin-bottom:4px;">수용가능(실시간) (${availableDiseases.length})</div>
-            <div style="font-size:11px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${labels}${more}</div>
-          </div>
-        `;
+        // 매칭된 질환과 나머지 분리
+        const matchedDiseases = hasMatchedFilter
+          ? availableDiseases.filter(d => matchedSevereKeys.includes(d.key))
+          : [];
+        const otherDiseases = hasMatchedFilter
+          ? availableDiseases.filter(d => !matchedSevereKeys.includes(d.key))
+          : availableDiseases;
+
+        content += `<div style="padding:8px 12px;border-bottom:1px solid ${c.border};">`;
+        content += `<div style="font-size:10px;color:${c.muted};margin-bottom:4px;">수용가능(실시간) (${availableDiseases.length})</div>`;
+
+        // 매칭된 질환 (하이라이트 표시)
+        if (matchedDiseases.length > 0) {
+          const matchedLabels = matchedDiseases.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
+          content += `
+            <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px;">
+              <span style="font-size:9px;font-weight:600;color:${isDarkMode ? '#60a5fa' : '#2563eb'};background:${isDarkMode ? 'rgba(59,130,246,0.2)' : 'rgba(219,234,254,0.9)'};padding:2px 5px;border-radius:3px;flex-shrink:0;line-height:1;">연관</span>
+              <span style="font-size:10px;color:${isDarkMode ? '#93c5fd' : '#1d4ed8'};font-weight:500;line-height:1.4;">${matchedLabels}</span>
+            </div>
+          `;
+        }
+
+        // 나머지 질환
+        if (otherDiseases.length > 0) {
+          const displayCount = Math.min(hasMatchedFilter ? 4 : 6, otherDiseases.length);
+          const labels = otherDiseases.slice(0, displayCount).map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
+          const more = otherDiseases.length > displayCount ? ` +${otherDiseases.length - displayCount}` : '';
+          content += `<div style="font-size:10px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${labels}${more}</div>`;
+        }
+
+        content += `</div>`;
       }
     }
 
@@ -290,7 +327,7 @@ export default function MapLibreMap({
 
     content += '</div>';
     return content;
-  }, [bedDataMap, severeDataMap, emergencyMessages, selectedSevereType, selectedDiseaseCategory, isDark]);
+  }, [bedDataMap, severeDataMap, emergencyMessages, selectedSevereType, selectedDiseaseCategory, selectedDiseases, isDark]);
 
   // 지도 초기화
   useEffect(() => {

@@ -108,6 +108,7 @@ export default function HybridMap({
           selectedRegion={selectedRegion}
           selectedSevereType={selectedSevereType}
           selectedDiseaseCategory={selectedDiseaseCategory}
+          selectedDiseases={selectedDiseases}
           selectedClassifications={selectedClassifications}
           hoveredHospitalCode={hoveredHospitalCode}
           onHospitalHover={onHospitalHover}
@@ -126,6 +127,7 @@ export default function HybridMap({
           selectedRegion={selectedRegion}
           selectedSevereType={selectedSevereType}
           selectedDiseaseCategory={selectedDiseaseCategory}
+          selectedDiseases={selectedDiseases}
           selectedClassifications={selectedClassifications}
           hoveredHospitalCode={hoveredHospitalCode}
           onHospitalHover={onHospitalHover}
