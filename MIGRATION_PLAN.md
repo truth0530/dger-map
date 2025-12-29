@@ -1,7 +1,7 @@
 # DGER-API → DGER-MAP 마이그레이션 계획 (보완)
 
 > 작성일: 2025-12-29
-> 상태: **로컬 검증 완료** (배포 대기)
+> 상태: **Vercel 배포 검증 완료** (dger.kr 전환 대기)
 > 기준: 리스크 최소화, 기존 트래픽/데이터 연속성 유지
 
 ---
@@ -525,6 +525,53 @@ DGER_API_URL=https://dger.kr DGER_MAP_URL=http://localhost:3000 \
 - 경고는 모두 예상된 동작이거나 선택적 설정 관련
 - **마이그레이션 진행 가능**
 
+### 12.9 Vercel 배포 테스트 결과 (2025-12-29)
+
+#### 테스트 환경
+- 환경: **dger-map.vercel.app** (Production deployment)
+- 커밋: `f4050ce` (마이그레이션 자동화 도구 + favicon.svg)
+- 결과: **통과 (15/15, 경고 3개)**
+
+#### 결과 상세
+
+| 카테고리 | 테스트 항목 | 결과 |
+|----------|------------|------|
+| Health Check | /api/health | ⚠️ degraded (Google Sheets, KV 미설정) |
+| 페이지 접근 | /, /severe, /messages, /feedback | ✅ 4/4 통과 |
+| Redirect | index.html, 27severe.html, systommsg.html, feed.html | ✅ 4/4 통과 (308) |
+| API (신규) | bed-info, hospital-list, severe-diseases | ✅ 3/3 통과 |
+| API (신규) | emergency-messages | ⚠️ 400 (파라미터 필요) |
+| API (레거시) | get-bed-info, get-hospital-list | ✅ 2/2 통과 |
+| API (레거시) | get-emergency-messages | ⚠️ 400 (파라미터 필요) |
+| 정적 파일 | hosp_list.json, favicon.svg | ✅ 2/2 통과 |
+
+#### 경고 분석
+
+| 경고 | 원인 | 영향 | 조치 |
+|------|------|------|------|
+| Health: degraded | Google Sheets, Vercel KV 미설정 | 피드백/평점 기능 제한 | 선택적 (설정 시 해결) |
+| emergency-messages: 400 | region 파라미터 필수 | 없음 (프론트엔드는 항상 전달) | 정상 동작 |
+
+#### Health Check 응답 예시
+```json
+{
+  "status": "degraded",
+  "version": "948db14",
+  "checks": [
+    {"name": "ERMCT_API_KEY", "status": "ok"},
+    {"name": "MAPTILER_API_KEY", "status": "ok"},
+    {"name": "GOOGLE_SHEETS", "status": "warn", "message": "피드백 기능 제한됨"},
+    {"name": "VERCEL_KV", "status": "warn", "message": "평점 데이터 휘발성"}
+  ]
+}
+```
+
+#### 결론
+- **핵심 기능 모두 정상 동작 확인**
+- 리다이렉트 (308), API rewrite 모두 정상 작동
+- dger.kr 도메인 전환 준비 완료
+- **다음 단계: dger.kr → dger-map 도메인 연결**
+
 ---
 
 ## 13. 참고
@@ -552,3 +599,4 @@ DGER_API_URL=https://dger.kr DGER_MAP_URL=http://localhost:3000 \
 | 2025-12-29 | 운영 검증 시나리오 추가 (Section 12): 외부 의존성, API 동등성, 레거시 경로, 캐시/SEO, 모니터링 체크리스트 |
 | 2025-12-29 | 자동화 검증 도구 추가: /api/health 엔드포인트, verify-migration.sh, compare-api-responses.sh |
 | 2025-12-29 | 로컬 테스트 결과 추가 (Section 12.8): 13/13 통과, 5개 경고 (모두 예상된 동작) |
+| 2025-12-29 | Vercel 배포 검증 완료 (Section 12.9): dger-map.vercel.app에서 15/15 통과, 3개 경고 |
