@@ -35,7 +35,7 @@ export function OccupancyBattery({ rate, isDark, size = 'medium' }: OccupancyBat
           className={`absolute top-0.5 left-0.5 bottom-0.5 transition-all ${fillClass}`}
           style={{ width: `calc(${fillWidth}% - 4px)`, borderRadius: '2px' }}
         />
-        <span className={`relative z-10 ${config.text} font-bold ${textColor}`}>
+        <span className={`relative z-0 ${config.text} font-bold ${textColor}`}>
           {rate}%
         </span>
         <div

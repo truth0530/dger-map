@@ -383,7 +383,34 @@ export function getDepartmentClasses(color: DepartmentColor): {
 /**
  * 키워드 하이라이트 타입
  */
-export type HighlightType = 'department' | 'staff' | 'equipment' | 'disease' | 'none';
+export type HighlightType = 'department' | 'staff' | 'equipment' | 'disease' | 'unavailable' | 'none';
+
+/**
+ * "불가능" 단어 사전
+ * - PC에서는 회색으로 연하게 표시
+ * - 모바일에서는 "X"로 대체
+ * - 앞으로 추가 가능한 형태로 관리
+ */
+export const UNAVAILABLE_PHRASES = [
+  '관련 환자 수용 불가(사전 연락 바랍니다)',
+  '관련환자 수용 불가(사전 연락 바랍니다)',
+  '사전 연락 바랍니다',
+  '수용 및 입원 불가능',
+  '환자 수용 불가능',   // 추가: 환자 수용 불가능 (띄어쓰기 포함)
+  '환자 수용불가능',    // 추가: 환자 수용불가능 (띄어쓰기 없음)
+  '수용불가능',
+  '수용 불가능',
+  '환자 수용불가',
+  '환자 수용 불가',
+  '수용불가',
+  '수용 불가',
+  '진료불가능',
+  '진료 불가능',
+  '진료불가',
+  '진료 불가',
+  '불가능',
+  '불가',
+];
 
 /**
  * 메시지에서 하이라이트할 키워드 패턴
@@ -406,7 +433,12 @@ export function parseMessageWithHighlights(message: string): HighlightedSegment[
   const segments: HighlightedSegment[] = [];
   let remaining = message;
 
-  // 패턴 정의: 진료과목, 의료진, 장비, 질환명
+  // 불가능 패턴을 동적으로 생성 (긴 것부터 매칭하도록 정렬됨)
+  const unavailablePattern = UNAVAILABLE_PHRASES
+    .map(phrase => phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))  // 특수문자 이스케이프
+    .join('|');
+
+  // 패턴 정의: 진료과목, 의료진, 장비, 질환명, 불가능
   const patterns = [
     { regex: /\[([^\]]+)\]/g, type: 'department' as HighlightType },  // [진료과목] 대괄호 형태
     // 대괄호 없는 진료과목 (문장 시작 또는 콤마/공백 뒤)
@@ -414,6 +446,7 @@ export function parseMessageWithHighlights(message: string): HighlightedSegment[
     { regex: /(의료진)/g, type: 'staff' as HighlightType },           // 의료진
     { regex: /(장비|기기|기계|CT|MRI|X-ray|초음파|내시경|인공호흡기|호흡기|ECMO|투석|혈액투석|산소|모니터|sono)/gi, type: 'equipment' as HighlightType }, // 장비 관련
     { regex: /(뇌출혈|뇌경색|심근경색|대동맥|중환자실|골절|출혈|경색|수술|acute\s*stroke|acute\s*storke|stroke|storke|급성|중증|패혈증|쇼크|외상|화상|간질환|담낭|담도|폐색|장중첩|장충첩증|정복술|복부손상|사지접합|저체중출생아|중증외상|epilepsy|seizure|spine|두경부|심경부감염|급성후두개염|상기도\s*폐쇄|목통증|후두개염|식도\s*응급질환|식도|척추|경련|소아응급|산모|객혈|BAE|의식저하|약물중독|자해)/gi, type: 'disease' as HighlightType }, // 질환명 관련
+    { regex: new RegExp(`(${unavailablePattern})`, 'gi'), type: 'unavailable' as HighlightType },  // 불가능 관련
   ];
 
   // 모든 매치를 찾아서 위치와 함께 저장
@@ -494,9 +527,33 @@ export function getHighlightClass(type: HighlightType): string {
       return 'text-green-400 font-semibold';
     case 'disease':     // 질환명 - 보라색
       return 'text-purple-400 font-semibold';
+    case 'unavailable': // 불가능 문구 - 회색 (연하게)
+      return 'text-gray-400 opacity-70';
     default:
       return '';
   }
+}
+
+/**
+ * 불가능 문구를 "X"로 대체 (모바일용)
+ * @param message 원본 메시지
+ * @returns X로 대체된 메시지
+ */
+export function replaceUnavailableWithX(message: string): string {
+  if (!message) return '';
+
+  let result = message;
+
+  // 긴 것부터 매칭하도록 정렬된 UNAVAILABLE_PHRASES 순서대로 처리
+  for (const phrase of UNAVAILABLE_PHRASES) {
+    const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    result = result.replace(regex, 'X');
+  }
+
+  // 연속된 X를 하나로 통합
+  result = result.replace(/X\s*X+/g, 'X');
+
+  return result;
 }
 
 /**

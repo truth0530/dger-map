@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
-import { parseMessageWithHighlights, getHighlightClass, HighlightType } from '@/lib/utils/messageClassifier';
+import { parseMessageWithHighlights, getHighlightClass, HighlightType, replaceUnavailableWithX } from '@/lib/utils/messageClassifier';
 import { OccupancyBattery, OrgTypeBadge, calculateOccupancyRate } from '@/components/ui/OccupancyBattery';
 
 // 질환 패턴 정의 (dger-api/public/js/diseasePatterns.js와 동일)
@@ -205,14 +205,20 @@ const getHighlightColorClass = (type: HighlightType, isDark: boolean): string =>
       return isDark ? 'text-green-400 font-semibold' : 'text-green-600 font-semibold';
     case 'disease':     // 질환명 - 보라색
       return isDark ? 'text-purple-400 font-semibold' : 'text-purple-600 font-semibold';
+    case 'unavailable': // 불가능 문구 - 회색 (연하게)
+      return isDark ? 'text-gray-500 opacity-70' : 'text-gray-400 opacity-70';
     default:
       return '';
   }
 };
 
 // 하이라이트된 메시지 렌더링 컴포넌트
-const HighlightedMessage = ({ message, isDark }: { message: string; isDark: boolean }) => {
-  const segments = parseMessageWithHighlights(message);
+// isMobile=true: 불가능 문구를 "X"로 대체
+// isMobile=false: 불가능 문구를 회색으로 표시
+const HighlightedMessage = ({ message, isDark, isMobile = false }: { message: string; isDark: boolean; isMobile?: boolean }) => {
+  // 모바일에서는 불가능 문구를 "X"로 대체
+  const processedMessage = isMobile ? replaceUnavailableWithX(message) : message;
+  const segments = parseMessageWithHighlights(processedMessage);
 
   return (
     <>
@@ -238,6 +244,7 @@ export default function MessagesPage() {
   const [allMessages, setAllMessages] = useState<HospitalWithMessages[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [allExpanded, setAllExpanded] = useState(true); // 기본: 전체 펼침
   const [isMobile, setIsMobile] = useState(false);
   const [hospitalTypeMap, setHospitalTypeMap] = useState<Record<string, string>>({});
 
@@ -558,20 +565,34 @@ export default function MessagesPage() {
     });
   };
 
+  // 전체 펼치기/접기
+  const toggleAllHospitals = () => {
+    if (allExpanded) {
+      // 전체 접기: 모든 병원명을 collapsedGroups에 추가
+      const allHospitalNames = new Set(filteredMessages.map(h => h.name));
+      setCollapsedGroups(allHospitalNames);
+      setAllExpanded(false);
+    } else {
+      // 전체 펼치기: collapsedGroups 비우기
+      setCollapsedGroups(new Set());
+      setAllExpanded(true);
+    }
+  };
+
   // 로딩 표시
   if (loading) {
     return (
-      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+      <div className="min-h-screen" style={{ backgroundColor: isDark ? '#1E3A3A' : '#F5F0E8' }}>
         <div className="flex flex-col justify-center items-center min-h-[400px]">
-          <div className={`w-10 h-10 border-4 ${isDark ? 'border-gray-700 border-t-blue-500' : 'border-gray-200 border-t-[#0a3a82]'} rounded-full animate-spin mb-4`}></div>
-          <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>데이터를 불러오는 중...</div>
+          <div className={`w-10 h-10 border-4 ${isDark ? 'border-teal-700 border-t-teal-400' : 'border-orange-200 border-t-[#E85C4A]'} rounded-full animate-spin mb-4`}></div>
+          <div className={isDark ? 'text-gray-300' : 'text-gray-700'}>데이터를 불러오는 중...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: isDark ? '#1E3A3A' : '#F5F0E8' }}>
       <main className="flex-1 p-4 max-w-[1800px] mx-auto w-full">
         {/* 컨트롤 섹션 - dger-api와 동일한 스타일 */}
         <div
@@ -580,10 +601,10 @@ export default function MessagesPage() {
         >
           {/* 지역 선택 */}
           <select
-            className={`flex-shrink-0 px-2.5 border-2 rounded text-xs min-w-14 max-w-20 ${
+            className={`flex-shrink-0 px-2.5 border rounded-lg text-xs min-w-14 max-w-20 transition-colors ${
               isDark
-                ? 'bg-gray-700 border-gray-600 text-white'
-                : 'bg-white border-gray-300'
+                ? 'bg-[#1a2f2f] border-teal-700 text-teal-100'
+                : 'bg-white border-gray-300 text-gray-800'
             }`}
             style={{ height: '32px', lineHeight: '30px', paddingTop: '0', paddingBottom: '0' }}
             value={selectedRegion}
@@ -614,19 +635,19 @@ export default function MessagesPage() {
               return (
                 <label
                   key={option.value}
-                  className="inline-flex items-center gap-1 px-2.5 text-xs font-medium cursor-pointer border-2 rounded transition-colors"
+                  className="inline-flex items-center gap-1 px-2.5 text-xs font-medium cursor-pointer border rounded-lg transition-colors"
                   style={{
                     height: '32px',
                     lineHeight: '28px',
                     backgroundColor: isSelected
-                      ? (isDark ? '#4b5563' : '#0a3a82')
-                      : (isDark ? '#374151' : '#f3f4f6'),
+                      ? (isDark ? '#c75a4a' : '#E85C4A')
+                      : (isDark ? '#1a2f2f' : '#ffffff'),
                     borderColor: isSelected
-                      ? (isDark ? '#6b7280' : '#0a3a82')
-                      : (isDark ? '#4b5563' : '#d1d5db'),
+                      ? (isDark ? '#d96a5a' : '#E85C4A')
+                      : (isDark ? '#2d4a4a' : '#d1d5db'),
                     color: isSelected
                       ? '#ffffff'
-                      : (isDark ? '#d1d5db' : '#374151')
+                      : (isDark ? '#a0b0b0' : '#374151')
                   }}
                 >
                   <input
@@ -652,10 +673,10 @@ export default function MessagesPage() {
           <input
             type="text"
             placeholder="병원명 검색"
-            className={`flex-shrink-0 px-2 border-2 rounded text-xs min-w-14 max-w-28 ${
+            className={`flex-shrink-0 px-3 border rounded-lg text-xs min-w-14 max-w-28 transition-colors ${
               isDark
-                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
-                : 'bg-white border-gray-300'
+                ? 'bg-[#1a2f2f] border-teal-700 text-teal-100 placeholder-teal-600'
+                : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
             }`}
             style={{ height: '32px' }}
             value={hospitalSearch}
@@ -665,10 +686,10 @@ export default function MessagesPage() {
           <input
             type="text"
             placeholder="메시지 검색"
-            className={`flex-shrink-0 px-2 border-2 rounded text-xs min-w-14 max-w-28 ${
+            className={`flex-shrink-0 px-3 border rounded-lg text-xs min-w-14 max-w-28 transition-colors ${
               isDark
-                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
-                : 'bg-white border-gray-300'
+                ? 'bg-[#1a2f2f] border-teal-700 text-teal-100 placeholder-teal-600'
+                : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
             }`}
             style={{ height: '32px' }}
             value={messageSearch}
@@ -677,10 +698,10 @@ export default function MessagesPage() {
 
           {/* 질환 필터 */}
           <select
-            className={`flex-shrink-0 px-2 border-2 rounded text-xs min-w-14 max-w-40 ${
+            className={`flex-shrink-0 px-2 border rounded-lg text-xs min-w-14 max-w-40 transition-colors ${
               isDark
-                ? 'bg-gray-700 border-gray-600 text-white'
-                : 'bg-white border-gray-300'
+                ? 'bg-[#1a2f2f] border-teal-700 text-teal-100'
+                : 'bg-white border-gray-300 text-gray-800'
             }`}
             style={{ height: '32px', lineHeight: '30px', paddingTop: '0', paddingBottom: '0' }}
             value={selectedSevereType}
@@ -691,109 +712,178 @@ export default function MessagesPage() {
             ))}
           </select>
 
+          {/* 전체 펼치기/접기 버튼 */}
           <button
-            onClick={loadAllHospitalData}
-            className={`flex-shrink-0 px-2.5 text-xs rounded whitespace-nowrap ${
-              isDark
-                ? 'bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600'
-                : 'bg-[#0a3a82] text-white hover:bg-[#0c4b9a]'
-            }`}
-            style={{ height: '32px' }}
+            onClick={toggleAllHospitals}
+            className="flex-shrink-0 px-3 text-xs rounded-lg whitespace-nowrap font-medium transition-colors border"
+            style={{
+              height: '32px',
+              backgroundColor: isDark ? '#1a2f2f' : '#ffffff',
+              borderColor: isDark ? '#2d4a4a' : '#d1d5db',
+              color: isDark ? '#a0b0b0' : '#374151',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = isDark ? '#2d4a4a' : '#f3f4f6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = isDark ? '#1a2f2f' : '#ffffff';
+            }}
           >
-            검색
+            {allExpanded ? '전체 접기' : '전체 펼치기'}
           </button>
         </div>
 
         {/* 데스크탑 테이블 뷰 */}
         {!isMobile && (
-          <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-sm overflow-hidden`}>
+          <div className="border rounded-2xl shadow-sm overflow-hidden" style={{
+            backgroundColor: isDark ? '#1a2f2f' : '#ffffff',
+            borderColor: isDark ? '#2d4a4a' : '#e5e7eb'
+          }}>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse table-fixed">
-                <thead className={isDark ? 'bg-gray-700' : 'bg-[#0056b3]'}>
-                  <tr>
-                    <th className="px-2 py-2 text-center text-white font-bold text-sm w-14">구분</th>
-                    <th className="px-2 py-2 text-left text-white font-bold text-sm w-20">중증</th>
-                    <th className="px-3 py-2 text-center text-white font-bold text-sm">메시지</th>
-                    <th className="px-2 py-2 pr-4 text-center text-white font-bold text-sm w-40">기간</th>
-                  </tr>
-                </thead>
-                {filteredMessages.length === 0 ? (
-                  <tbody>
-                    <tr>
-                      <td colSpan={4} className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        현재 선택한 지역의 불가능 메시지가 없습니다.
-                      </td>
-                    </tr>
-                  </tbody>
-                ) : (
-                  filteredMessages
-                    .sort((a, b) => {
-                      const aType = hospitalTypeMap[a.id] || '';
-                      const bType = hospitalTypeMap[b.id] || '';
-                      const aIsCenter = aType.includes('권역') || aType.includes('지역응급의료센터') || aType.includes('전문');
-                      const bIsCenter = bType.includes('권역') || bType.includes('지역응급의료센터') || bType.includes('전문');
-                      if (aIsCenter && !bIsCenter) return -1;
-                      if (!aIsCenter && bIsCenter) return 1;
-                      return a.name.localeCompare(b.name);
-                    })
-                    .map(hospital => {
-                      const isCollapsed = collapsedGroups.has(hospital.name);
-                      const level = getHospitalLevel(hospital);
-                      const { rate, occupied } = calculateOccupancyRate(hospital.hvs01 || 0, hospital.hvec || 0);
-                      const emergencyMsgs = hospital.messages.filter(m => !m.isDisease);
-                      const diseaseMsgs = hospital.messages.filter(m => m.isDisease);
-                      const orderedMsgs = [...emergencyMsgs, ...diseaseMsgs];
+              {filteredMessages.length === 0 ? (
+                <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  현재 선택한 지역의 불가능 메시지가 없습니다.
+                </div>
+              ) : (
+                filteredMessages
+                  .sort((a, b) => {
+                    const aType = hospitalTypeMap[a.id] || '';
+                    const bType = hospitalTypeMap[b.id] || '';
+                    const aIsCenter = aType.includes('권역') || aType.includes('지역응급의료센터') || aType.includes('전문');
+                    const bIsCenter = bType.includes('권역') || bType.includes('지역응급의료센터') || bType.includes('전문');
+                    if (aIsCenter && !bIsCenter) return -1;
+                    if (!aIsCenter && bIsCenter) return 1;
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map(hospital => {
+                    const isCollapsed = collapsedGroups.has(hospital.name);
+                    const level = getHospitalLevel(hospital);
+                    const { rate, occupied } = calculateOccupancyRate(hospital.hvs01 || 0, hospital.hvec || 0);
+                    const emergencyMsgs = hospital.messages.filter(m => !m.isDisease);
+                    const diseaseMsgs = hospital.messages.filter(m => m.isDisease);
 
-                      return (
-                        <tbody key={hospital.id} className="hospital-group">
-                          <tr
-                            className={`cursor-pointer transition-colors ${
-                              isCollapsed
-                                ? isDark ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-500 hover:bg-gray-400'
-                                : isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-[#1976d2] hover:bg-[#1565c0]'
-                            }`}
-                            onClick={() => toggleHospitalGroup(hospital.name)}
-                          >
-                            <td colSpan={4} className="px-3 py-1.5 text-white font-bold text-left relative pl-10">
-                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-white">
-                                {isCollapsed ? '▶' : '▼'}
-                              </span>
-                              {hospital.name}
-                              <span className="font-normal text-sm text-gray-200 ml-2">{occupied}명</span>
-                              <span className="ml-1"><OccupancyBattery rate={rate} isDark={isDark} size="small" /></span>
-                              <span className="ml-2"><OrgTypeBadge type={level} isDark={isDark} /></span>
-                            </td>
-                          </tr>
-                          {!isCollapsed && orderedMsgs.map((msg, idx) => (
-                            <tr key={idx} className={`border-b ${isDark ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}>
-                              <td className={`px-2 py-1.5 text-center text-sm ${msg.isDisease ? (isDark ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : (isDark ? 'text-gray-300' : 'text-gray-700')}`}>
-                                {msg.isDisease ? '중증' : '응급'}
-                              </td>
-                              <td className={`px-2 py-1.5 text-left text-sm truncate ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                                {msg.standardizedSymptom}
-                              </td>
-                              <td className={`px-3 py-1.5 text-sm break-words ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <HighlightedMessage message={msg.msg} isDark={isDark} />
-                              </td>
-                              <td className={`px-2 py-1.5 pr-4 text-center text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                {formatPeriod(msg.symBlkSttDtm, msg.symBlkEndDtm)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      );
-                    })
-                )}
-              </table>
+                    return (
+                      <div key={hospital.id} className="hospital-group">
+                        {/* 병원 헤더 */}
+                        <div
+                          className="cursor-pointer transition-colors px-3 py-1.5 text-white font-bold text-left relative pl-10 flex items-center"
+                          style={{
+                            backgroundColor: isCollapsed
+                              ? (isDark ? '#1a2f2f' : '#9A9590')
+                              : (isDark ? '#2d5050' : '#C97A6A')
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isCollapsed
+                            ? (isDark ? '#243a3a' : '#7A7570')
+                            : (isDark ? '#3d6060' : '#B56A5A')}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isCollapsed
+                            ? (isDark ? '#1a2f2f' : '#9A9590')
+                            : (isDark ? '#2d5050' : '#C97A6A')}
+                          onClick={() => toggleHospitalGroup(hospital.name)}
+                        >
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-white">
+                            {isCollapsed ? '▶' : '▼'}
+                          </span>
+                          <span className="mr-2 inline-flex items-center"><OrgTypeBadge type={level} isDark={isDark} /></span>
+                          <span>{hospital.name}</span>
+                          <span className="font-normal text-sm text-gray-200 ml-3">재실환자 {occupied}명</span>
+                          <span className="font-normal text-sm text-gray-200 ml-2">병상 포화도</span>
+                          <span className="ml-1 inline-flex items-center"><OccupancyBattery rate={rate} isDark={isDark} size="small" /></span>
+                        </div>
+
+                        {/* 펼쳐진 내용 */}
+                        {!isCollapsed && (
+                          <div>
+                            {/* 응급실 메시지 섹션 */}
+                            {emergencyMsgs.length > 0 && (
+                              <div className={`border-l-4 ${isDark ? 'border-l-emerald-500' : 'border-l-green-500'}`}>
+                                <table className="w-full border-collapse table-fixed">
+                                  <thead>
+                                    <tr style={{ backgroundColor: isDark ? '#1a3535' : '#4A5D5D' }}>
+                                      <th className="px-3 py-1.5 text-left text-white font-bold text-xs">[{hospital.name}] 응급실 메시지 {emergencyMsgs.length}건</th>
+                                      <th className="px-2 py-1.5 pr-4 text-center text-white font-bold text-xs w-28">기간</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {emergencyMsgs.map((msg, idx) => (
+                                      <tr
+                                        key={idx}
+                                        className="border-b last:border-b-0 transition-colors"
+                                        style={{ borderColor: isDark ? '#2d4a4a' : '#e5e7eb' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? '#1e3838' : '#faf5f0'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                      >
+                                        <td
+                                          className={`px-3 py-1.5 text-sm break-words ${isDark ? 'text-gray-200' : 'text-gray-700'}`}
+                                          title={msg.msg}
+                                        >
+                                          <HighlightedMessage message={msg.msg} isDark={isDark} />
+                                        </td>
+                                        <td className={`px-2 py-1.5 pr-4 text-center text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                          {formatPeriod(msg.symBlkSttDtm, msg.symBlkEndDtm)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+
+                            {/* 중증질환 메시지 섹션 */}
+                            {diseaseMsgs.length > 0 && (
+                              <div className={`border-l-4 ${isDark ? 'border-l-red-500' : 'border-l-[#E85C4A]'}`}>
+                                <table className="w-full border-collapse table-fixed">
+                                  <thead>
+                                    <tr style={{ backgroundColor: isDark ? '#2d2525' : '#5D4A4A' }}>
+                                      <th className="px-2 py-1.5 text-left text-white font-bold text-xs w-48"></th>
+                                      <th className="px-3 py-1.5 text-left text-white font-bold text-xs">[{hospital.name}] 중증응급질환 불가능 메시지 {diseaseMsgs.length}건</th>
+                                      <th className="px-2 py-1.5 pr-4 text-center text-white font-bold text-xs w-28">기간</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {diseaseMsgs.map((msg, idx) => (
+                                      <tr
+                                        key={idx}
+                                        className="border-b last:border-b-0 transition-colors"
+                                        style={{ borderColor: isDark ? '#2d4a4a' : '#e5e7eb' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? '#1e3838' : '#faf5f0'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                      >
+                                        <td
+                                          className={`px-2 py-1.5 text-left text-sm truncate ${isDark ? 'text-gray-200' : 'text-gray-700'} w-48`}
+                                          title={msg.standardizedSymptom}
+                                        >
+                                          {msg.standardizedSymptom}
+                                        </td>
+                                        <td
+                                          className={`px-3 py-1.5 text-sm break-words ${isDark ? 'text-gray-200' : 'text-gray-700'}`}
+                                          title={msg.msg}
+                                        >
+                                          <HighlightedMessage message={msg.msg} isDark={isDark} />
+                                        </td>
+                                        <td className={`px-2 py-1.5 pr-4 text-center text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                          {formatPeriod(msg.symBlkSttDtm, msg.symBlkEndDtm)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              )}
             </div>
           </div>
         )}
 
-        {/* 모바일 카드 뷰 */}
+        {/* 모바일 카드 뷰 - 단순화된 디자인 */}
         {isMobile && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredMessages.length === 0 ? (
-              <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 현재 대구지역의 불가능 메시지가 없습니다.
               </div>
             ) : (
@@ -817,41 +907,50 @@ export default function MessagesPage() {
                   return (
                     <div
                       key={hospital.id}
-                      className={`rounded-lg overflow-hidden shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border`}
+                      className="rounded-lg overflow-hidden shadow-sm"
+                      style={{
+                        backgroundColor: isDark ? '#1a2f2f' : '#ffffff',
+                        border: `1px solid ${isDark ? '#2d4a4a' : '#d1d5db'}`
+                      }}
                     >
                       {/* 병원 헤더 */}
                       <div
-                        className={`px-3 py-2 cursor-pointer font-bold text-sm text-center text-white ${
-                          isCollapsed
-                            ? isDark ? 'bg-gray-600' : 'bg-gray-500'
-                            : isDark ? 'bg-gray-700' : 'bg-[#1976d2]'
-                        }`}
+                        className="px-3 py-2 cursor-pointer font-bold text-sm text-white flex items-center justify-center"
+                        style={{
+                          backgroundColor: isCollapsed
+                            ? (isDark ? '#1a2f2f' : '#9A9590')
+                            : (isDark ? '#2d5050' : '#C97A6A')
+                        }}
                         onClick={() => toggleHospitalGroup(hospital.name)}
                       >
-                        {hospital.name}
-                        <span className="font-normal text-xs text-gray-200 ml-2">{occupied}명</span>
-                        <span className="ml-1"><OccupancyBattery rate={rate} isDark={isDark} size="small" /></span>
-                        <span className="ml-2"><OrgTypeBadge type={level} isDark={isDark} /></span>
+                        <span className="mr-2 inline-flex items-center"><OrgTypeBadge type={level} isDark={isDark} /></span>
+                        <span>{hospital.name}</span>
+                        <span className="font-normal text-xs text-gray-200 ml-2">재실환자 {occupied}명</span>
+                        <span className="font-normal text-xs text-gray-200 ml-1">병상 포화도</span>
+                        <span className="ml-1 inline-flex items-center"><OccupancyBattery rate={rate} isDark={isDark} size="small" /></span>
                       </div>
 
-                      {/* 병원 콘텐츠 */}
+                      {/* 병원 콘텐츠 - 플랫 디자인 */}
                       {!isCollapsed && (
-                        <div className="p-2">
+                        <div>
                           {/* 응급실 메시지 */}
                           {emergencyMsgs.length > 0 && (
-                            <div className={`mb-2 p-2 rounded-md ${isDark ? 'bg-gray-900 border-green-700' : 'bg-green-50 border-green-500'} border-l-4`}>
-                              <div className={`font-semibold text-xs mb-1 ${isDark ? 'text-green-400' : 'text-green-700'}`}>
-                                [응급실] 운영 정보
+                            <div className={`border-l-4 ${isDark ? 'border-l-emerald-500' : 'border-l-green-500'}`}>
+                              <div className={`px-3 py-1.5 text-xs font-semibold ${isDark ? 'bg-emerald-900/30 text-emerald-400' : 'bg-green-50 text-green-700'}`}>
+                                [{hospital.name}] 응급실 메시지 {emergencyMsgs.length}건
                               </div>
                               {emergencyMsgs.map((msg, idx) => (
-                                <div key={idx} className={`py-1 text-xs border-b last:border-b-0 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                                <div
+                                  key={idx}
+                                  className={`px-3 py-2 text-xs border-b last:border-b-0 ${isDark ? 'border-gray-700' : 'border-gray-100'}`}
+                                >
                                   {msg.standardizedSymptom !== '응급실' && (
-                                    <span className={`font-bold mr-2 ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                                    <span className={`font-bold mr-1 ${isDark ? 'text-emerald-400' : 'text-green-600'}`}>
                                       {msg.standardizedSymptom}
                                     </span>
                                   )}
-                                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}><HighlightedMessage message={msg.msg} isDark={isDark} /></span>
-                                  <span className={`ml-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                  <span className={isDark ? 'text-gray-200' : 'text-gray-700'}><HighlightedMessage message={msg.msg} isDark={isDark} isMobile={true} /></span>
+                                  <span className={`ml-2 text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                                     {formatDateNoYear(msg.symBlkSttDtm)}
                                   </span>
                                 </div>
@@ -861,17 +960,21 @@ export default function MessagesPage() {
 
                           {/* 중증질환 메시지 */}
                           {diseaseMsgs.length > 0 && (
-                            <div className={`p-2 rounded-md ${isDark ? 'bg-gray-900 border-red-700' : 'bg-red-50 border-red-500'} border-l-4`}>
-                              <div className={`font-semibold text-xs mb-1 ${isDark ? 'text-red-400' : 'text-red-700'}`}>
-                                [중증질환] 수용불가 정보
+                            <div className={`border-l-4 ${isDark ? 'border-l-red-500' : 'border-l-[#E85C4A]'}`}>
+                              <div className={`px-3 py-1.5 text-xs font-semibold ${isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-[#E85C4A]'}`}>
+                                [{hospital.name}] 중증응급질환 불가능 메시지 {diseaseMsgs.length}건
                               </div>
                               {diseaseMsgs.map((msg, idx) => (
-                                <div key={idx} className={`py-1 text-xs border-b last:border-b-0 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-                                  <span className={`font-bold mr-2 ${isDark ? 'text-red-400' : 'text-red-700'}`}>
+                                <div
+                                  key={idx}
+                                  className={`px-3 py-2 text-xs border-b last:border-b-0 ${isDark ? 'border-gray-700' : 'border-gray-100'}`}
+                                  title={`${msg.diseasePattern?.displayFormat || msg.standardizedSymptom}: ${msg.msg}`}
+                                >
+                                  <span className={`font-bold mr-1 ${isDark ? 'text-amber-400' : 'text-[#E85C4A]'}`}>
                                     {msg.diseasePattern?.displayFormat || msg.standardizedSymptom}
                                   </span>
-                                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}><HighlightedMessage message={msg.msg} isDark={isDark} /></span>
-                                  <span className={`ml-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                  <span className={isDark ? 'text-gray-200' : 'text-gray-700'}><HighlightedMessage message={msg.msg} isDark={isDark} isMobile={true} /></span>
+                                  <span className={`ml-2 text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                                     {formatDateNoYear(msg.symBlkSttDtm)}
                                   </span>
                                 </div>

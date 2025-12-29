@@ -272,45 +272,45 @@ export default function HomePage() {
   }, [data, searchTerm, orgTypes]);
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}>
       <div className="max-w-full mx-auto px-2 py-2">
         {/* 컨트롤 섹션 - dger-api와 동일 */}
         <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-1 flex-nowrap">
-          {/* 테이블/카드 보기 탭 */}
-          <div className="flex items-center flex-shrink-0">
+          {/* 테이블/카드 보기 탭 - 모바일에서 숨김, 데스크탑에서만 표시 */}
+          <div className="hidden sm:flex items-center flex-shrink-0">
             <button
               onClick={() => setViewMode('table')}
               className="px-3 py-1.5 text-sm rounded-l border h-9 transition-colors whitespace-nowrap"
               style={{
                 backgroundColor: viewMode === 'table'
-                  ? (isDark ? '#4b5563' : '#0a3a82')
+                  ? (isDark ? '#4b5563' : '#4A5D5D')
                   : (isDark ? '#1f2937' : '#f3f4f6'),
                 borderColor: viewMode === 'table'
-                  ? (isDark ? '#6b7280' : '#0a3a82')
+                  ? (isDark ? '#6b7280' : '#4A5D5D')
                   : (isDark ? '#4b5563' : '#d1d5db'),
                 color: viewMode === 'table'
                   ? '#ffffff'
                   : (isDark ? '#d1d5db' : '#374151')
               }}
             >
-              테이블 보기
+              테이블
             </button>
             <button
               onClick={() => setViewMode('cards')}
               className="px-3 py-1.5 text-sm rounded-r border-t border-r border-b h-9 transition-colors whitespace-nowrap"
               style={{
                 backgroundColor: viewMode === 'cards'
-                  ? (isDark ? '#4b5563' : '#0a3a82')
+                  ? (isDark ? '#4b5563' : '#4A5D5D')
                   : (isDark ? '#1f2937' : '#f3f4f6'),
                 borderColor: viewMode === 'cards'
-                  ? (isDark ? '#6b7280' : '#0a3a82')
+                  ? (isDark ? '#6b7280' : '#4A5D5D')
                   : (isDark ? '#4b5563' : '#d1d5db'),
                 color: viewMode === 'cards'
                   ? '#ffffff'
                   : (isDark ? '#d1d5db' : '#374151')
               }}
             >
-              카드 보기
+              카드
             </button>
           </div>
 
@@ -318,12 +318,12 @@ export default function HomePage() {
           <select
             value={selectedRegion}
             onChange={(e) => handleRegionChange(e.target.value)}
-            className={`px-2 py-1.5 border rounded text-sm h-9 flex-shrink-0 ${
+            className={`px-1 sm:px-2 py-1.5 border rounded text-sm h-9 flex-shrink-0 ${
               isDark
                 ? 'bg-gray-800 border-gray-600 text-white'
                 : 'bg-white border-gray-300 text-gray-900'
             }`}
-            style={{ width: '104px' }}
+            style={{ width: 'auto', minWidth: '52px', maxWidth: '104px' }}
           >
             {REGIONS.map(region => (
               <option key={region.value} value={region.value}>
@@ -334,35 +334,39 @@ export default function HomePage() {
 
           {/* 병원 유형 필터 - 체크박스 그룹 */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            {(Object.keys(orgTypes) as (keyof OrgTypes)[]).map((key) => (
-              <label
-                key={key}
-                className="px-2.5 py-1.5 text-xs font-medium rounded border-2 cursor-pointer transition-colors flex items-center whitespace-nowrap"
-                style={{
-                  height: '32px',
-                  backgroundColor: orgTypes[key]
-                    ? (isDark ? '#4b5563' : '#0a3a82')
-                    : (isDark ? '#374151' : '#f3f4f6'),
-                  borderColor: orgTypes[key]
-                    ? (isDark ? '#6b7280' : '#0a3a82')
-                    : (isDark ? '#4b5563' : '#d1d5db'),
-                  color: orgTypes[key]
-                    ? '#ffffff'
-                    : (isDark ? '#d1d5db' : '#374151')
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={orgTypes[key]}
-                  onChange={(e) => setOrgTypes({
-                    ...orgTypes,
-                    [key]: e.target.checked
-                  })}
-                  className="hidden"
-                />
-                {key}
-              </label>
-            ))}
+            {(Object.keys(orgTypes) as (keyof OrgTypes)[]).map((key) => {
+              const shortLabel = key === '권역' ? '권' : key === '센터' ? '센' : '기';
+              return (
+                <label
+                  key={key}
+                  className="px-2.5 py-1.5 text-xs font-medium rounded border-2 cursor-pointer transition-colors flex items-center whitespace-nowrap"
+                  style={{
+                    height: '32px',
+                    backgroundColor: orgTypes[key]
+                      ? (isDark ? '#4b5563' : '#4A5D5D')
+                      : (isDark ? '#374151' : '#f3f4f6'),
+                    borderColor: orgTypes[key]
+                      ? (isDark ? '#6b7280' : '#4A5D5D')
+                      : (isDark ? '#4b5563' : '#d1d5db'),
+                    color: orgTypes[key]
+                      ? '#ffffff'
+                      : (isDark ? '#d1d5db' : '#374151')
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={orgTypes[key]}
+                    onChange={(e) => setOrgTypes({
+                      ...orgTypes,
+                      [key]: e.target.checked
+                    })}
+                    className="hidden"
+                  />
+                  <span className="sm:hidden">{shortLabel}</span>
+                  <span className="hidden sm:inline">{key}</span>
+                </label>
+              );
+            })}
           </div>
 
           {/* 검색 */}
@@ -413,8 +417,8 @@ export default function HomePage() {
 
         {/* 로딩 상태 */}
         {loading && (
-          <div className={`fixed inset-0 flex items-center justify-center z-50 ${isDark ? 'bg-gray-900/90' : 'bg-white/90'}`}>
-            <div className={`w-12 h-12 border-4 border-t-[#0a3a82] rounded-full animate-spin ${isDark ? 'border-gray-700' : 'border-gray-200'}`}></div>
+          <div className={`fixed inset-0 flex items-center justify-center z-50 ${isDark ? 'bg-gray-900/90' : 'bg-[#F5F0E8]/90'}`}>
+            <div className={`w-12 h-12 border-4 border-t-[#4A5D5D] rounded-full animate-spin ${isDark ? 'border-gray-700' : 'border-gray-200'}`}></div>
           </div>
         )}
 
@@ -428,57 +432,81 @@ export default function HomePage() {
         {/* 테이블 뷰 */}
         {viewMode === 'table' && (
           <div className={`border rounded-lg overflow-hidden shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-            <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
-              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                <thead className={`sticky top-0 z-10 ${isDark ? 'bg-[#111827]' : 'bg-[#0a3a82]'}`}>
+            <div className="sm:overflow-x-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+              <table className="w-full border-collapse">
+                {/* 칼럼 너비 정의: 병원명 넓게, 코호트 좁게, 업데이트 유지 */}
+                <colgroup>
+                  <col className="w-[100px] sm:w-[180px] lg:w-[220px] min-w-[100px]" /> {/* 병원명 - 넓게 유지 */}
+                  <col className="w-[60px] sm:w-[80px]" /> {/* 병상포화도 */}
+                  <col className="w-[50px] sm:w-[70px]" /> {/* 재실인원 */}
+                  <col className="w-[50px] sm:w-[70px]" /> {/* 일반병상 */}
+                  <col className="hidden sm:table-column w-[50px] lg:w-[60px]" /> {/* 코호트 - 좁게 */}
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" /> {/* 음압격리 */}
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" /> {/* 일반격리 */}
+                  <col className="hidden sm:table-column w-[45px] lg:w-[55px]" /> {/* 소아 */}
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" /> {/* 소아음압 */}
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" /> {/* 소아일반 */}
+                  <col className="w-[85px] sm:w-[100px] lg:w-[115px]" /> {/* 업데이트 - 유지 */}
+                </colgroup>
+                <thead className={`sticky top-0 z-20 ${isDark ? 'bg-[#111827]' : 'bg-[#4A5D5D]'}`}>
                   <tr>
-                    <th style={{ width: columnWidths.hospital }} className="px-3 py-2 text-left text-white font-semibold text-sm whitespace-nowrap relative">
-                      병원명
+                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">병원</span>
+                      <span className="hidden lg:inline">병원명</span>
                       {selectedDisease && (
-                        <span className="ml-2 font-normal text-xs text-orange-300">
+                        <span className="ml-2 font-normal text-xs text-orange-300 hidden lg:inline">
                           ({SEVERE_TYPES.find(d => d.qn === selectedDisease)?.label})
                         </span>
                       )}
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('hospital', e)} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => startResize('hospital', e)} />
                     </th>
-                    <th style={{ width: columnWidths.occupancy }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
-                      병상포화도
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('occupancy', e)} />
+                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">포화도</span>
+                      <span className="hidden lg:inline">병상포화도</span>
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => startResize('occupancy', e)} />
                     </th>
-                    <th style={{ width: columnWidths.count }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
-                      재실인원
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('count', e)} />
+                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">재실</span>
+                      <span className="hidden lg:inline">재실인원</span>
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => startResize('count', e)} />
                     </th>
-                    <th style={{ width: columnWidths.general }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
-                      일반병상
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('general', e)} />
+                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">일반</span>
+                      <span className="hidden lg:inline">일반병상</span>
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => startResize('general', e)} />
                     </th>
-                    <th style={{ width: columnWidths.cohort }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
-                      코호트
+                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">코</span>
+                      <span className="hidden lg:inline">코호트</span>
                       <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('cohort', e)} />
                     </th>
-                    <th style={{ width: columnWidths.negative }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
-                      음압격리
+                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">음압</span>
+                      <span className="hidden lg:inline">음압격리</span>
                       <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('negative', e)} />
                     </th>
-                    <th style={{ width: columnWidths.isolation }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
-                      일반격리
+                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">일격</span>
+                      <span className="hidden lg:inline">일반격리</span>
                       <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('isolation', e)} />
                     </th>
-                    <th style={{ width: columnWidths.pediatric }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
+                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
                       소아
                       <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('pediatric', e)} />
                     </th>
-                    <th style={{ width: columnWidths.pedNegative }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
-                      소아음압
+                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">소음</span>
+                      <span className="hidden lg:inline">소아음압</span>
                       <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('pedNegative', e)} />
                     </th>
-                    <th style={{ width: columnWidths.pedIsolation }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap relative">
-                      소아일반
+                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">소일</span>
+                      <span className="hidden lg:inline">소아일반</span>
                       <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('pedIsolation', e)} />
                     </th>
-                    <th style={{ width: columnWidths.update }} className="px-3 py-2 text-center text-white font-semibold text-sm whitespace-nowrap">
-                      업데이트
+                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap">
+                      <span className="lg:hidden">갱신</span>
+                      <span className="hidden lg:inline">업데이트</span>
                     </th>
                   </tr>
                 </thead>
@@ -592,67 +620,69 @@ function HospitalRow({ hospital, isDark, isExpanded, onToggle, messages, message
           ? isDark ? 'bg-amber-900/30 hover:bg-amber-900/50' : 'bg-amber-50 hover:bg-amber-100'
           : isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
       }`}>
-        {/* 병원명 + 펼치기/접기 버튼 */}
-        <td style={columnWidths ? { width: columnWidths.hospital } : undefined} className={`px-3 py-2 text-sm overflow-hidden text-ellipsis ${isDark ? 'text-white' : 'text-gray-900'}`}>
+        {/* 병원명 + 펼치기/접기 버튼 - 좌측 정렬 */}
+        <td className={`px-1 sm:px-2 py-1.5 text-xs text-left ${isDark ? 'text-white' : 'text-gray-900'}`}>
           <div className="flex items-center gap-1">
             <button
               onClick={onToggle}
-              className={`px-1 text-xs flex-shrink-0 ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-0.5 text-xs flex-shrink-0 ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
               title={isExpanded ? '접기' : '펼치기'}
             >
               {isExpanded ? '⌄' : '›'}
             </button>
-            <span className="font-medium truncate">{hospital.dutyName}</span>
+            {/* lg 이하에서 약어 표시, lg 이상에서 전체 이름 */}
+            <span className="font-medium whitespace-nowrap lg:hidden" title={hospital.dutyName}>{shortenHospitalName(hospital.dutyName)}</span>
+            <span className="font-medium whitespace-nowrap hidden lg:inline" title={hospital.dutyName}>{hospital.dutyName}</span>
           </div>
         </td>
 
         {/* 병상포화도 */}
-        <td style={columnWidths ? { width: columnWidths.occupancy } : undefined} className="px-3 py-2 text-center whitespace-nowrap">
+        <td className="px-1 sm:px-2 py-1.5 text-center whitespace-nowrap">
           <OccupancyBattery rate={occupancyRate} isDark={isDark} size="large" />
         </td>
 
         {/* 재실인원 */}
-        <td style={columnWidths ? { width: columnWidths.count } : undefined} className={`px-3 py-2 text-center text-sm font-medium whitespace-nowrap ${isDark ? 'text-white' : 'text-gray-900'}`}>
+        <td className={`px-1 sm:px-2 py-1.5 text-center text-xs font-medium whitespace-nowrap ${isDark ? 'text-white' : 'text-gray-900'}`}>
           {totalOccupancy}
         </td>
 
         {/* 일반병상 */}
-        <td style={columnWidths ? { width: columnWidths.general } : undefined} className={`px-3 py-2 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.general.available, beds.general.total)}`}>
+        <td className={`px-1 sm:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.general.available, beds.general.total)}`}>
           {renderBedValue(beds.general.available, beds.general.total)}
         </td>
 
-        {/* 코호트 */}
-        <td style={columnWidths ? { width: columnWidths.cohort } : undefined} className={`px-3 py-2 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.cohort.available, beds.cohort.total)}`}>
+        {/* 코호트 - 모바일 숨김, 좁은 패딩 */}
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.cohort.available, beds.cohort.total)}`}>
           {renderBedValue(beds.cohort.available, beds.cohort.total)}
         </td>
 
-        {/* 음압격리 */}
-        <td style={columnWidths ? { width: columnWidths.negative } : undefined} className={`px-3 py-2 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.erNegative.available, beds.erNegative.total)}`}>
+        {/* 음압격리 - 모바일 숨김 */}
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.erNegative.available, beds.erNegative.total)}`}>
           {renderBedValue(beds.erNegative.available, beds.erNegative.total)}
         </td>
 
-        {/* 일반격리 */}
-        <td style={columnWidths ? { width: columnWidths.isolation } : undefined} className={`px-3 py-2 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.erGeneral.available, beds.erGeneral.total)}`}>
+        {/* 일반격리 - 모바일 숨김 */}
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.erGeneral.available, beds.erGeneral.total)}`}>
           {renderBedValue(beds.erGeneral.available, beds.erGeneral.total)}
         </td>
 
-        {/* 소아 */}
-        <td style={columnWidths ? { width: columnWidths.pediatric } : undefined} className={`px-3 py-2 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatric.available, beds.pediatric.total)}`}>
+        {/* 소아 - 모바일 숨김 */}
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatric.available, beds.pediatric.total)}`}>
           {renderBedValue(beds.pediatric.available, beds.pediatric.total)}
         </td>
 
-        {/* 소아음압 */}
-        <td style={columnWidths ? { width: columnWidths.pedNegative } : undefined} className={`px-3 py-2 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricNegative.available, beds.pediatricNegative.total)}`}>
+        {/* 소아음압 - 모바일 숨김 */}
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricNegative.available, beds.pediatricNegative.total)}`}>
           {renderBedValue(beds.pediatricNegative.available, beds.pediatricNegative.total)}
         </td>
 
-        {/* 소아일반 */}
-        <td style={columnWidths ? { width: columnWidths.pedIsolation } : undefined} className={`px-3 py-2 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}`}>
+        {/* 소아일반 - 모바일 숨김 */}
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}`}>
           {renderBedValue(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}
         </td>
 
-        {/* 업데이트 시간 */}
-        <td style={columnWidths ? { width: columnWidths.update } : undefined} className={`px-3 py-2 text-center text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+        {/* 업데이트 시간 - 너비 유지 */}
+        <td className={`px-1 sm:px-2 py-1.5 text-center text-[10px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
           {hospital.hvidate ? formatDateWithDay(hospital.hvidate) : '-'}
         </td>
       </tr>
@@ -751,7 +781,7 @@ function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messag
   return (
     <div className={`border rounded-lg overflow-hidden shadow-sm ${
       isCenter
-        ? isDark ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200 border-l-4 border-l-[#0a3a82]'
+        ? isDark ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200 border-l-4 border-l-[#4A5D5D]'
         : isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
     }`}>
       {/* 헤더 */}
@@ -765,7 +795,8 @@ function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messag
               {isExpanded ? '⌄' : '›'}
             </button>
             <h3 className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {hospital.dutyName}
+              <span className="sm:hidden">{shortenHospitalName(hospital.dutyName)}</span>
+              <span className="hidden sm:inline">{hospital.dutyName}</span>
             </h3>
           </div>
           <div className="flex items-center gap-2">

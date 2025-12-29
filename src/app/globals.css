@@ -350,9 +350,9 @@ html.light .text-red-400 {
 
 /* ==================== Shadcn UI 스타일 ==================== */
 
-/* 버튼 기본 스타일 */
+/* 버튼 기본 스타일 - text-sm 제거 (컴포넌트에서 제어) */
 button {
-  @apply rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  @apply rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
 }
 
 /* 버튼 variant 스타일 */
@@ -393,9 +393,9 @@ button.border, [class*="border"] {
   @apply flex items-center p-6 pt-0;
 }
 
-/* 입력 필드 스타일 - height 제거 (컴포넌트에서 제어) */
+/* 입력 필드 스타일 - height, text-sm 제거 (컴포넌트에서 제어) */
 input, textarea {
-  @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply w-full rounded-md border border-input bg-background px-3 py-2 ring-offset-background file:border-0 file:bg-transparent file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 /* 라이트 모드 입력 필드 */
@@ -420,7 +420,7 @@ html.light textarea:focus {
   background: transparent !important;
   box-shadow: none !important;
   min-height: auto !important;
-  font-size: 13px !important;
+  font-size: 11px !important;
   line-height: 1.4 !important;
 }
 
@@ -444,8 +444,8 @@ html.light textarea:focus {
   box-shadow: none !important;
   min-height: 18px !important;
   height: auto !important;
-  font-size: 13px !important;
-  line-height: 1.3 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
 }
 
 [cmdk-item]:hover,
@@ -482,7 +482,7 @@ html.light textarea:focus {
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  font-size: 13px !important;
+  font-size: 11px !important;
   height: auto !important;
   min-height: auto !important;
 }

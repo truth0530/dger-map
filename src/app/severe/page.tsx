@@ -8,6 +8,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
+import { SEVERE_CONSTRAINTS } from '@/lib/constants/severeDefinitions';
+import { shortenHospitalName } from '@/lib/utils/hospitalUtils';
 
 // 중증질환 코드 목록 (dger-api와 동일)
 const SEVERE_CODES = [
@@ -39,6 +41,17 @@ const SEVERE_CODES = [
   { qn: 26, label: '[영상의학혈관중재] 성인', field: 'MKioskTy26' },
   { qn: 27, label: '[영상의학혈관중재] 영유아', field: 'MKioskTy27' }
 ];
+
+// 연령/체중 제한 정보 가져오기
+function getConstraintInfo(field: string): { ageLimit?: string; weightLimit?: string; note?: string } | null {
+  const constraint = SEVERE_CONSTRAINTS[field];
+  if (!constraint) return null;
+  return {
+    ageLimit: constraint.ageLimit,
+    weightLimit: constraint.weightLimit,
+    note: constraint.note
+  };
+}
 
 // 시도명 매핑
 const REGION_OPTIONS = [
@@ -125,6 +138,17 @@ export default function SeverePage() {
   const [loading, setLoading] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Record<number, string | null>>({});
   const [allExpanded, setAllExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // 화면 크기 감지
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 질환 데이터 로드
   const loadData = useCallback(async () => {
@@ -331,7 +355,7 @@ export default function SeverePage() {
               {data.availableHospitals.map((h, i) => (
                 <div key={`a-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
                   <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                    {h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                    {isMobile ? shortenHospitalName(h.name) : h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
                   </span>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-700'}`}>수용가능</span>
                 </div>
@@ -346,7 +370,7 @@ export default function SeverePage() {
               {data.unavailableHospitals.map((h, i) => (
                 <div key={`u-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
                   <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                    {h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                    {isMobile ? shortenHospitalName(h.name) : h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
                   </span>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-700'}`}>불가</span>
                 </div>
@@ -361,7 +385,7 @@ export default function SeverePage() {
               {data.noInfoHospitals.map((h, i) => (
                 <div key={`n-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
                   <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                    {h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                    {isMobile ? shortenHospitalName(h.name) : h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
                   </span>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'}`}>미참여</span>
                 </div>
@@ -388,7 +412,7 @@ export default function SeverePage() {
         {hospitals.map((h, i) => (
           <div key={i} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
             <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-              {h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+              {isMobile ? shortenHospitalName(h.name) : h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
             </span>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusClass}`}>{statusText}</span>
           </div>
@@ -400,16 +424,16 @@ export default function SeverePage() {
   // 로딩 화면
   if (loading) {
     return (
-      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
-        <div className="fixed inset-0 flex justify-center items-center bg-white/90 dark:bg-gray-900/90 z-50">
-          <div className={`w-12 h-12 border-4 ${isDark ? 'border-gray-700 border-t-blue-500' : 'border-gray-200 border-t-[#0a3a82]'} rounded-full animate-spin`}></div>
+      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}>
+        <div className={`fixed inset-0 flex justify-center items-center z-50 ${isDark ? 'bg-gray-900/90' : 'bg-[#F5F0E8]/90'}`}>
+          <div className={`w-12 h-12 border-4 ${isDark ? 'border-gray-700 border-t-blue-500' : 'border-gray-200 border-t-[#4A5D5D]'} rounded-full animate-spin`}></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}>
       <main className="p-2 sm:p-4 max-w-[1800px] mx-auto">
         {/* 컨트롤 섹션 - 좌측 정렬 */}
         <div className="flex items-center justify-start gap-2 mb-2 px-2 overflow-x-auto">
@@ -433,7 +457,7 @@ export default function SeverePage() {
             className={`px-3 text-sm font-medium rounded cursor-pointer transition-colors whitespace-nowrap ${
               isDark
                 ? 'bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600'
-                : 'bg-[#0a3a82] hover:bg-[#0c4ba0] text-white'
+                : 'bg-[#4A5D5D] hover:bg-[#3A4D4D] text-white'
             }`}
             style={{ height: '36px' }}
           >
@@ -445,7 +469,7 @@ export default function SeverePage() {
             className={`px-3 text-sm font-medium rounded cursor-pointer transition-colors whitespace-nowrap ${
               isDark
                 ? 'bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600'
-                : 'bg-[#0a3a82] hover:bg-[#0c4ba0] text-white'
+                : 'bg-[#4A5D5D] hover:bg-[#3A4D4D] text-white'
             }`}
             style={{ height: '36px' }}
           >
@@ -453,8 +477,8 @@ export default function SeverePage() {
           </button>
         </div>
 
-        {/* 질환 그리드 - dger-api와 동일한 스타일 */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
+        {/* 질환 그리드 - 컴팩트 간격, 넓은 카드 */}
+        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))' }}>
           {SEVERE_CODES.map(disease => {
             const data = diseaseData[disease.qn];
             if (!data) return null;
@@ -464,46 +488,72 @@ export default function SeverePage() {
                 key={disease.qn}
                 className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg overflow-hidden transition-shadow hover:shadow-md`}
               >
-                {/* 카드 컨텐츠 - 컴팩트 레이아웃 */}
-                <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                  {/* 질환명 */}
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full border ${isDark ? 'bg-gray-700 border-gray-600 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                {/* 카드 컨텐츠 - 컴팩트 레이아웃 (줄바꿈 방지) */}
+                <div className="px-3 py-2.5 flex items-center justify-between gap-2">
+                  {/* 질환명 - 툴팁 포함 */}
+                  <div
+                    className="flex items-center gap-1.5 flex-1 min-w-0 cursor-default"
+                    title={`${data.name}${(() => {
+                      const constraint = getConstraintInfo(disease.field);
+                      return constraint?.note ? `\n${constraint.note}` : '';
+                    })()}`}
+                  >
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full border flex-shrink-0 ${isDark ? 'bg-gray-700 border-gray-600 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
                       {disease.qn}
                     </span>
-                    <span className={`font-semibold text-sm truncate ${isDark ? 'text-white' : 'text-gray-800'}`} title={data.name}>
+                    <span className={`font-semibold text-sm whitespace-nowrap ${isDark ? 'text-white' : 'text-gray-800'}`}>
                       {data.name}
                     </span>
+                    {/* 연령/체중 제한 표시 */}
+                    {(() => {
+                      const constraint = getConstraintInfo(disease.field);
+                      if (!constraint) return null;
+                      const limitText = constraint.ageLimit || constraint.weightLimit || '';
+                      return limitText ? (
+                        <span
+                          className={`text-[10px] px-1 py-0.5 rounded border whitespace-nowrap flex-shrink-0 ${
+                            isDark
+                              ? 'bg-amber-900/50 border-amber-700 text-amber-400'
+                              : 'bg-amber-50 border-amber-200 text-amber-700'
+                          }`}
+                        >
+                          {limitText}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
 
-                  {/* 통계 - 클릭 가능 */}
-                  <div className="flex gap-3 flex-shrink-0">
+                  {/* 통계 - 최대한 컴팩트 */}
+                  <div className="flex flex-shrink-0">
                     <div
-                      className={`flex items-center gap-1 text-sm cursor-pointer px-1.5 py-1 rounded transition-colors ${
+                      className={`flex items-center text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors ${
                         isDark ? 'hover:bg-gray-700 text-green-400' : 'hover:bg-gray-100 text-green-700'
                       }`}
                       onClick={() => toggleSection(disease.qn, 'available')}
+                      title="수용가능 병원 목록 보기"
                     >
-                      <span className="text-xs font-medium">가능</span>
-                      <span className="font-bold">{data.available}</span>
+                      <span className="font-medium">가능</span>
+                      <span className="font-bold ml-0.5">{data.available}</span>
                     </div>
                     <div
-                      className={`flex items-center gap-1 text-sm cursor-pointer px-1.5 py-1 rounded transition-colors ${
+                      className={`flex items-center text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors ${
                         isDark ? 'hover:bg-gray-700 text-red-400' : 'hover:bg-gray-100 text-red-700'
                       }`}
                       onClick={() => toggleSection(disease.qn, 'unavailable')}
+                      title="수용불가 병원 목록 보기"
                     >
-                      <span className="text-xs font-medium">불가</span>
-                      <span className="font-bold">{data.unavailable}</span>
+                      <span className="font-medium">불가</span>
+                      <span className="font-bold ml-0.5">{data.unavailable}</span>
                     </div>
                     <div
-                      className={`flex items-center gap-1 text-sm cursor-pointer px-1.5 py-1 rounded transition-colors ${
+                      className={`flex items-center text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors ${
                         isDark ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
                       }`}
                       onClick={() => toggleSection(disease.qn, 'noInfo')}
+                      title="미참여 병원 목록 보기"
                     >
-                      <span className="text-xs font-medium">미참여</span>
-                      <span className="font-bold">{data.noInfo}</span>
+                      <span className="font-medium">미참여</span>
+                      <span className="font-bold ml-0.5">{data.noInfo}</span>
                     </div>
                   </div>
                 </div>

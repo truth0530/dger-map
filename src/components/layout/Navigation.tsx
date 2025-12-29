@@ -11,11 +11,11 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 
 const NAV_ITEMS = [
-  { href: '/', label: '병상현황', description: '응급실 병상 현황' },
-  { href: '/messages', label: '응급메시지', description: '병원별 응급 메시지 조회' },
-  { href: '/severe', label: '중증질환', description: '27개 중증질환 수용현황' },
-  { href: '/map', label: '지도', description: '중증응급질환 지도 시각화' },
-  { href: '/feedback', label: '피드백', description: '릴리즈 노트 및 피드백' }
+  { href: '/', label: '병상현황', shortLabel: '병상', description: '응급실 병상 현황' },
+  { href: '/messages', label: '응급메시지', shortLabel: '메시지', description: '병원별 응급 메시지 조회' },
+  { href: '/severe', label: '중증질환', shortLabel: '중증', description: '27개 중증질환 수용현황' },
+  { href: '/map', label: '지도', shortLabel: '지도', description: '중증응급질환 지도 시각화' },
+  { href: '/feedback', label: '피드백', shortLabel: '피드백', description: '릴리즈 노트 및 피드백' }
 ];
 
 /**
@@ -41,7 +41,7 @@ export default function Navigation() {
     <>
       <SkipNavigation />
       <nav
-        className={`${isDark ? 'bg-gray-800' : 'bg-[#0a3a82]'} text-white relative z-40 overflow-visible`}
+        className={`${isDark ? 'bg-gray-800' : 'bg-[#1E3A3A]'} text-white relative z-40 overflow-visible`}
         role="navigation"
         aria-label="메인 네비게이션"
       >
@@ -50,7 +50,7 @@ export default function Navigation() {
             {/* 로고 */}
             <Link
               href="/"
-              className={`font-bold text-lg transition-colors ${isDark ? 'hover:text-gray-300' : 'hover:text-blue-200'}`}
+              className={`font-bold text-lg transition-colors ${isDark ? 'hover:text-gray-300' : 'hover:text-teal-200'}`}
               aria-label="DGER 홈으로 이동"
             >
               DGER
@@ -64,7 +64,7 @@ export default function Navigation() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    className={`px-2 sm:px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                       isActive
                         ? isDark ? 'bg-gray-600 text-white' : 'bg-white/20 text-white'
                         : isDark ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-white/80 hover:text-white hover:bg-white/10'
@@ -74,16 +74,15 @@ export default function Navigation() {
                     aria-current={isActive ? 'page' : undefined}
                     role="menuitem"
                   >
-                    {item.label}
+                    <span className="sm:hidden">{item.shortLabel}</span>
+                    <span className="hidden sm:inline">{item.label}</span>
                   </Link>
                 );
               })}
             </div>
 
-            {/* 테마 토글 - 아래로 위치 조정 */}
-            <div className="mt-3">
-              <ThemeToggle />
-            </div>
+            {/* 테마 토글 */}
+            <ThemeToggle />
 
           </div>
         </div>

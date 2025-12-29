@@ -304,6 +304,11 @@ export function MapDashboard() {
     });
   }, [hospitals, allData, selectedRegion, selectedDiseaseSubcategories, selectedDay, selectedStatus, selectedClassifications, selectedSevereType, severeData, selectedBedStatus, getBedStatusForHospital, hasAnySelectedBedType]);
 
+  // 센터급 여부 확인 (권역응급의료센터, 지역응급의료센터는 센터급)
+  const isCenterLevel = (classification: string | undefined): boolean => {
+    return classification === "권역응급의료센터" || classification === "지역응급의료센터";
+  };
+
   // 검색어로 필터링 및 정렬된 병원 목록
   const searchedHospitals = useMemo(() => {
     let result = filteredHospitals;
@@ -316,9 +321,17 @@ export function MapDashboard() {
       );
     }
 
-    // 정렬
-    if (sortMode === "travelTime" && travelTimes.size > 0) {
-      result = [...result].sort((a, b) => {
+    // 정렬: 센터급/기관급 그룹 분리 후 각 그룹 내에서 정렬
+    result = [...result].sort((a, b) => {
+      // 1. 센터급 vs 기관급 그룹 분리 (센터급이 먼저)
+      const aIsCenter = isCenterLevel(a.classification);
+      const bIsCenter = isCenterLevel(b.classification);
+      if (aIsCenter && !bIsCenter) return -1;
+      if (!aIsCenter && bIsCenter) return 1;
+
+      // 2. 같은 그룹 내에서 정렬
+      if (sortMode === "travelTime" && travelTimes.size > 0) {
+        // 소요시간순 정렬
         const aTime = travelTimes.get(a.code)?.duration;
         const bTime = travelTimes.get(b.code)?.duration;
 
@@ -330,13 +343,18 @@ export function MapDashboard() {
         if (aTime !== null && aTime !== undefined && bTime !== null && bTime !== undefined) {
           return aTime - bTime;
         }
+      } else {
+        // 포화도순 정렬 (default)
+        const aRate = bedDataMap.get(a.code)?.occupancyRate ?? 100;
+        const bRate = bedDataMap.get(b.code)?.occupancyRate ?? 100;
+        return aRate - bRate; // 낮은 포화도(여유)가 먼저
+      }
 
-        return 0;
-      });
-    }
+      return 0;
+    });
 
     return result;
-  }, [filteredHospitals, searchQuery, sortMode, travelTimes]);
+  }, [filteredHospitals, searchQuery, sortMode, travelTimes, bedDataMap]);
 
   // 호버된 병원이 리스트에 있으면 스크롤
   useEffect(() => {
@@ -617,9 +635,9 @@ export function MapDashboard() {
   const closeMobilePanel = () => setMobilePanel(null);
 
   return (
-    <div className={`w-screen h-screen flex flex-col overflow-hidden ${isDark ? 'bg-gray-950' : 'bg-white'}`}>
+    <div className={`w-screen h-screen flex flex-col overflow-hidden ${isDark ? 'bg-gray-950' : 'bg-[#F5F0E8]'}`}>
       {/* Header */}
-      <header className={`border-b px-3 md:px-4 py-2 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+      <header className={`border-b px-3 md:px-4 py-2 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-gray-300'}`}>
         <div className="flex items-center justify-between">
           <h1 className={`text-sm md:text-lg font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>중증응급질환 진료 현황</h1>
 
@@ -650,13 +668,13 @@ export function MapDashboard() {
 
       <div className="flex-1 flex relative">
         {/* 좌측 필터 사이드바 */}
-        <aside className={`hidden md:flex w-48 flex-col ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+        <aside className={`hidden md:flex w-48 flex-col border-r ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-[#d4cdc4]'}`}>
           <div className="flex-1 overflow-y-auto">
           {/* 지역 + 기관분류 - 아코디언 */}
-          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
+          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
             <button
               onClick={() => toggleSection("region")}
-              className={`w-full px-2 py-1.5 flex items-center justify-between text-[9px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-800'}`}
+              className={`w-full px-2 py-1.5 flex items-center justify-between text-[11px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-[#4A5D5D] hover:text-[#3a4a4a]'}`}
             >
               <span>지역 / 기관</span>
               <svg className={`w-3 h-3 transition-transform ${expandedSections.has("region") ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -664,17 +682,17 @@ export function MapDashboard() {
               </svg>
             </button>
             {expandedSections.has("region") && (
-              <div className="px-2 pb-2">
+              <div className={`px-2 pb-2 ${isDark ? '' : 'bg-[#F5F0E8]/50'}`}>
                 <div className="flex items-end gap-1">
                   <div className="w-14 shrink-0">
-                    <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
+                    <label className={`text-[11px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
                     <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
                       <SelectTrigger size="xs" className={`[&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
                         {REGIONS.map((r) => (
-                          <SelectItem key={r.value} value={r.value} className={`text-[9px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          <SelectItem key={r.value} value={r.value} className={`text-[11px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                             {r.label}
                           </SelectItem>
                         ))}
@@ -682,39 +700,39 @@ export function MapDashboard() {
                     </Select>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <label className={`text-[8px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
+                    <label className={`text-[11px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
                     <div className="flex gap-0.5 items-center">
                       <button
                         onClick={() => toggleClassification("권역응급의료센터")}
                         className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
                           selectedClassifications.includes("권역응급의료센터")
-                            ? "bg-cyan-500/20 text-white"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        <span className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                        <span className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : isDark ? "bg-gray-500" : "bg-gray-400"}`} />
                         권역
                       </button>
                       <button
                         onClick={() => toggleClassification("지역응급의료센터")}
                         className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
                           selectedClassifications.includes("지역응급의료센터")
-                            ? "bg-cyan-500/20 text-white"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                        <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : isDark ? "bg-gray-500" : "bg-gray-400"}`} />
                         센터
                       </button>
                       <button
                         onClick={() => toggleClassification("지역응급의료기관")}
                         className={`flex items-center gap-0.5 text-[6px] px-0.5 py-px rounded transition-colors whitespace-nowrap ${
                           selectedClassifications.includes("지역응급의료기관")
-                            ? "bg-cyan-500/20 text-white"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        <svg className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : "fill-gray-500"}`} viewBox="0 0 10 10">
+                        <svg className={`w-1.5 h-1.5 shrink-0 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : isDark ? "fill-gray-500" : "fill-gray-400"}`} viewBox="0 0 10 10">
                           <polygon points="5,0 10,10 0,10" />
                         </svg>
                         기관
@@ -727,10 +745,10 @@ export function MapDashboard() {
           </div>
 
           {/* 질환 선택 - 아코디언 */}
-          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
+          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
             <button
               onClick={() => toggleSection("disease")}
-              className={`w-full px-2 py-1.5 flex items-center justify-between text-[9px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-800'}`}
+              className={`w-full px-2 py-1.5 flex items-center justify-between text-[11px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-[#4A5D5D] hover:text-[#3a4a4a]'}`}
             >
               <span>질환 필터</span>
               <svg className={`w-3 h-3 transition-transform ${expandedSections.has("disease") ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -738,18 +756,18 @@ export function MapDashboard() {
               </svg>
             </button>
             {expandedSections.has("disease") && (
-              <div className="px-2 pb-2 space-y-1.5">
+              <div className={`px-2 pb-2 space-y-1.5 ${isDark ? '' : 'bg-[#F5F0E8]/50'}`}>
                 {/* 42개 자원조사 */}
                 <div>
                   <div className="flex items-center justify-between mb-0.5">
-                    <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>중증자원조사 42개</label>
+                    <label className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>중증자원조사 42개</label>
                     <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
                       <SelectTrigger size="xs" className={`w-20 [&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
                         {DAYS_OF_WEEK.map((day) => (
-                          <SelectItem key={day} value={day} className={`text-[9px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          <SelectItem key={day} value={day} className={`text-[11px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                             {day}요일
                           </SelectItem>
                         ))}
@@ -758,7 +776,7 @@ export function MapDashboard() {
                   </div>
                   <Combobox
                     options={[
-                      { value: "", label: "전체" },
+                      { value: "", label: "중증자원조사 42개" },
                       ...DISEASE_CATEGORIES.map((cat) => ({ value: cat.key, label: cat.label })),
                     ]}
                     value={selectedDiseaseCategory || ""}
@@ -774,10 +792,10 @@ export function MapDashboard() {
                         <button
                           key={sub.key}
                           onClick={() => toggleDiseaseSubcategory(sub.key)}
-                          className={`text-[8px] px-1 py-0.5 rounded transition-colors ${
+                          className={`text-[11px] px-1 py-0.5 rounded transition-colors ${
                             selectedDiseaseSubcategories.has(sub.key)
-                              ? "bg-cyan-500/20 text-white"
-                              : "text-gray-500 hover:text-gray-400"
+                              ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                              : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                           }`}
                         >
                           {sub.label}
@@ -789,12 +807,12 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("24시간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[7px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
+                      className={`text-[10px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
                         !selectedDiseaseCategory
-                          ? "text-gray-700 cursor-not-allowed"
+                          ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("24시간")
-                            ? "border border-green-500 text-green-400"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "border border-green-500 text-green-400" : "border border-green-600 text-green-700 bg-green-50"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       24h{stats ? `(${stats.h24})` : ''}
@@ -802,12 +820,12 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("주간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[7px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
+                      className={`text-[10px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
                         !selectedDiseaseCategory
-                          ? "text-gray-700 cursor-not-allowed"
+                          ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("주간")
-                            ? "border border-blue-500 text-blue-400"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "border border-blue-500 text-blue-400" : "border border-blue-600 text-blue-700 bg-blue-50"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       주간{stats ? `(${stats.day})` : ''}
@@ -815,12 +833,12 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("야간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[7px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
+                      className={`text-[10px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
                         !selectedDiseaseCategory
-                          ? "text-gray-700 cursor-not-allowed"
+                          ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("야간")
-                            ? "border border-purple-500 text-purple-400"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "border border-purple-500 text-purple-400" : "border border-purple-600 text-purple-700 bg-purple-50"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       야간{stats ? `(${stats.night})` : ''}
@@ -830,12 +848,12 @@ export function MapDashboard() {
                 {/* 실시간 27개 */}
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className={`text-[8px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>27개 실시간 중증질환</label>
-                    {severeLoading && <span className="text-[8px] text-orange-400">로딩...</span>}
+                    <label className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>27개 실시간 중증질환</label>
+                    {severeLoading && <span className="text-[11px] text-orange-400">로딩...</span>}
                   </div>
                   <Combobox
                     options={[
-                      { value: "", label: "전체" },
+                      { value: "", label: "27개 중증질환" },
                       ...SEVERE_TYPES.map((type) => ({ value: type.key, label: type.label })),
                     ]}
                     value={selectedSevereType || ""}
@@ -847,9 +865,9 @@ export function MapDashboard() {
                   />
                 </div>
                 {severeStats && (
-                  <div className="flex items-center gap-3 text-[8px]">
-                    <span className="text-green-400">가능 {severeStats.available}</span>
-                    <span className="text-red-400">불가 {severeStats.unavailable}</span>
+                  <div className="flex items-center gap-3 text-[11px]">
+                    <span className={isDark ? "text-green-400" : "text-green-600"}>가능 {severeStats.available}</span>
+                    <span className={isDark ? "text-red-400" : "text-red-600"}>불가 {severeStats.unavailable}</span>
                   </div>
                 )}
               </div>
@@ -857,62 +875,65 @@ export function MapDashboard() {
           </div>
 
           {/* 병상 - 아코디언 */}
-          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
+          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
             <button
               onClick={() => toggleSection("bed")}
-              className={`w-full px-2 py-1.5 flex items-center justify-between text-[9px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-800'}`}
+              className={`w-full px-2 py-1.5 flex items-center justify-between text-[11px] font-medium ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-[#4A5D5D] hover:text-[#3a4a4a]'}`}
             >
               <span className="flex items-center gap-1">
                 병상 정보
-                {bedLoading && <span className="text-[8px] text-orange-400">로딩...</span>}
+                {bedLoading && <span className={`text-[11px] ${isDark ? 'text-orange-400' : 'text-orange-500'}`}>로딩...</span>}
               </span>
               <svg className={`w-3 h-3 transition-transform ${expandedSections.has("bed") ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
             {expandedSections.has("bed") && (
-              <div className="px-2 pb-2">
+              <div className={`px-2 pb-2 ${isDark ? '' : 'bg-[#F5F0E8]/50'}`}>
                 <div className="flex flex-wrap gap-0.5">
                   {(Object.entries(BED_TYPE_CONFIG) as [BedType, typeof BED_TYPE_CONFIG[BedType]][]).map(([type, config]) => (
                     <button
                       key={type}
                       onClick={() => toggleBedType(type)}
-                      className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
                         selectedBedTypes.has(type)
-                          ? "bg-cyan-500/20 text-white"
-                          : "text-gray-500 hover:text-gray-400"
+                          ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                          : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       {config.shortLabel}
                     </button>
                   ))}
                 </div>
-                <div className="flex gap-1.5 mt-1.5">
+                <div className="flex gap-1 mt-1">
                   <button
                     onClick={() => toggleBedStatus("여유")}
-                    className={`flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded transition-colors ${
-                      selectedBedStatus.includes("여유") ? "bg-green-600/40 text-green-300 font-medium" : "text-gray-500 hover:text-gray-400"
+                    className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                      selectedBedStatus.includes("여유")
+                        ? isDark ? "bg-green-600 text-white font-medium" : "bg-green-600 text-white font-medium"
+                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("여유") ? "bg-green-500" : "bg-gray-600"}`} />
                     여유
                   </button>
                   <button
                     onClick={() => toggleBedStatus("적정")}
-                    className={`flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded transition-colors ${
-                      selectedBedStatus.includes("적정") ? "bg-yellow-600/40 text-yellow-300 font-medium" : "text-gray-500 hover:text-gray-400"
+                    className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                      selectedBedStatus.includes("적정")
+                        ? isDark ? "bg-yellow-500 text-white font-medium" : "bg-yellow-500 text-white font-medium"
+                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("적정") ? "bg-yellow-500" : "bg-gray-600"}`} />
                     적정
                   </button>
                   <button
                     onClick={() => toggleBedStatus("부족")}
-                    className={`flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded transition-colors ${
-                      selectedBedStatus.includes("부족") ? "bg-red-600/40 text-red-300 font-medium" : "text-gray-500 hover:text-gray-400"
+                    className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                      selectedBedStatus.includes("부족")
+                        ? isDark ? "bg-red-600 text-white font-medium" : "bg-red-600 text-white font-medium"
+                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("부족") ? "bg-red-500" : "bg-gray-600"}`} />
                     부족
                   </button>
                 </div>
@@ -920,54 +941,48 @@ export function MapDashboard() {
             )}
           </div>
 
-          {/* 내 위치 기반 소요시간 */}
-          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
-            <div className="px-2 py-1.5">
-              <button
-                onClick={handleLocationRequest}
-                disabled={locationLoading || travelTimeLoading}
-                className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[9px] font-medium transition-colors ${
-                  sortMode === "travelTime"
-                    ? "bg-blue-600 text-white"
-                    : isDark
-                      ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                } ${(locationLoading || travelTimeLoading) ? "opacity-50 cursor-not-allowed" : ""}`}
-                title={userLocation ? `현재 위치: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : "내 위치 기반 소요시간 조회"}
-              >
-                {locationLoading || travelTimeLoading ? (
-                  <>
-                    <span className="w-2.5 h-2.5 border-2 border-t-transparent rounded-full animate-spin"></span>
-                    <span>조회중...</span>
-                  </>
-                ) : (
-                  <span>내 위치 기준 정렬</span>
-                )}
-              </button>
-              {sortMode === "travelTime" && (
-                <button
-                  onClick={() => setSortMode("default")}
-                  className={`w-full mt-1 text-[8px] py-0.5 rounded transition-colors ${
-                    isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  정렬 초기화
-                </button>
-              )}
-              {locationError && (
-                <div className="mt-1 text-[8px] text-red-400">{locationError}</div>
-              )}
-            </div>
-          </div>
           </div>
         </aside>
 
         {/* 병원 목록 사이드바 */}
-        <aside className={`hidden md:flex w-56 flex-col border-x ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-100 border-gray-300'}`}>
-          <div className="px-1.5 py-1 space-y-1">
-            <label className={`text-[10px] font-medium block ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {getFilterSummary()} ({searchedHospitals.length})
-            </label>
+        <aside className={`hidden md:flex w-64 flex-col border-r ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-[#d4cdc4]'}`}>
+          <div className={`px-1.5 py-1.5 space-y-1.5 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#ddd6cc]'}`}>
+            <div className="flex items-center justify-between">
+              <label className={`text-[10px] font-medium ${isDark ? 'text-gray-400' : 'text-[#4A5D5D]'}`}>
+                {getFilterSummary()} ({searchedHospitals.length})
+              </label>
+              {(locationLoading || travelTimeLoading) && (
+                <span className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin border-current opacity-50"></span>
+              )}
+            </div>
+            {/* 정렬 토글 스위치 */}
+            <div className={`flex rounded-md overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-[#c8c2b8]'}`}>
+              <button
+                onClick={() => setSortMode("default")}
+                className={`flex-1 px-2 py-1 text-[11px] font-medium transition-colors ${
+                  sortMode === "default"
+                    ? isDark ? "bg-cyan-600 text-white" : "bg-[#4A5D5D] text-white"
+                    : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                포화도순
+              </button>
+              <button
+                onClick={handleLocationRequest}
+                disabled={locationLoading || travelTimeLoading}
+                className={`flex-1 px-2 py-1 text-[11px] font-medium transition-colors ${
+                  sortMode === "travelTime"
+                    ? isDark ? "bg-cyan-600 text-white" : "bg-[#4A5D5D] text-white"
+                    : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-gray-800"
+                } ${(locationLoading || travelTimeLoading) ? "opacity-50" : ""}`}
+                title={userLocation ? `현재 위치: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : "내 위치 기반 소요시간 조회"}
+              >
+                내위치순
+              </button>
+            </div>
+            {locationError && (
+              <div className="text-[11px] text-red-400">{locationError}</div>
+            )}
             <div className="relative">
               <svg
                 className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}
@@ -982,7 +997,7 @@ export function MapDashboard() {
                 placeholder="병원명 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-5 pr-2 text-[10px] rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-transparent border-none text-gray-900 placeholder-gray-400'}`}
+                className={`w-full h-5 pr-2 text-[11px] rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-[#F5F0E8] border border-[#d4cdc4] text-gray-900 placeholder-gray-400'}`}
                 style={{ paddingLeft: '20px' }}
               />
               {searchQuery && (
@@ -999,7 +1014,7 @@ export function MapDashboard() {
           </div>
           <div
             ref={hospitalListRef}
-            className={`flex-1 overflow-y-auto p-1.5 space-y-0.5 ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}
+            className={`flex-1 overflow-y-auto p-1.5 space-y-0.5 ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}
           >
             {searchedHospitals.map((hospital) => {
               const status = getHospitalStatus(hospital);
@@ -1051,7 +1066,7 @@ export function MapDashboard() {
                 <div
                   key={hospital.code}
                   data-hospital-code={hospital.code}
-                  className={`rounded border text-[11px] cursor-pointer transition-all duration-200 ${bgClass} ${
+                  className={`rounded text-[11px] cursor-pointer transition-all duration-200 ${bgClass} ${
                     isHovered ? (isDark ? 'ring-1 ring-white/30' : 'ring-1 ring-gray-400/30') : ''
                   }`}
                   onMouseEnter={() => handleHospitalHover(hospital.code)}
@@ -1059,31 +1074,31 @@ export function MapDashboard() {
                 >
                   {/* 헤더 (클릭 시 아코디언 토글) */}
                   <div
-                    className="flex items-center gap-1 px-1 py-0.5"
+                    className="flex items-center gap-1.5 px-1.5 py-0.5"
                     onClick={() => setExpandedHospitalCode(isExpanded ? null : hospital.code)}
                   >
                     {shortClass && renderClassificationIcon(shortClass, isDark)}
                     <span
-                      className={`font-medium truncate flex-1 ${isDark ? (isHovered ? 'text-white' : 'text-gray-200') : (isHovered ? 'text-gray-900' : 'text-gray-700')}`}
+                      className={`font-medium truncate flex-1 min-w-0 ${isDark ? (isHovered ? 'text-white' : 'text-gray-200') : (isHovered ? 'text-gray-900' : 'text-gray-700')}`}
                       title={hospital.name}
                     >
                       {shortenHospitalName(hospital.name)}
                     </span>
                     {/* 소요시간 (활성화 시) */}
                     {sortMode === "travelTime" && (
-                      <span className="shrink-0 text-[9px] font-medium text-blue-400">
+                      <span className="shrink-0 text-[11px] font-medium text-blue-400 whitespace-nowrap">
                         {formatDuration(travelTimes.get(hospital.code)?.duration ?? null)}
                       </span>
                     )}
                     {occupancyRate !== null && (
-                      <div className="shrink-0 scale-[0.65] origin-right">
+                      <div className="shrink-0 scale-[0.65] origin-right whitespace-nowrap">
                         <OccupancyBattery rate={occupancyRate} isDark={isDark} size="small" />
                       </div>
                     )}
                     {selectedSevereType && isSevereAvailable ? (
-                      <span className="shrink-0 text-[9px] text-green-400">가능</span>
+                      <span className="shrink-0 text-[11px] text-green-400 whitespace-nowrap">가능</span>
                     ) : status && !selectedSevereType ? (
-                      <span className={`shrink-0 text-[9px] ${getStatusColor(status, isDark)}`}>
+                      <span className={`shrink-0 text-[11px] ${getStatusColor(status, isDark)}`}>
                         {status}
                       </span>
                     ) : null}
@@ -1103,14 +1118,14 @@ export function MapDashboard() {
                       {/* 병상 현황 */}
                       {bedInfo && (
                         <div className="flex items-center gap-2">
-                          <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>응급실</span>
+                          <span className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>응급실</span>
                           <span className={`text-[10px] font-semibold ${
                             (bedInfo.hvec ?? 0) > 0 ? 'text-green-400' : 'text-red-400'
                           }`}>{bedInfo.hvec ?? 0}</span>
-                          <span className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>/ {bedInfo.hvs01 ?? 0}</span>
+                          <span className={`text-[11px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>/ {bedInfo.hvs01 ?? 0}</span>
                           <span className="flex-1" />
                           {bedInfo.hvidate && (
-                            <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                            <span className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                               {bedInfo.hvidate.slice(0, 4)}-{bedInfo.hvidate.slice(4, 6)}-{bedInfo.hvidate.slice(6, 8)} {bedInfo.hvidate.slice(8, 10)}:{bedInfo.hvidate.slice(10, 12)} 기준
                             </span>
                           )}
@@ -1119,26 +1134,26 @@ export function MapDashboard() {
 
                       {/* 수용가능(실시간) */}
                       <div>
-                        <div className={`text-[9px] mb-0.5 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                        <div className={`text-[11px] mb-0.5 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                           수용가능(실시간) ({availableDiseases.length})
                         </div>
                         {availableDiseases.length > 0 ? (
-                          <div className={`text-[9px] leading-relaxed ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                          <div className={`text-[11px] leading-relaxed ${isDark ? 'text-green-400' : 'text-green-600'}`}>
                             {availableDiseases.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ')}
                           </div>
                         ) : (
-                          <div className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>없음</div>
+                          <div className={`text-[11px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>없음</div>
                         )}
                       </div>
 
                       {/* 진료 제한 (있을 때만 표시) */}
                       {urgentItems.length > 0 && (
                         <div className={`p-1 rounded ${isDark ? 'bg-red-900/20' : 'bg-red-50'}`}>
-                          <div className={`text-[9px] mb-0.5 font-medium ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                          <div className={`text-[11px] mb-0.5 font-medium ${isDark ? 'text-red-400' : 'text-red-600'}`}>
                             진료제한 ({urgentItems.length})
                           </div>
                           {urgentItems.map((item, idx) => (
-                            <div key={idx} className="flex gap-1 text-[9px] leading-relaxed">
+                            <div key={idx} className="flex gap-1 text-[11px] leading-relaxed">
                               <span className={`font-medium shrink-0 ${isDark ? 'text-red-400' : 'text-red-600'}`}>{item.label}</span>
                               <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{item.content}</span>
                             </div>
@@ -1190,13 +1205,13 @@ export function MapDashboard() {
 
         {/* 모바일 필터 패널 */}
         <div
-          className={`md:hidden fixed top-12 left-0 bottom-0 w-64 bg-gray-900 border-r border-gray-800 z-50 transform transition-transform duration-300 ${
-            mobilePanel === "filter" ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={`md:hidden fixed top-12 left-0 bottom-0 w-64 border-r z-50 transform transition-transform duration-300 ${
+            isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-gray-300'
+          } ${mobilePanel === "filter" ? "translate-x-0" : "-translate-x-full"}`}
         >
-          <div className="flex items-center justify-between p-3 border-b border-gray-800">
-            <span className="text-sm font-medium text-white">필터</span>
-            <button onClick={closeMobilePanel} className="p-1 text-gray-400 hover:text-white">
+          <div className={`flex items-center justify-between p-3 border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
+            <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>필터</span>
+            <button onClick={closeMobilePanel} className={`p-1 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -1205,17 +1220,17 @@ export function MapDashboard() {
           <div className="overflow-y-auto h-[calc(100%-48px)]">
             {/* 지역/요일 선택 */}
             {/* 지역 + 기관분류 */}
-            <div className="px-3 py-3 border-b border-gray-800">
+            <div className={`px-3 py-3 border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-gray-500 mb-1 block">지역</label>
+                  <label className={`text-[10px] mb-1 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
                   <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
-                    <SelectTrigger size="xs" className="bg-transparent border-none text-white">
+                    <SelectTrigger size="xs" className={`bg-transparent border-none ${isDark ? 'text-white' : 'text-gray-900'}`}>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
                       {REGIONS.map((r) => (
-                        <SelectItem key={r.value} value={r.value} className="text-white">
+                        <SelectItem key={r.value} value={r.value} className={isDark ? 'text-white' : 'text-gray-900'}>
                           {r.label}
                         </SelectItem>
                       ))}
@@ -1223,39 +1238,39 @@ export function MapDashboard() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-[10px] text-gray-500 mb-1 block">기관</label>
+                  <label className={`text-[10px] mb-1 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
                   <div className="flex flex-wrap gap-1.5 items-center">
                     <button
                       onClick={() => toggleClassification("권역응급의료센터")}
-                      className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors ${
                         selectedClassifications.includes("권역응급의료센터")
-                          ? "bg-cyan-500/20 text-white"
-                          : "text-gray-500 hover:text-gray-400"
+                          ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                          : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <span className={`w-2.5 h-2.5 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                      <span className={`w-2.5 h-2.5 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : isDark ? "bg-gray-500" : "bg-gray-400"}`} />
                       권역
                     </button>
                     <button
                       onClick={() => toggleClassification("지역응급의료센터")}
-                      className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors ${
                         selectedClassifications.includes("지역응급의료센터")
-                          ? "bg-cyan-500/20 text-white"
-                          : "text-gray-500 hover:text-gray-400"
+                          ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                          : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <span className={`w-2.5 h-2.5 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : "bg-gray-500"}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : isDark ? "bg-gray-500" : "bg-gray-400"}`} />
                       센터
                     </button>
                     <button
                       onClick={() => toggleClassification("지역응급의료기관")}
-                      className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors ${
                         selectedClassifications.includes("지역응급의료기관")
-                          ? "bg-cyan-500/20 text-white"
-                          : "text-gray-500 hover:text-gray-400"
+                          ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                          : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <svg className={`w-2.5 h-2.5 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : "fill-gray-500"}`} viewBox="0 0 10 10">
+                      <svg className={`w-2.5 h-2.5 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : isDark ? "fill-gray-500" : "fill-gray-400"}`} viewBox="0 0 10 10">
                         <polygon points="5,0 10,10 0,10" />
                       </svg>
                       기관
@@ -1266,18 +1281,18 @@ export function MapDashboard() {
             </div>
 
             {/* 질환 선택 */}
-            <div className="px-3 py-3 border-b border-gray-800">
+            <div className={`px-3 py-3 border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
               <div className="space-y-2">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] text-gray-500">중증자원조사 42개</label>
+                    <label className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>중증자원조사 42개</label>
                     <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
-                      <SelectTrigger size="xs" className="w-16 bg-transparent border-none text-white">
+                      <SelectTrigger size="xs" className={`w-16 bg-transparent border-none ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
                         {DAYS_OF_WEEK.map((day) => (
-                          <SelectItem key={day} value={day} className="text-white">
+                          <SelectItem key={day} value={day} className={isDark ? 'text-white' : 'text-gray-900'}>
                             {day}요일
                           </SelectItem>
                         ))}
@@ -1288,13 +1303,13 @@ export function MapDashboard() {
                     value={selectedDiseaseCategory || "none"}
                     onValueChange={(v) => handleCategoryChange(v === "none" ? null : v)}
                   >
-                    <SelectTrigger size="xs" className="bg-transparent border-none text-white">
+                    <SelectTrigger size="xs" className={`bg-transparent border-none ${isDark ? 'text-white' : 'text-gray-900'}`}>
                       <SelectValue placeholder="대분류 선택..." />
                     </SelectTrigger>
-                    <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
-                      <SelectItem value="none" className="text-gray-400">전체</SelectItem>
+                    <SelectContent className={`max-h-64 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                      <SelectItem value="none" className={isDark ? 'text-gray-400' : 'text-gray-500'}>전체</SelectItem>
                       {DISEASE_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.key} value={cat.key} className="text-white">
+                        <SelectItem key={cat.key} value={cat.key} className={isDark ? 'text-white' : 'text-gray-900'}>
                           {cat.label}
                         </SelectItem>
                       ))}
@@ -1307,10 +1322,10 @@ export function MapDashboard() {
                         <button
                           key={sub.key}
                           onClick={() => toggleDiseaseSubcategory(sub.key)}
-                          className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                          className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
                             selectedDiseaseSubcategories.has(sub.key)
-                              ? "bg-cyan-500/20 text-white"
-                              : "text-gray-500 hover:text-gray-400"
+                              ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                              : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                           }`}
                         >
                           {sub.label}
@@ -1323,12 +1338,12 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("24시간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[9px] px-2 py-1 rounded transition-colors ${
+                      className={`text-[11px] px-2 py-1 rounded transition-colors ${
                         !selectedDiseaseCategory
-                          ? "text-gray-700 cursor-not-allowed"
+                          ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("24시간")
-                            ? "border border-green-500 text-green-400"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "border border-green-500 text-green-400" : "border border-green-600 text-green-700 bg-green-50"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       24h
@@ -1336,12 +1351,12 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("주간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[9px] px-2 py-1 rounded transition-colors ${
+                      className={`text-[11px] px-2 py-1 rounded transition-colors ${
                         !selectedDiseaseCategory
-                          ? "text-gray-700 cursor-not-allowed"
+                          ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("주간")
-                            ? "border border-blue-500 text-blue-400"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "border border-blue-500 text-blue-400" : "border border-blue-600 text-blue-700 bg-blue-50"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       주간
@@ -1349,12 +1364,12 @@ export function MapDashboard() {
                     <button
                       onClick={() => selectedDiseaseCategory && toggleStatus("야간")}
                       disabled={!selectedDiseaseCategory}
-                      className={`text-[9px] px-2 py-1 rounded transition-colors ${
+                      className={`text-[11px] px-2 py-1 rounded transition-colors ${
                         !selectedDiseaseCategory
-                          ? "text-gray-700 cursor-not-allowed"
+                          ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("야간")
-                            ? "border border-purple-500 text-purple-400"
-                            : "text-gray-500 hover:text-gray-400"
+                            ? isDark ? "border border-purple-500 text-purple-400" : "border border-purple-600 text-purple-700 bg-purple-50"
+                            : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       야간
@@ -1362,18 +1377,18 @@ export function MapDashboard() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-gray-500 mb-1 block">27개 실시간 중증질환</label>
+                  <label className={`text-[10px] mb-1 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>27개 실시간 중증질환</label>
                   <Select
                     value={selectedSevereType || "none"}
                     onValueChange={(v) => setSelectedSevereType(v === "none" ? null : v as SevereTypeKey)}
                   >
-                    <SelectTrigger size="xs" className="bg-transparent border-none text-white">
+                    <SelectTrigger size="xs" className={`bg-transparent border-none ${isDark ? 'text-white' : 'text-gray-900'}`}>
                       <SelectValue placeholder="선택..." />
                     </SelectTrigger>
-                    <SelectContent className="max-h-64 bg-gray-800 border-gray-700">
-                      <SelectItem value="none" className="text-gray-400">전체</SelectItem>
+                    <SelectContent className={`max-h-64 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                      <SelectItem value="none" className={isDark ? 'text-gray-400' : 'text-gray-500'}>전체</SelectItem>
                       {SEVERE_TYPES.map((type) => (
-                        <SelectItem key={type.key} value={type.key} className="text-white">
+                        <SelectItem key={type.key} value={type.key} className={isDark ? 'text-white' : 'text-gray-900'}>
                           {type.label}
                         </SelectItem>
                       ))}
@@ -1386,8 +1401,8 @@ export function MapDashboard() {
             {/* 병상 필터 (유형 + 상태) */}
             <div className="px-3 py-3">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-[10px] text-gray-500">실시간 병상정보</label>
-                {bedLoading && <span className="text-[9px] text-orange-400">로딩...</span>}
+                <label className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>실시간 병상정보</label>
+                {bedLoading && <span className={`text-[11px] ${isDark ? 'text-orange-400' : 'text-orange-500'}`}>로딩...</span>}
               </div>
               {/* 병상 유형 */}
               <div className="flex flex-wrap gap-1 mb-2">
@@ -1395,10 +1410,10 @@ export function MapDashboard() {
                   <button
                     key={type}
                     onClick={() => toggleBedType(type)}
-                    className={`text-[9px] px-2 py-1 rounded transition-colors ${
+                    className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
                       selectedBedTypes.has(type)
-                        ? "bg-cyan-500/20 text-white"
-                        : "text-gray-500 hover:text-gray-400"
+                        ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
                     {config.shortLabel}
@@ -1406,32 +1421,35 @@ export function MapDashboard() {
                 ))}
               </div>
               {/* 병상 상태 */}
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <button
                   onClick={() => toggleBedStatus("여유")}
-                  className={`flex items-center gap-1.5 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
-                    selectedBedStatus.includes("여유") ? "bg-green-500/20 text-green-400" : "text-gray-600 hover:text-gray-400"
+                  className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("여유")
+                      ? isDark ? "bg-green-600 text-white font-medium" : "bg-green-600 text-white font-medium"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("여유") ? "bg-green-500" : "bg-gray-600"}`} />
                   여유
                 </button>
                 <button
                   onClick={() => toggleBedStatus("적정")}
-                  className={`flex items-center gap-1.5 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
-                    selectedBedStatus.includes("적정") ? "bg-blue-500/20 text-blue-400" : "text-gray-600 hover:text-gray-400"
+                  className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("적정")
+                      ? isDark ? "bg-yellow-500 text-white font-medium" : "bg-yellow-500 text-white font-medium"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("적정") ? "bg-blue-500" : "bg-gray-600"}`} />
                   적정
                 </button>
                 <button
                   onClick={() => toggleBedStatus("부족")}
-                  className={`flex items-center gap-1.5 text-[9px] px-1.5 py-0.5 rounded transition-colors ${
-                    selectedBedStatus.includes("부족") ? "bg-red-500/20 text-red-400" : "text-gray-600 hover:text-gray-400"
+                  className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("부족")
+                      ? isDark ? "bg-red-600 text-white font-medium" : "bg-red-600 text-white font-medium"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${selectedBedStatus.includes("부족") ? "bg-red-500" : "bg-gray-600"}`} />
                   부족
                 </button>
               </div>
@@ -1441,20 +1459,53 @@ export function MapDashboard() {
 
         {/* 모바일 병원 목록 패널 */}
         <div
-          className={`md:hidden fixed top-12 right-0 bottom-0 w-72 border-l z-50 transform transition-transform duration-300 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} ${
+          className={`md:hidden fixed top-12 right-0 bottom-0 w-72 border-l z-50 transform transition-transform duration-300 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-gray-300'} ${
             mobilePanel === "list" ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className={`flex items-center justify-between p-2 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-            <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{getFilterSummary()} ({searchedHospitals.length})</span>
-            <button onClick={closeMobilePanel} className={`p-1 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+          <div className={`p-2 border-b ${isDark ? 'border-gray-800 bg-gray-900' : 'border-[#d4cdc4] bg-[#ddd6cc]'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#4A5D5D]'}`}>{getFilterSummary()} ({searchedHospitals.length})</span>
+              <button onClick={closeMobilePanel} className={`p-1 ${isDark ? 'text-gray-400 hover:text-white' : 'text-[#4A5D5D] hover:text-[#3a4a4a]'}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* 정렬 토글 스위치 */}
+            <div className={`flex rounded-md overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-[#c8c2b8]'}`}>
+              <button
+                onClick={() => setSortMode("default")}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+                  sortMode === "default"
+                    ? isDark ? "bg-cyan-600 text-white" : "bg-[#4A5D5D] text-white"
+                    : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                포화도순
+              </button>
+              <button
+                onClick={handleLocationRequest}
+                disabled={locationLoading || travelTimeLoading}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+                  sortMode === "travelTime"
+                    ? isDark ? "bg-cyan-600 text-white" : "bg-[#4A5D5D] text-white"
+                    : isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-gray-800"
+                } ${(locationLoading || travelTimeLoading) ? "opacity-50" : ""}`}
+                title={userLocation ? `현재 위치: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : "내 위치 기반 소요시간 조회"}
+              >
+                {(locationLoading || travelTimeLoading) && (
+                  <span className="inline-block w-3 h-3 mr-1 border-2 border-t-transparent rounded-full animate-spin border-current"></span>
+                )}
+                내위치순
+              </button>
+            </div>
+            {locationError && (
+              <div className="text-[10px] text-red-400 mt-1">{locationError}</div>
+            )}
           </div>
           {/* 검색창 */}
-          <div className={`p-2 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
+          <div className={`p-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
             <div className="relative">
               <svg
                 className={`absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}
@@ -1485,7 +1536,7 @@ export function MapDashboard() {
             </div>
           </div>
           {/* 병원 목록 */}
-          <div className={`overflow-y-auto h-[calc(100%-96px)] p-2 space-y-0.5 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`overflow-y-auto h-[calc(100%-96px)] p-2 space-y-0.5 ${isDark ? 'bg-gray-900' : 'bg-[#E8E2D8]'}`}>
             {searchedHospitals.map((hospital) => {
               const status = getHospitalStatus(hospital);
               const isHovered = hoveredHospitalCode === hospital.code;

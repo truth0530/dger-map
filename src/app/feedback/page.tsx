@@ -13,6 +13,9 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 interface ReleaseNote {
   date: string;
   content: string;
+  type?: 'major' | 'minor' | 'fix' | 'init' | 'version';
+  version?: string;
+  tech?: string;
 }
 
 // 피드백 게시글 타입
@@ -27,30 +30,76 @@ interface FeedbackPost {
   hasPassword: boolean;
   replyAt?: string;
   replyContent?: string;
+  replyPublic?: boolean; // 답변공개여부 - true면 답변 공개
 }
 
 // 릴리즈 노트 데이터
 const RELEASE_NOTES: ReleaseNote[] = [
-  { date: '2025.11.01', content: '공공데이터 복구완료, 응급실메시지 진료과목 등 세부 라벨 표기 구현' },
-  { date: '2025.10.08', content: 'DGER 자체서버 구축완료, 임시 가동 시작(병상만 구현완료)' },
-  { date: '2025.09.26', content: '국가정보자원관리원 화재로 공공데이터 포털 사용중단, 내손안의 응급실 임시 연결' },
-  { date: '2025.09.13', content: '응급실 연락처 제거, 병상포화도 추가' },
-  { date: '2025.09.10', content: '중증질환 항목 오류 긴급 수정' },
-  { date: '2025.09.08', content: '새로운 DGER로 이전완료' },
-  { date: '2025.06.27', content: 'DGER 디자인과 속도 개편' },
-  { date: '2025.06.27', content: '속도개선 (5분 간격 업데이트)' },
-  { date: '2025.06.27', content: '버튼사이즈 확대, 소아병상/격리병상 표출' },
-  { date: '2025.06.27', content: '불가능 메시지 개선 (줄바꿈처리, 폰트사이즈 확대)' },
-  { date: '2022.12.06', content: '쌍방향 시스템 초안 구축 (CPR 알림/해제)' },
-  { date: '2022.10.10', content: '종합상황판 리뉴얼에 따른 재배치 부분완료' },
-  { date: '2022.06.11', content: '대구동산병원 반영완료' },
-  { date: '2022.02.15', content: '포화신호등 반영: 95% 이상(위험) 60~94%(주의) 60% 미만(안전)' },
-  { date: '2021.11.26', content: 'DGER 최초 배포 - 대구지역 구급대원을 위한 응급실 병상 정보 시스템' }
+  // DGER 3.0 - React 프레임워크 기반
+  { date: '2025.12.30', content: 'DGER 3.0', type: 'version', version: '3.0', tech: 'Next.js 16 (React 프레임워크 기반)' },
+  { date: '2025.12.30', content: 'Next.js 16 기반 DGER 이송지도 개발', type: 'init' },
+
+  // DGER 2.0 - Node.js 서버 기반
+  { date: '2025.09.08', content: 'DGER 2.0', type: 'version', version: '2.0', tech: 'Node.js Express (서버 기반)' },
+  { date: '2025.11.01', content: '공공데이터 복구완료, 응급실메시지 진료과목 등 세부 라벨 표기 구현', type: 'major' },
+  { date: '2025.10.08', content: 'DGER 자체서버 구축완료, 임시 가동 시작(병상만 구현완료)', type: 'major' },
+  { date: '2025.09.26', content: '국가정보자원관리원 화재로 공공데이터 포털 사용중단, 내손안의 응급실 임시 연결', type: 'fix' },
+  { date: '2025.09.13', content: '응급실 연락처 제거, 병상포화도 추가', type: 'minor' },
+  { date: '2025.09.10', content: '중증질환 항목 오류 긴급 수정', type: 'fix' },
+  { date: '2025.09.08', content: '새로운 DGER로 이전완료', type: 'major' },
+
+  // DGER 1.0 - 스프레드시트 기반
+  { date: '2021.11.26', content: 'DGER 1.0', type: 'version', version: '1.0', tech: 'Google Sheets (스프레드시트 기반)' },
+  { date: '2025.06.27', content: 'DGER 디자인과 속도 개편', type: 'major' },
+  { date: '2025.06.27', content: '속도개선 (5분 간격 업데이트)', type: 'minor' },
+  { date: '2025.06.27', content: '버튼사이즈 확대, 소아병상/격리병상 표출', type: 'minor' },
+  { date: '2025.06.27', content: '불가능 메시지 개선 (줄바꿈처리, 폰트사이즈 확대)', type: 'minor' },
+  { date: '2022.12.06', content: '쌍방향 시스템 초안 구축 (CPR 알림/해제)', type: 'major' },
+  { date: '2022.10.10', content: '종합상황판 리뉴얼에 따른 재배치 부분완료', type: 'minor' },
+  { date: '2022.06.11', content: '대구동산병원 반영완료', type: 'minor' },
+  { date: '2022.02.15', content: '포화신호등 반영: 95% 이상(위험) 60~94%(주의) 60% 미만(안전)', type: 'major' },
+  { date: '2021.11.26', content: 'DGER 최초 배포 - 대구지역 구급대원을 위한 응급실 병상 정보 시스템', type: 'init' }
 ];
 
 // 카테고리 목록
 const CATEGORIES = ['전체', '버그', '건의', '기타'] as const;
 type Category = typeof CATEGORIES[number];
+
+// 릴리즈 타입별 스타일
+const getReleaseTypeStyle = (type: ReleaseNote['type'], isDark: boolean) => {
+  switch (type) {
+    case 'version':
+      return isDark
+        ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+        : 'bg-purple-100 border-purple-400 text-purple-700';
+    case 'major':
+      return isDark
+        ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+        : 'bg-blue-100 border-blue-400 text-blue-700';
+    case 'fix':
+      return isDark
+        ? 'bg-red-500/20 border-red-500 text-red-400'
+        : 'bg-red-100 border-red-400 text-red-700';
+    case 'init':
+      return isDark
+        ? 'bg-green-500/20 border-green-500 text-green-400'
+        : 'bg-green-100 border-green-400 text-green-700';
+    default:
+      return isDark
+        ? 'bg-gray-500/20 border-gray-500 text-gray-400'
+        : 'bg-gray-200 border-gray-400 text-gray-700';
+  }
+};
+
+const getReleaseTypeLabel = (type: ReleaseNote['type']) => {
+  switch (type) {
+    case 'version': return '버전';
+    case 'major': return '주요 업데이트';
+    case 'fix': return '버그 수정';
+    case 'init': return '최초 배포';
+    default: return '개선';
+  }
+};
 
 export default function FeedbackPage() {
   const { isDark } = useTheme();
@@ -253,327 +302,510 @@ export default function FeedbackPage() {
       case '버그':
         return isDark ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-700';
       case '건의':
-        return isDark ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-700';
+        return isDark ? 'bg-emerald-900/50 text-emerald-300' : 'bg-[#4A5D5D]/20 text-[#4A5D5D]';
       default:
         return isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600';
     }
   };
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-[#fafbfc]'}`}>
-      <main className={`max-w-[800px] mx-auto my-6 ${isDark ? 'bg-gray-800' : 'bg-white'} rounded-md shadow-sm p-8`}
-        style={{ margin: '1.5rem auto' }}>
-
-        {/* 페이지 헤더 */}
-        <div className={`border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} pb-6 mb-6`}>
-          <h1 className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-gray-800'}`} style={{ letterSpacing: '-0.3px' }}>
+    <div className={`min-h-screen ${isDark ? 'bg-gradient-to-b from-gray-900 to-gray-950' : 'bg-gradient-to-b from-[#F5F0E8] to-[#EDE7DD]'}`}>
+      {/* 상단 히어로 섹션 */}
+      <div className={`relative overflow-hidden ${isDark ? 'bg-gray-800/50' : 'bg-[#E8E2D8]'} border-b ${isDark ? 'border-gray-700/50' : 'border-gray-300'}`}>
+        <div className="absolute inset-0 overflow-hidden">
+          <div className={`absolute -top-40 -right-40 w-80 h-80 rounded-full ${isDark ? 'bg-blue-500/5' : 'bg-blue-500/10'} blur-3xl`} />
+          <div className={`absolute -bottom-40 -left-40 w-80 h-80 rounded-full ${isDark ? 'bg-emerald-500/5' : 'bg-emerald-500/10'} blur-3xl`} />
+        </div>
+        <div className="relative max-w-[900px] mx-auto px-6 py-10">
+          <h1 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
             DGER Release & Feedback
           </h1>
-          <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+          <p className={`text-base mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             대구맞춤형 응급실 병상정보 시스템
           </p>
         </div>
+      </div>
 
+      <main className="max-w-[900px] mx-auto px-6 py-8">
         {/* 탭 네비게이션 */}
-        <div className={`flex border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} mb-6`}>
+        <div className={`inline-flex p-1 rounded-xl ${isDark ? 'bg-gray-800/80' : 'bg-gray-100'} mb-8`}>
           <button
             onClick={() => setActiveTab('release')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
               activeTab === 'release'
-                ? isDark ? 'border-blue-500 text-blue-400' : 'border-blue-600 text-blue-600'
-                : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? isDark
+                  ? 'bg-gray-700 text-white shadow-lg'
+                  : 'bg-white text-gray-900 shadow-md'
+                : isDark
+                  ? 'text-gray-400 hover:text-gray-200'
+                  : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            릴리즈 노트
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              릴리즈 노트
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('board')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
               activeTab === 'board'
-                ? isDark ? 'border-blue-500 text-blue-400' : 'border-blue-600 text-blue-600'
-                : isDark ? 'border-transparent text-gray-400 hover:text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? isDark
+                  ? 'bg-gray-700 text-white shadow-lg'
+                  : 'bg-white text-gray-900 shadow-md'
+                : isDark
+                  ? 'text-gray-400 hover:text-gray-200'
+                  : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            피드백 게시판
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              피드백 게시판
+            </span>
           </button>
         </div>
 
         {/* 릴리즈 노트 탭 */}
         {activeTab === 'release' && (
-          <>
-            {/* 소개 섹션 */}
-            <div className={`rounded p-5 mb-6 border ${
-              isDark ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+          <div className="space-y-8">
+            {/* 소개 섹션 - 카드 스타일 */}
+            <div className={`relative overflow-hidden rounded-2xl p-6 ${
+              isDark ? 'bg-gray-800/50 border border-gray-700/50' : 'bg-[#FAF7F2] border border-gray-300 shadow-sm'
             }`}>
-              <h3 className={`text-base font-semibold mb-3 ${isDark ? 'text-white' : 'text-gray-800'}`}>
-                안녕하세요, 중앙응급의료센터(대구응급의료지원센터) 이광성입니다.
-              </h3>
-              <div className={`text-sm leading-relaxed space-y-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                <p>
-                  2021년 11월 26일부터 대구지역 구급대원을 위해 DGER을 제작하여 배포하였고,<br />
-                  인천, 광주, 세종, 경남지역으로 확대하여 시범사업을 진행하였으며,<br />
-                  2022년 3월 16일부터 내 손안의 응급실이 복지부를 통해 정식 출시되었습니다.
-                </p>
-                <p>
-                  현재는 내손안의 응급실의 보조적 수단으로 서버를 유지중이며,<br />
-                  향후 개선방향을 제시하기 위해 지속적인 피드백을 받도록 하겠습니다.
-                </p>
+              <div className="absolute top-0 right-0 w-32 h-32 transform translate-x-8 -translate-y-8">
+                <div className={`w-full h-full rounded-full ${isDark ? 'bg-blue-500/10' : 'bg-blue-500/5'}`} />
+              </div>
+              <div className="relative">
+                <div className={`text-sm leading-relaxed space-y-3 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                  <p>
+                    2021년 11월 26일부터 대구지역 구급대원을 위해 DGER을 제작하여 배포하였고,
+                    인천, 광주, 세종, 경남지역으로 확대하여 시범사업을 진행하였으며,
+                    2022년 3월 16일부터 내 손안의 응급실이 복지부를 통해 정식 출시되었습니다.
+                  </p>
+                  <p>
+                    현재는 내손안의 응급실의 보조적 수단으로 서버를 유지중이며,
+                    향후 개선방향을 제시하기 위해 지속적인 피드백을 받도록 하겠습니다.
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* 릴리즈 노트 */}
-            <div className="mb-6">
-              <h3 className={`text-base font-semibold mb-4 pb-2 border-b ${
-                isDark ? 'text-white border-gray-700' : 'text-gray-800 border-gray-200'
-              }`}>
-                Release Notes
-              </h3>
-              <ul className="space-y-0">
-                {RELEASE_NOTES.map((note, index) => (
-                  <li
-                    key={index}
-                    className={`flex items-baseline py-2 border-b ${
-                      isDark ? 'border-gray-700' : 'border-gray-100'
-                    } last:border-0`}
-                  >
-                    <span className={`text-xs font-mono font-medium w-[70px] flex-shrink-0 mr-4 ${
-                      isDark ? 'text-gray-500' : 'text-gray-400'
-                    }`}>
-                      {note.date}
-                    </span>
-                    <span className={`text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                      {note.content}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            {/* 릴리즈 노트 - 타임라인 스타일 */}
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  Release Timeline
+                </h3>
+                <span className={`text-xs px-3 py-1 rounded-full ${isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
+                  329+ commits
+                </span>
+              </div>
+
+              <div className="relative">
+                {/* 타임라인 세로선 */}
+                <div className={`absolute left-[7px] top-3 bottom-3 w-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-400'}`} />
+
+                <div className="space-y-1">
+                  {RELEASE_NOTES.map((note, index) => (
+                    note.type === 'version' ? (
+                      // 버전 섹션 헤더
+                      <div
+                        key={index}
+                        className={`relative pl-8 py-4 ${index !== 0 ? 'mt-6' : ''}`}
+                      >
+                        {/* 버전 마커 (큰 원) */}
+                        <div className={`absolute left-0 top-[20px] w-[15px] h-[15px] rounded-full border-2 ${
+                          isDark
+                            ? 'bg-purple-500 border-purple-400'
+                            : 'bg-purple-500 border-purple-400'
+                        }`} />
+
+                        <div className="flex items-center gap-3">
+                          <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {note.content}
+                          </span>
+                          <span className={`text-xs px-2.5 py-1 rounded-full border ${getReleaseTypeStyle(note.type, isDark)}`}>
+                            {note.tech}
+                          </span>
+                        </div>
+                        <p className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          {note.date} ~
+                        </p>
+                      </div>
+                    ) : (
+                      // 일반 릴리즈 노트 항목
+                      <div
+                        key={index}
+                        className={`relative pl-8 py-3 group rounded-xl transition-colors ${
+                          isDark ? 'hover:bg-gray-800/50' : 'hover:bg-[#E8E2D8]'
+                        }`}
+                      >
+                        {/* 타임라인 점 */}
+                        <div className={`absolute left-0 top-[18px] w-[15px] h-[15px] rounded-full border-2 transition-colors ${
+                          note.type === 'major' || note.type === 'init'
+                            ? isDark
+                              ? 'bg-blue-500 border-blue-400'
+                              : 'bg-blue-500 border-blue-300'
+                            : note.type === 'fix'
+                              ? isDark
+                                ? 'bg-red-500 border-red-400'
+                                : 'bg-red-500 border-red-300'
+                              : isDark
+                                ? 'bg-gray-600 border-gray-500 group-hover:bg-gray-500'
+                                : 'bg-gray-400 border-gray-300 group-hover:bg-gray-500'
+                        }`} />
+
+                        <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
+                          <span className={`text-xs font-mono font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                            {note.date}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${getReleaseTypeStyle(note.type, isDark)}`}>
+                            {getReleaseTypeLabel(note.type)}
+                          </span>
+                        </div>
+                        <p className={`mt-1 text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                          {note.content}
+                        </p>
+                      </div>
+                    )
+                  ))}
+                </div>
+              </div>
             </div>
-          </>
+          </div>
         )}
 
         {/* 피드백 게시판 탭 */}
         {activeTab === 'board' && (
-          <>
-            {/* 작성 폼 */}
-            <form onSubmit={handleSubmit} className={`rounded p-5 mb-6 border ${
-              isDark ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+          <div className="space-y-8">
+            {/* 작성 폼 - 모던 카드 스타일 */}
+            <form onSubmit={handleSubmit} className={`relative overflow-hidden rounded-2xl ${
+              isDark ? 'bg-gray-800/50 border border-gray-700/50' : 'bg-[#FAF7F2] border border-gray-300 shadow-sm'
             }`}>
-              <h3 className={`text-base font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-800'}`}>
-                피드백 작성
-              </h3>
+              {/* 폼 헤더 */}
+              <div className={`px-6 py-4 border-b ${isDark ? 'border-gray-700/50 bg-gray-800/30' : 'border-gray-100 bg-gray-50/50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg ${isDark ? 'bg-emerald-500/20' : 'bg-[#4A5D5D]/10'} flex items-center justify-center`}>
+                    <svg className={`w-4 h-4 ${isDark ? 'text-emerald-400' : 'text-[#4A5D5D]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className={`text-base font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      피드백 작성
+                    </h3>
+                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      버그 신고, 기능 건의 등을 남겨주세요
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                {/* 카테고리 */}
+              <div className="p-6 space-y-5">
+                {/* 1행: 분류 + 작성자 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      분류
+                    </label>
+                    <div className="flex gap-2">
+                      {(['건의', '버그', '기타'] as const).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setFormCategory(cat)}
+                          className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
+                            formCategory === cat
+                              ? cat === '버그'
+                                ? isDark
+                                  ? 'bg-red-500/20 border-red-500 text-red-400'
+                                  : 'bg-red-50 border-red-500 text-red-600'
+                                : isDark
+                                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                  : 'bg-[#4A5D5D]/10 border-[#4A5D5D] text-[#4A5D5D]'
+                              : isDark
+                                ? 'bg-gray-800 border-gray-600 text-gray-400 hover:border-gray-500'
+                                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      작성자 (선택)
+                    </label>
+                    <input
+                      type="text"
+                      value={formAuthor}
+                      onChange={(e) => setFormAuthor(e.target.value)}
+                      placeholder="익명"
+                      maxLength={20}
+                      className={`w-full px-4 py-2.5 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 ${
+                        isDark
+                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
+                          : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* 2행: 내용 */}
                 <div>
-                  <label className={`block text-sm mb-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    분류
+                  <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    내용
                   </label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value as typeof formCategory)}
-                    className={`w-full px-3 py-2 rounded border text-sm ${
+                  <textarea
+                    value={formContent}
+                    onChange={(e) => setFormContent(e.target.value)}
+                    placeholder="피드백을 입력해주세요..."
+                    maxLength={1000}
+                    rows={4}
+                    className={`w-full px-4 py-3 rounded-lg border text-sm resize-none transition-colors focus:outline-none focus:ring-2 ${
                       isDark
-                        ? 'bg-gray-800 border-gray-600 text-white'
-                        : 'bg-white border-gray-300 text-gray-800'
+                        ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
+                        : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
+                    }`}
+                  />
+                  <div className={`text-xs mt-1.5 text-right ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {formContent.length}/1000
+                  </div>
+                </div>
+
+                {/* 3행: 연락처 + 공개여부 + 비밀번호 */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      연락처 (선택)
+                    </label>
+                    <input
+                      type="text"
+                      value={formContact}
+                      onChange={(e) => setFormContact(e.target.value)}
+                      placeholder="이메일/전화번호"
+                      maxLength={50}
+                      className={`w-full px-4 py-2.5 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 ${
+                        isDark
+                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
+                          : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex items-end pb-1">
+                    <label className={`flex items-center gap-3 cursor-pointer ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={formIsPublic}
+                          onChange={(e) => setFormIsPublic(e.target.checked)}
+                          className="sr-only"
+                        />
+                        <div className={`w-10 h-6 rounded-full transition-colors ${
+                          formIsPublic
+                            ? isDark ? 'bg-emerald-500' : 'bg-[#4A5D5D]'
+                            : isDark ? 'bg-gray-600' : 'bg-gray-300'
+                        }`}>
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                            formIsPublic ? 'translate-x-5' : 'translate-x-1'
+                          }`} />
+                        </div>
+                      </div>
+                      <span className="text-sm">
+                        {formIsPublic ? '공개' : '비공개'}
+                      </span>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      비밀번호 (본인 확인용)
+                    </label>
+                    <input
+                      type="password"
+                      value={formPassword}
+                      onChange={(e) => setFormPassword(e.target.value)}
+                      placeholder="4~20자"
+                      maxLength={20}
+                      className={`w-full px-4 py-2.5 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 ${
+                        isDark
+                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
+                          : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* 제출 메시지 */}
+                {submitMessage && (
+                  <div className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm ${
+                    submitMessage.type === 'success'
+                      ? isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-600'
+                      : isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600'
+                  }`}>
+                    {submitMessage.type === 'success' ? (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    {submitMessage.text}
+                  </div>
+                )}
+
+                {/* 제출 버튼 */}
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={submitting || !isConfigured}
+                    className={`px-8 py-2.5 text-sm font-medium rounded-lg transition-all disabled:opacity-50 ${
+                      isDark
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                        : 'bg-[#4A5D5D] hover:bg-[#3A4D4D] text-white shadow-lg shadow-[#4A5D5D]/30'
                     }`}
                   >
-                    <option value="건의">건의</option>
-                    <option value="버그">버그</option>
-                    <option value="기타">기타</option>
-                  </select>
-                </div>
-
-                {/* 작성자 */}
-                <div>
-                  <label className={`block text-sm mb-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    작성자 (선택)
-                  </label>
-                  <input
-                    type="text"
-                    value={formAuthor}
-                    onChange={(e) => setFormAuthor(e.target.value)}
-                    placeholder="익명"
-                    maxLength={20}
-                    className={`w-full px-3 py-2 rounded border text-sm ${
-                      isDark
-                        ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500'
-                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
-                    }`}
-                  />
+                    {submitting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        보내는 중...
+                      </span>
+                    ) : '보내기'}
+                  </button>
                 </div>
               </div>
-
-              {/* 내용 */}
-              <div className="mb-4">
-                <label className={`block text-sm mb-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                  내용
-                </label>
-                <textarea
-                  value={formContent}
-                  onChange={(e) => setFormContent(e.target.value)}
-                  placeholder="피드백을 입력해주세요..."
-                  maxLength={1000}
-                  rows={4}
-                  className={`w-full px-3 py-2 rounded border text-sm resize-none ${
-                    isDark
-                      ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500'
-                      : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
-                  }`}
-                />
-                <div className={`text-xs mt-1 text-right ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                  {formContent.length}/1000
-                </div>
-              </div>
-
-              {/* 연락처, 공개여부, 비밀번호 */}
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                {/* 연락처 */}
-                <div>
-                  <label className={`block text-sm mb-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    연락처 (선택)
-                  </label>
-                  <input
-                    type="text"
-                    value={formContact}
-                    onChange={(e) => setFormContact(e.target.value)}
-                    placeholder="이메일/전화번호"
-                    maxLength={50}
-                    className={`w-full px-3 py-2 rounded border text-sm ${
-                      isDark
-                        ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500'
-                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
-                    }`}
-                  />
-                </div>
-
-                {/* 공개여부 체크박스 */}
-                <div className="flex items-center whitespace-nowrap">
-                  <label className={`flex items-center cursor-pointer ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    <input
-                      type="checkbox"
-                      checked={formIsPublic}
-                      onChange={(e) => setFormIsPublic(e.target.checked)}
-                      className="mr-2 w-4 h-4 rounded"
-                    />
-                    <span className="text-sm">공개글로 작성 <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>(기본: 비밀글)</span></span>
-                  </label>
-                </div>
-
-                {/* 비밀번호 */}
-                <div>
-                  <label className={`block text-sm mb-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    비밀번호 (본인 확인용)
-                  </label>
-                  <input
-                    type="password"
-                    value={formPassword}
-                    onChange={(e) => setFormPassword(e.target.value)}
-                    placeholder="4~20자"
-                    maxLength={20}
-                    className={`w-full px-3 py-2 rounded border text-sm ${
-                      isDark
-                        ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500'
-                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {/* 제출 메시지 */}
-              {submitMessage && (
-                <div className={`text-sm mb-3 ${
-                  submitMessage.type === 'success'
-                    ? isDark ? 'text-green-400' : 'text-green-600'
-                    : isDark ? 'text-red-400' : 'text-red-600'
-                }`}>
-                  {submitMessage.text}
-                </div>
-              )}
-
-              {/* 제출 버튼 */}
-              <button
-                type="submit"
-                disabled={submitting || !isConfigured}
-                className={`px-5 py-2 text-sm font-medium rounded transition-colors disabled:opacity-50 ${
-                  isDark
-                    ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                {submitting ? '작성 중...' : '작성하기'}
-              </button>
             </form>
 
-            {/* 카테고리 필터 */}
-            <div className="flex gap-2 mb-4">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    setSelectedCategory(cat);
-                    setPage(1);
-                  }}
-                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    selectedCategory === cat
-                      ? isDark ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
-                      : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+            {/* 카테고리 필터 + 게시글 목록 헤더 */}
+            <div className="flex items-center justify-between">
+              <div className={`inline-flex p-1 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setSelectedCategory(cat);
+                      setPage(1);
+                    }}
+                    className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                      selectedCategory === cat
+                        ? isDark
+                          ? 'bg-gray-700 text-white shadow'
+                          : 'bg-white text-gray-900 shadow-sm'
+                        : isDark
+                          ? 'text-gray-400 hover:text-gray-200'
+                          : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                {posts.length > 0 && `${posts.length}개의 피드백`}
+              </span>
             </div>
 
             {/* 게시글 목록 */}
-            <div className="mb-6">
+            <div className="space-y-4">
               {loading ? (
-                <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  로딩 중...
+                <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <svg className="animate-spin w-8 h-8 mb-3" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span className="text-sm">피드백을 불러오는 중...</span>
                 </div>
               ) : error ? (
-                <div className={`text-center py-8 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
-                  {error}
+                <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-red-400' : 'text-red-500'}`}>
+                  <svg className="w-12 h-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm">{error}</span>
                 </div>
               ) : posts.length === 0 ? (
-                <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  등록된 피드백이 없습니다.
+                <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <svg className="w-12 h-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                  <span className="text-sm">등록된 피드백이 없습니다</span>
+                  <span className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    첫 번째 피드백을 남겨보세요!
+                  </span>
                 </div>
               ) : (
-                <ul className="space-y-0">
+                <div className="space-y-3">
                   {posts.map((post) => {
                     const isViewed = viewedContent[post.id];
                     const displayPost = isViewed || post;
                     const showContent = post.isPublic || isViewed;
 
                     return (
-                      <li
+                      <div
                         key={post.id}
-                        className={`py-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'} last:border-0`}
+                        className={`rounded-xl p-5 transition-all ${
+                          isDark
+                            ? 'bg-gray-800/50 border border-gray-700/50 hover:border-gray-600/50'
+                            : 'bg-[#FAF7F2] border border-gray-300 shadow-sm hover:shadow-md'
+                        }`}
                       >
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`text-xs font-mono ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                            {formatDate(post.createdAt)}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded ${getCategoryColor(post.category)}`}>
-                            {post.category}
-                          </span>
-                          <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {post.author}
-                          </span>
-                          {!post.isPublic && (
-                            <span className={`text-xs px-2 py-0.5 rounded ${
-                              isDark ? 'bg-yellow-900/50 text-yellow-300' : 'bg-yellow-100 text-yellow-700'
+                        {/* 게시글 헤더 */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
+                              isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
                             }`}>
-                              비밀글
+                              {post.author.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                {post.author}
+                              </span>
+                              <span className={`block text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                {formatDate(post.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getCategoryColor(post.category)}`}>
+                              {post.category}
                             </span>
-                          )}
-                          {post.replyContent && (
-                            <span className={`text-xs px-2 py-0.5 rounded ${
-                              isDark ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-700'
-                            }`}>
-                              답변완료
-                            </span>
-                          )}
+                            {!post.isPublic && (
+                              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                                isDark ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                <span className="flex items-center gap-1">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                  </svg>
+                                  비밀글
+                                </span>
+                              </span>
+                            )}
+                            {post.replyContent && post.replyPublic && (
+                              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                                isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'
+                              }`}>
+                                <span className="flex items-center gap-1">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  답변완료
+                                </span>
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* 게시글 내용 */}
@@ -584,24 +816,26 @@ export default function FeedbackPage() {
                         ) : (
                           <div className={`text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                             {viewingPostId === post.id ? (
-                              <div>
-                                <div className="flex items-center gap-1.5 flex-nowrap">
+                              <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
+                                <div className="flex items-center gap-2">
                                   <input
                                     type="password"
                                     value={viewPassword}
                                     onChange={(e) => setViewPassword(e.target.value)}
-                                    placeholder="비밀번호"
-                                    className={`px-2 py-1 rounded border text-sm w-20 ${
+                                    placeholder="비밀번호 입력"
+                                    className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
                                       isDark
-                                        ? 'bg-gray-800 border-gray-600 text-white'
-                                        : 'bg-white border-gray-300 text-gray-800'
+                                        ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500'
+                                        : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400'
                                     }`}
                                     onKeyDown={(e) => e.key === 'Enter' && handleViewPrivate(post.id)}
                                   />
                                   <button
                                     onClick={() => handleViewPrivate(post.id)}
-                                    className={`px-2 py-1 text-xs rounded flex-shrink-0 ${
-                                      isDark ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
+                                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                      isDark
+                                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                        : 'bg-[#4A5D5D] hover:bg-[#3A4D4D] text-white'
                                     }`}
                                   >
                                     확인
@@ -612,15 +846,15 @@ export default function FeedbackPage() {
                                       setViewPassword('');
                                       setViewError(null);
                                     }}
-                                    className={`px-2 py-1 text-xs rounded flex-shrink-0 ${
-                                      isDark ? 'bg-gray-600 text-white' : 'bg-gray-300 text-gray-700'
+                                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                      isDark ? 'bg-gray-600 text-white hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                     }`}
                                   >
                                     취소
                                   </button>
                                 </div>
                                 {viewError && (
-                                  <p className={`text-xs mt-1 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                                  <p className={`text-xs mt-2 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
                                     {viewError}
                                   </p>
                                 )}
@@ -631,22 +865,34 @@ export default function FeedbackPage() {
                                   setViewingPostId(post.id);
                                   setViewError(null);
                                 }}
-                                className={`text-sm underline ${isDark ? 'text-blue-400' : 'text-blue-600'}`}
+                                className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
+                                  isDark ? 'bg-gray-700/50 hover:bg-gray-700 text-gray-400' : 'bg-gray-50 hover:bg-gray-100 text-gray-500'
+                                }`}
                               >
-                                비밀글입니다. 클릭하여 열람
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                비밀번호를 입력하면 내용을 볼 수 있습니다
                               </button>
                             )}
                           </div>
                         )}
 
-                        {/* 답변 표시 */}
-                        {showContent && displayPost.replyContent && (
-                          <div className={`mt-3 p-3 rounded border-l-4 ${
+                        {/* 답변 표시 - replyPublic이 true인 경우만 표시 */}
+                        {showContent && displayPost.replyContent && displayPost.replyPublic && (
+                          <div className={`mt-4 p-4 rounded-xl ${
                             isDark
-                              ? 'bg-green-900/20 border-green-600'
-                              : 'bg-green-50 border-green-500'
+                              ? 'bg-green-500/10 border border-green-500/20'
+                              : 'bg-green-50 border border-green-200'
                           }`}>
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                isDark ? 'bg-green-500/20' : 'bg-green-100'
+                              }`}>
+                                <svg className={`w-3 h-3 ${isDark ? 'text-green-400' : 'text-green-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </div>
                               <span className={`text-xs font-semibold ${isDark ? 'text-green-400' : 'text-green-700'}`}>
                                 관리자 답변
                               </span>
@@ -661,57 +907,54 @@ export default function FeedbackPage() {
                             </p>
                           </div>
                         )}
-                      </li>
+                      </div>
                     );
                   })}
-                </ul>
+                </div>
               )}
             </div>
 
             {/* 페이지네이션 */}
             {totalPages > 1 && (
-              <div className="flex justify-center gap-2">
+              <div className="flex items-center justify-center gap-2">
                 <button
                   onClick={() => setPage(Math.max(1, page - 1))}
                   disabled={page === 1}
-                  className={`px-3 py-1.5 text-xs rounded transition-colors disabled:opacity-50 ${
-                    isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDark
+                      ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:hover:bg-gray-800'
+                      : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:hover:bg-white'
                   }`}
                 >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                   이전
                 </button>
-                <span className={`px-3 py-1.5 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {page} / {totalPages}
-                </span>
+                <div className={`flex items-center gap-1 px-4 py-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{page}</span>
+                  <span>/</span>
+                  <span>{totalPages}</span>
+                </div>
                 <button
                   onClick={() => setPage(Math.min(totalPages, page + 1))}
                   disabled={page === totalPages}
-                  className={`px-3 py-1.5 text-xs rounded transition-colors disabled:opacity-50 ${
-                    isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDark
+                      ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:hover:bg-gray-800'
+                      : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:hover:bg-white'
                   }`}
                 >
                   다음
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
 
-        {/* 외부 링크 */}
-        <div className={`mt-8 pt-6 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} flex gap-3`}>
-          <a
-            href="https://dger.netlify.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`px-4 py-2 text-sm font-medium rounded border transition-colors ${
-              isDark
-                ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
-                : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            구버전 DGER
-          </a>
-        </div>
       </main>
     </div>
   );

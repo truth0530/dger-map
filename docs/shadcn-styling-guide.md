@@ -124,15 +124,66 @@ shadcn 컴포넌트 크기가 변경되지 않을 때:
 
 ---
 
+## 🚨 핵심 발견 (2024.12.29) - 가장 중요!
+
+### 문제: 폰트 사이즈가 절대 변경되지 않음
+
+`text-[8px]`, `text-[10px]` 등의 Tailwind 클래스를 아무리 적용해도 폰트 사이즈가 14px에서 변하지 않는 현상.
+
+### 근본 원인: globals.css의 전역 `text-sm` 클래스
+
+```css
+/* ❌ 문제의 코드 - globals.css */
+button {
+  @apply rounded-md text-sm font-medium transition-colors ...;
+  /*             ^^^^^^^ 이것이 모든 버튼 폰트를 14px로 강제! */
+}
+
+input, textarea {
+  @apply w-full rounded-md border px-3 py-2 text-sm ...;
+  /*                                        ^^^^^^^ input도 마찬가지 */
+}
+```
+
+**`text-sm`은 Tailwind에서 `font-size: 0.875rem` (14px)로 변환됩니다.**
+
+전역 element 선택자(`button`, `input`)에 적용된 스타일은:
+- 컴포넌트 레벨의 className보다 CSS specificity가 같거나 높음
+- `@apply` 내의 클래스가 먼저 적용되어 후속 클래스를 덮어씀
+
+### 해결책
+
+```css
+/* ✅ 수정된 코드 - globals.css */
+button {
+  @apply rounded-md font-medium transition-colors ...;
+  /* text-sm 제거! 폰트 사이즈는 각 컴포넌트에서 제어 */
+}
+
+input, textarea {
+  @apply w-full rounded-md border px-3 py-2 ...;
+  /* text-sm 제거! */
+}
+```
+
+### 교훈
+
+1. **전역 스타일에서 `font-size` 관련 클래스 사용 금지** (`text-sm`, `text-xs` 등)
+2. **컴포넌트 스타일 변경 전 항상 globals.css 확인**
+3. **브라우저 DevTools에서 실제 computed style 확인 필수**
+4. 기존 가이드의 height(`h-10`) 문제와 동일한 패턴이 font-size에도 적용됨
+
+---
+
 ## 실제 수정 사례 (2024.12)
 
 ### 수정된 파일들
 
 | 파일 | 변경 내용 |
 |------|----------|
-| `globals.css` | `h-10` 전역 스타일 제거, select 관련 전역 스타일 제거 |
-| `button.tsx` | `size: "xs"` variant 추가 (`h-6 rounded px-2 py-0.5 text-[10px]`) |
-| `select.tsx` | `size` prop 추가, `data-[size=xs]` 스타일 추가 |
+| `globals.css` | `h-10` 전역 스타일 제거, select 관련 전역 스타일 제거, **`text-sm` 제거** |
+| `button.tsx` | `size: "xs"`, `size: "xxs"` variant 추가 |
+| `select.tsx` | `size` prop 추가, `data-[size=xs]`, `data-[size=xxs]` 스타일 추가 |
 | `combobox.tsx` | `size` prop 추가 및 Button에 전달 |
 | `MapDashboard.tsx` | 모든 Select/Combobox에 `size="xs"` 적용 |
 

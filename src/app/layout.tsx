@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Noto_Sans_KR } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import Navigation from "@/components/layout/Navigation";
+import Footer from "@/components/layout/Footer";
 import { Providers } from "@/lib/providers/Providers";
 
 const notoSansKR = Noto_Sans_KR({
@@ -9,6 +11,9 @@ const notoSansKR = Noto_Sans_KR({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
 });
+
+// Google Analytics ID (dger-api와 동일)
+const GA_TRACKING_ID = "G-16WRBHPQXM";
 
 export const metadata: Metadata = {
   title: "DGER | 중증응급질환 대시보드",
@@ -21,6 +26,11 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ko_KR",
   },
+  verification: {
+    other: {
+      "naver-site-verification": "c2e281969f3e71edbeef521689f4847b7f0e593d",
+    },
+  },
 };
 
 export default function RootLayout({
@@ -30,12 +40,30 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className="dark">
+      <head>
+        {/* Google Analytics */}
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA_TRACKING_ID}');
+          `}
+        </Script>
+      </head>
       <body className={`${notoSansKR.variable} font-sans antialiased`}>
         <Providers>
-          <Navigation />
-          <main id="main-content" className="min-h-[calc(100vh-56px)]" role="main">
-            {children}
-          </main>
+          <div className="flex flex-col min-h-screen">
+            <Navigation />
+            <main id="main-content" className="flex-1" role="main">
+              {children}
+            </main>
+            <Footer />
+          </div>
         </Providers>
       </body>
     </html>

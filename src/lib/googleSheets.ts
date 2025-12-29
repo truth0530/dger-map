@@ -18,6 +18,7 @@ export interface FeedbackPost {
   hasPassword: boolean; // 비밀번호 설정 여부 (실제 비밀번호는 노출 안함)
   replyAt?: string;     // 답변일시 (관리자가 구글시트에서 직접 작성)
   replyContent?: string; // 답변내용
+  replyPublic?: boolean; // 답변공개여부 (K열) - Y면 공개, N이면 비공개, 빈값이면 게시글 공개여부 따름
 }
 
 // Google Sheets 인증
@@ -70,10 +71,10 @@ export async function getFeedbackList(
   }
 
   try {
-    // 시트 데이터 조회 (A:J 컬럼: ID, 작성일시, 작성자, 카테고리, 내용, 공개여부, 연락처, 비밀번호, 답변일시, 답변내용)
+    // 시트 데이터 조회 (A:K 컬럼: ID, 작성일시, 작성자, 카테고리, 내용, 공개여부, 연락처, 비밀번호, 답변일시, 답변내용, 답변공개여부)
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Sheet1!A:J',  // 시트명은 필요시 조정
+      range: 'Sheet1!A:K',  // 시트명은 필요시 조정
     });
 
     const rows = response.data.values || [];
@@ -82,18 +83,38 @@ export async function getFeedbackList(
     const dataRows = rows.slice(1);
 
     // FeedbackPost로 변환 (ID가 없으면 인덱스 기반으로 생성)
-    let posts: FeedbackPost[] = dataRows.map((row, index) => ({
-      id: row[0] || `legacy-${index + 1}`,  // ID가 없으면 legacy-N 형식으로 생성
-      createdAt: row[1] || '',
-      author: row[2] || '익명',
-      category: row[3] || '기타',
-      content: row[4] || '',
-      isPublic: row[5] === 'Y' || row[5] === 'true' || row[5] === '공개',
-      contact: row[6] || undefined,
-      hasPassword: !!(row[7] && row[7].length > 0),
-      replyAt: row[8] || undefined,
-      replyContent: row[9] || undefined,
-    })).filter(post => post.content);  // 내용이 있는 것만 필터링
+    let posts: FeedbackPost[] = dataRows.map((row, index) => {
+      const isPublic = row[5] === 'Y' || row[5] === 'true' || row[5] === '공개';
+      const replyPublicValue = row[10]?.toUpperCase?.();  // K열 (인덱스 10)
+
+      // 답변공개여부 로직:
+      // - K열이 'Y'면 답변 공개
+      // - K열이 'N'이면 답변 비공개
+      // - K열이 빈값이면 게시글 공개여부(F열) 따름
+      let replyPublic: boolean | undefined;
+      if (replyPublicValue === 'Y') {
+        replyPublic = true;
+      } else if (replyPublicValue === 'N') {
+        replyPublic = false;
+      } else {
+        // 빈값이면 게시글 공개여부 따름
+        replyPublic = isPublic;
+      }
+
+      return {
+        id: row[0] || `legacy-${index + 1}`,  // ID가 없으면 legacy-N 형식으로 생성
+        createdAt: row[1] || '',
+        author: row[2] || '익명',
+        category: row[3] || '기타',
+        content: row[4] || '',
+        isPublic,
+        contact: row[6] || undefined,
+        hasPassword: !!(row[7] && row[7].length > 0),
+        replyAt: row[8] || undefined,
+        replyContent: row[9] || undefined,
+        replyPublic,
+      };
+    }).filter(post => post.content);  // 내용이 있는 것만 필터링
 
     // 카테고리 필터
     if (category && category !== '전체') {
