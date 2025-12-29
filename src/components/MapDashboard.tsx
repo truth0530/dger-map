@@ -29,6 +29,7 @@ const HybridMap = dynamic(() => import("@/components/maplibre/HybridMap"), {
 import { useBedData, HospitalBedData } from "@/lib/hooks/useBedData";
 import { useSevereData, HospitalSevereData } from "@/lib/hooks/useSevereData";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
+import { useTravelTime, HospitalTravelTime, HospitalCoordinate } from "@/lib/hooks/useTravelTime";
 import { mapSidoName } from "@/lib/utils/regionMapping";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
@@ -41,6 +42,7 @@ type MobilePanelType = "filter" | "list" | null;
 type EmergencyClassification = "권역응급의료센터" | "지역응급의료센터" | "지역응급의료기관";
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
 type BedStatus = "여유" | "적정" | "부족";
+type SortMode = "default" | "travelTime";
 
 const REGIONS = [
   { value: "all", label: "전국" },
@@ -90,6 +92,7 @@ export function MapDashboard() {
   const [searchQuery, setSearchQuery] = useState<string>("");  // 병원명 검색어
   const [mobilePanel, setMobilePanel] = useState<MobilePanelType>(null);  // 모바일 패널 상태
   const [expandedHospitalCode, setExpandedHospitalCode] = useState<string | null>(null);  // 확장된 병원 코드
+  const [sortMode, setSortMode] = useState<SortMode>("default");  // 정렬 모드
 
   // 아코디언 상태 관리
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["region", "disease", "bed"]));
@@ -119,6 +122,17 @@ export function MapDashboard() {
   const { data: severeData, fetchSevereData, loading: severeLoading } = useSevereData();
   // 응급 메시지 훅
   const { messages: emergencyMessages, fetchMessages: fetchEmergencyMessages } = useEmergencyMessages();
+  // 소요시간 훅
+  const {
+    userLocation,
+    locationLoading,
+    locationError,
+    requestLocation,
+    travelTimes,
+    travelTimeLoading,
+    fetchTravelTimes,
+    formatDuration,
+  } = useTravelTime();
 
   // 지역 변경 시 병상 및 중증질환 데이터 로드
   useEffect(() => {
@@ -290,14 +304,39 @@ export function MapDashboard() {
     });
   }, [hospitals, allData, selectedRegion, selectedDiseaseSubcategories, selectedDay, selectedStatus, selectedClassifications, selectedSevereType, severeData, selectedBedStatus, getBedStatusForHospital, hasAnySelectedBedType]);
 
-  // 검색어로 필터링된 병원 목록
+  // 검색어로 필터링 및 정렬된 병원 목록
   const searchedHospitals = useMemo(() => {
-    if (!searchQuery.trim()) return filteredHospitals;
-    const query = searchQuery.trim().toLowerCase();
-    return filteredHospitals.filter((hospital) =>
-      hospital.name.toLowerCase().includes(query)
-    );
-  }, [filteredHospitals, searchQuery]);
+    let result = filteredHospitals;
+
+    // 검색어 필터링
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      result = result.filter((hospital) =>
+        hospital.name.toLowerCase().includes(query)
+      );
+    }
+
+    // 정렬
+    if (sortMode === "travelTime" && travelTimes.size > 0) {
+      result = [...result].sort((a, b) => {
+        const aTime = travelTimes.get(a.code)?.duration;
+        const bTime = travelTimes.get(b.code)?.duration;
+
+        // 소요시간이 있는 병원 우선
+        if (aTime !== null && aTime !== undefined && (bTime === null || bTime === undefined)) return -1;
+        if ((aTime === null || aTime === undefined) && bTime !== null && bTime !== undefined) return 1;
+
+        // 둘 다 소요시간이 있으면 짧은 순
+        if (aTime !== null && aTime !== undefined && bTime !== null && bTime !== undefined) {
+          return aTime - bTime;
+        }
+
+        return 0;
+      });
+    }
+
+    return result;
+  }, [filteredHospitals, searchQuery, sortMode, travelTimes]);
 
   // 호버된 병원이 리스트에 있으면 스크롤
   useEffect(() => {
@@ -469,6 +508,26 @@ export function MapDashboard() {
   const handleSidebarRegionChange = (region: string) => {
     setSelectedRegion(region);
   };
+
+  // 내 위치 기반 소요시간 조회
+  const handleLocationRequest = useCallback(async () => {
+    const location = await requestLocation();
+    if (location && filteredHospitals.length > 0) {
+      // 병원 좌표 추출
+      const hospitalCoords: HospitalCoordinate[] = filteredHospitals
+        .filter(h => h.lat && h.lng)
+        .map(h => ({
+          code: h.code,
+          lat: h.lat!,
+          lng: h.lng!
+        }));
+
+      if (hospitalCoords.length > 0) {
+        await fetchTravelTimes(hospitalCoords, location);
+        setSortMode("travelTime");
+      }
+    }
+  }, [requestLocation, fetchTravelTimes, filteredHospitals]);
 
   // 전국 지도로 돌아가기 (HybridMap에서 호출)
   const handleBackToNational = () => {
@@ -860,6 +919,46 @@ export function MapDashboard() {
               </div>
             )}
           </div>
+
+          {/* 내 위치 기반 소요시간 */}
+          <div className={`border-b ${isDark ? 'border-gray-800' : 'border-gray-300'}`}>
+            <div className="px-2 py-1.5">
+              <button
+                onClick={handleLocationRequest}
+                disabled={locationLoading || travelTimeLoading}
+                className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[9px] font-medium transition-colors ${
+                  sortMode === "travelTime"
+                    ? "bg-blue-600 text-white"
+                    : isDark
+                      ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                } ${(locationLoading || travelTimeLoading) ? "opacity-50 cursor-not-allowed" : ""}`}
+                title={userLocation ? `현재 위치: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : "내 위치 기반 소요시간 조회"}
+              >
+                {locationLoading || travelTimeLoading ? (
+                  <>
+                    <span className="w-2.5 h-2.5 border-2 border-t-transparent rounded-full animate-spin"></span>
+                    <span>조회중...</span>
+                  </>
+                ) : (
+                  <span>내 위치 기준 정렬</span>
+                )}
+              </button>
+              {sortMode === "travelTime" && (
+                <button
+                  onClick={() => setSortMode("default")}
+                  className={`w-full mt-1 text-[8px] py-0.5 rounded transition-colors ${
+                    isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  정렬 초기화
+                </button>
+              )}
+              {locationError && (
+                <div className="mt-1 text-[8px] text-red-400">{locationError}</div>
+              )}
+            </div>
+          </div>
           </div>
         </aside>
 
@@ -970,6 +1069,12 @@ export function MapDashboard() {
                     >
                       {shortenHospitalName(hospital.name)}
                     </span>
+                    {/* 소요시간 (활성화 시) */}
+                    {sortMode === "travelTime" && (
+                      <span className="shrink-0 text-[9px] font-medium text-blue-400">
+                        {formatDuration(travelTimes.get(hospital.code)?.duration ?? null)}
+                      </span>
+                    )}
                     {occupancyRate !== null && (
                       <div className="shrink-0 scale-[0.65] origin-right">
                         <OccupancyBattery rate={occupancyRate} isDark={isDark} size="small" />
@@ -1411,6 +1516,12 @@ export function MapDashboard() {
                     >
                       {shortenHospitalName(hospital.name)}
                     </span>
+                    {/* 소요시간 (활성화 시) */}
+                    {sortMode === "travelTime" && travelTimes.get(hospital.code)?.duration && (
+                      <span className="shrink-0 text-[10px] font-medium text-blue-400">
+                        {formatDuration(travelTimes.get(hospital.code)?.duration ?? null)}
+                      </span>
+                    )}
                     {occupancyRate !== null && (
                       <div className="shrink-0 scale-[0.65] origin-right">
                         <OccupancyBattery rate={occupancyRate} isDark={isDark} size="small" />
