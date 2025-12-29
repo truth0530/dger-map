@@ -22,7 +22,7 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
 
   // 테마 적용
   const applyTheme = (newTheme: Theme) => {
@@ -39,12 +39,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     localStorage.setItem('theme', newTheme);
   };
 
-  // 초기 테마 로드 (기본값: 다크 모드)
+  // 초기 테마 로드 (기본값: 라이트 모드)
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as Theme | null;
 
-    // 저장된 테마가 없으면 다크 모드로 기본 설정
-    const initialTheme = savedTheme || 'dark';
+    // 저장된 테마가 없으면 라이트 모드로 기본 설정
+    const initialTheme = savedTheme || 'light';
     setTheme(initialTheme);
     applyTheme(initialTheme);
   }, []);

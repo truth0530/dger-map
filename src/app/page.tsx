@@ -621,7 +621,7 @@ function HospitalRow({ hospital, isDark, isExpanded, onToggle, messages, message
           : isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
       }`}>
         {/* 병원명 + 펼치기/접기 버튼 - 좌측 정렬 */}
-        <td className={`px-1 sm:px-2 py-1.5 text-xs text-left ${isDark ? 'text-white' : 'text-gray-900'}`}>
+        <td className={`px-1 sm:px-2 py-1.5 text-sm text-left ${isDark ? 'text-white' : 'text-gray-900'}`}>
           <div className="flex items-center gap-1">
             <button
               onClick={onToggle}
@@ -642,42 +642,42 @@ function HospitalRow({ hospital, isDark, isExpanded, onToggle, messages, message
         </td>
 
         {/* 재실인원 */}
-        <td className={`px-1 sm:px-2 py-1.5 text-center text-xs font-medium whitespace-nowrap ${isDark ? 'text-white' : 'text-gray-900'}`}>
+        <td className={`px-1 sm:px-2 py-1.5 text-center text-sm font-medium whitespace-nowrap ${isDark ? 'text-white' : 'text-gray-900'}`}>
           {totalOccupancy}
         </td>
 
         {/* 일반병상 */}
-        <td className={`px-1 sm:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.general.available, beds.general.total)}`}>
+        <td className={`px-1 sm:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.general.available, beds.general.total)}`}>
           {renderBedValue(beds.general.available, beds.general.total)}
         </td>
 
         {/* 코호트 - 모바일 숨김, 좁은 패딩 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.cohort.available, beds.cohort.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.cohort.available, beds.cohort.total)}`}>
           {renderBedValue(beds.cohort.available, beds.cohort.total)}
         </td>
 
         {/* 음압격리 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.erNegative.available, beds.erNegative.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.erNegative.available, beds.erNegative.total)}`}>
           {renderBedValue(beds.erNegative.available, beds.erNegative.total)}
         </td>
 
         {/* 일반격리 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.erGeneral.available, beds.erGeneral.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.erGeneral.available, beds.erGeneral.total)}`}>
           {renderBedValue(beds.erGeneral.available, beds.erGeneral.total)}
         </td>
 
         {/* 소아 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatric.available, beds.pediatric.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatric.available, beds.pediatric.total)}`}>
           {renderBedValue(beds.pediatric.available, beds.pediatric.total)}
         </td>
 
         {/* 소아음압 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricNegative.available, beds.pediatricNegative.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricNegative.available, beds.pediatricNegative.total)}`}>
           {renderBedValue(beds.pediatricNegative.available, beds.pediatricNegative.total)}
         </td>
 
         {/* 소아일반 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-xs whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}`}>
           {renderBedValue(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}
         </td>
 

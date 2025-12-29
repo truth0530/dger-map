@@ -1091,8 +1091,8 @@ export function MapDashboard() {
                       </span>
                     )}
                     {occupancyRate !== null && (
-                      <div className="shrink-0 scale-[0.65] origin-right whitespace-nowrap">
-                        <OccupancyBattery rate={occupancyRate} isDark={isDark} size="small" />
+                      <div className="shrink-0 scale-[0.75] origin-right whitespace-nowrap">
+                        <OccupancyBattery rate={occupancyRate} isDark={isDark} size="medium" />
                       </div>
                     )}
                     {selectedSevereType && isSevereAvailable ? (
@@ -1574,8 +1574,8 @@ export function MapDashboard() {
                       </span>
                     )}
                     {occupancyRate !== null && (
-                      <div className="shrink-0 scale-[0.65] origin-right">
-                        <OccupancyBattery rate={occupancyRate} isDark={isDark} size="small" />
+                      <div className="shrink-0 scale-[0.75] origin-right">
+                        <OccupancyBattery rate={occupancyRate} isDark={isDark} size="medium" />
                       </div>
                     )}
                     {selectedSevereType && isSevereAvailable ? (
