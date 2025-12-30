@@ -13,8 +13,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/popup.css';
 import { getStyleUrl, getRegionView, MAPTILER_CONFIG } from '@/lib/maplibre/config';
 import { useTheme } from '@/lib/contexts/ThemeContext';
-import { parseMessage, getStatusColorClasses, renderHighlightedMessage } from '@/lib/utils/messageClassifier';
+import { parseMessage, getStatusColorClasses, renderHighlightedMessage, replaceUnavailableWithX } from '@/lib/utils/messageClassifier';
 import { createMarkerElement } from '@/lib/utils/markerRenderer';
+import { shortenHospitalName } from '@/lib/utils/hospitalUtils';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
 import { getCategoryByKey, getMatchedSevereKeys } from '@/lib/constants/diseaseCategories';
 import type { Hospital, AvailabilityStatus } from '@/types';
@@ -111,18 +112,30 @@ export default function MapLibreMap({
     return '#f87171';
   };
 
-  // 기관분류 설명
-  const getClassificationInfo = (classification?: string): { name: string; desc: string } => {
+  // 기관분류 설명 (2글자 약어)
+  const getClassificationInfo = (classification?: string): { name: string; desc: string; color: string } => {
     switch (classification) {
       case '권역응급의료센터':
-        return { name: '권역센터', desc: '광역 권역의 응급의료 허브' };
+        return { name: '권역', desc: '광역 권역의 응급의료 허브', color: '#d97706' };
       case '지역응급의료센터':
-        return { name: '지역센터', desc: '지역 응급의료 중심기관' };
+        return { name: '센터', desc: '지역 응급의료 중심기관', color: '#0891b2' };
       case '지역응급의료기관':
-        return { name: '지역기관', desc: '지역 응급의료 시설' };
+        return { name: '기관', desc: '지역 응급의료 시설', color: '#059669' };
       default:
-        return { name: '기관', desc: '응급의료기관' };
+        return { name: '기관', desc: '응급의료기관', color: '#6b7280' };
     }
+  };
+
+  // 배터리 SVG 생성 함수
+  const createBatterySvg = (rate: number, isDarkMode: boolean) => {
+    const fillWidth = Math.min(Math.max(rate, 0), 100) * 0.2; // 20px max width
+    const fillColor = rate >= 95 ? '#ef4444' : rate >= 60 ? '#f59e0b' : '#22c55e';
+    const bgColor = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+    return `<svg width="26" height="12" viewBox="0 0 26 12" style="vertical-align:middle;">
+      <rect x="0" y="1" width="22" height="10" rx="2" fill="${bgColor}" stroke="${isDarkMode ? '#6b7280' : '#9ca3af'}" stroke-width="1"/>
+      <rect x="22" y="3.5" width="3" height="5" rx="1" fill="${isDarkMode ? '#6b7280' : '#9ca3af'}"/>
+      <rect x="1" y="2" width="${fillWidth}" height="8" rx="1" fill="${fillColor}"/>
+    </svg>`;
   };
 
   // 팝업 내용 생성 (컴팩트 버전 - B옵션)
@@ -178,14 +191,20 @@ export default function MapLibreMap({
     const occColor = occupancy >= 95 ? '#ef4444' : occupancy >= 60 ? '#f59e0b' : '#22c55e';
     const erAvail = bedData?.hvec ?? 0;
     const erTotal = bedData?.hvs01 ?? 0;
+    const occupied = erTotal - erAvail;  // 재실환자수
+
+    // 약어 병원명
+    const shortName = shortenHospitalName(hospital.name);
 
     let content = `<div class="popup-content" style="min-width:200px;max-width:280px;">`;
 
-    // 헤더: 기관분류 + 병원명
+    // 헤더: 기관분류(2글자) + 병원명(약어) + 재실환자수 + 배터리
     content += `
-      <div style="display:flex;align-items:center;gap:6px;padding:10px 12px;background:${isDarkMode ? 'linear-gradient(135deg,#374151 0%,#1f2937 100%)' : 'linear-gradient(135deg,#f3f4f6 0%,#e5e7eb 100%)'};border-bottom:1px solid ${c.border};">
-        <span style="font-size:10px;font-weight:600;color:${c.muted};background:${isDarkMode ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.12)'};padding:2px 6px;border-radius:4px;">${classInfo.name}</span>
-        <span style="font-size:13px;font-weight:600;color:${c.text};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hospital.name}</span>
+      <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:${isDarkMode ? 'linear-gradient(135deg,#374151 0%,#1f2937 100%)' : 'linear-gradient(135deg,#f3f4f6 0%,#e5e7eb 100%)'};border-bottom:1px solid ${c.border};">
+        <span style="font-size:10px;font-weight:600;color:${classInfo.color};background:${isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.8)'};padding:1px 4px;border-radius:3px;">${classInfo.name}</span>
+        <span style="font-size:12px;font-weight:600;color:${c.text};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${hospital.name}">${shortName}</span>
+        <span style="font-size:10px;color:${c.muted};">${occupied}명</span>
+        ${createBatterySvg(occupancy, isDarkMode)}
       </div>
     `;
 
@@ -339,37 +358,13 @@ export default function MapLibreMap({
       }
     }
 
-    // 병상 현황 (컴팩트 1줄 + 배터리 표시)
-    if (bedData) {
-      // 배터리 fill width (최대 100%로 제한하되, 값은 그대로 표시)
-      const batteryFill = Math.min(100, Math.max(0, occupancy));
-      const batteryBorder = isDarkMode ? '#6b7280' : '#9ca3af';
-
-      content += `
-        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${c.bg};border-bottom:1px solid ${c.border};">
-          <span style="font-size:10px;color:${c.muted};font-weight:500;">응급실</span>
-          <span style="font-size:14px;font-weight:700;color:${getBedStatusColor(erAvail, erTotal)};">${erAvail}</span>
-          <span style="font-size:10px;color:${c.muted};">/ ${erTotal}</span>
-          <span style="flex:1;"></span>
-          <div style="display:inline-flex;align-items:center;">
-            <div style="position:relative;width:36px;height:18px;border:1px solid ${batteryBorder};border-radius:3px;background:transparent;">
-              <div style="position:absolute;top:2px;left:2px;bottom:2px;width:calc(${batteryFill}% - 4px);background:${occColor};border-radius:2px;"></div>
-              <span style="position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:9px;font-weight:700;color:${occupancy >= 50 ? '#fff' : c.text};">${occupancy}%</span>
-            </div>
-            <div style="width:2px;height:8px;background:${batteryBorder};border-radius:0 1px 1px 0;margin-left:-1px;"></div>
-          </div>
-        </div>
-      `;
-    }
-
-    // 긴급 알림 (진료불가/제한 실제 내용 표시) - 하이라이트 정책 적용
+    // 긴급 알림 (진료불가/제한 실제 내용 표시) - 하이라이트 정책 적용 + X 대체 정책
     if (urgentItems.length > 0) {
       content += `
         <div style="padding:8px 12px;background:${isDarkMode ? 'rgba(239,68,68,0.12)' : 'rgba(254,202,202,0.5)'};border-bottom:1px solid ${c.border};">
           ${urgentItems.slice(0, 3).map(item => `
-            <div style="display:flex;gap:6px;font-size:10px;line-height:1.5;">
-              <span style="font-weight:600;color:#ef4444;flex-shrink:0;">${item.label}</span>
-              <span style="color:${c.muted};">${renderHighlightedMessage(item.content, isDarkMode)}</span>
+            <div style="font-size:10px;line-height:1.5;">
+              <span style="font-weight:600;color:#ef4444;">${item.label} </span><span style="color:${c.muted};">${renderHighlightedMessage(replaceUnavailableWithX(item.content), isDarkMode)}</span>
             </div>
           `).join('')}
           ${urgentItems.length > 3 ? `<div style="font-size:9px;color:${c.muted};margin-top:2px;">+${urgentItems.length - 3}건 더</div>` : ''}
@@ -531,6 +526,37 @@ export default function MapLibreMap({
     });
   }, [filteredHospitals, isLoaded, createMarkerElement, createPopupContent, onHospitalHover, onHospitalClick]);
 
+  // 마커에 이벤트 리스너 연결 헬퍼 함수
+  const attachMarkerEventListeners = useCallback((el: HTMLElement, hospital: Hospital) => {
+    el.addEventListener('mouseenter', () => {
+      onHospitalHover?.(hospital.code);
+
+      // 팝업 표시
+      if (popupRef.current) {
+        popupRef.current.remove();
+      }
+
+      popupRef.current = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: 15,
+        className: `maplibre-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
+      })
+        .setLngLat([hospital.lng!, hospital.lat!])
+        .setHTML(createPopupContent(hospital, isDark))
+        .addTo(map.current!);
+    });
+
+    el.addEventListener('mouseleave', () => {
+      onHospitalHover?.(null);
+      popupRef.current?.remove();
+    });
+
+    el.addEventListener('click', () => {
+      onHospitalClick?.(hospital);
+    });
+  }, [onHospitalHover, onHospitalClick, createPopupContent, isDark]);
+
   // 외부 호버 상태 변경 시 마커 스타일 + 팝업 표시
   useEffect(() => {
     if (!isLoaded || !map.current) return;
@@ -549,6 +575,10 @@ export default function MapLibreMap({
         // 새 마커로 교체
         marker.remove();
         const newEl = createMarkerElementCallback(hospital, true);
+
+        // 이벤트 리스너 재연결
+        attachMarkerEventListeners(newEl, hospital);
+
         const newMarker = new maplibregl.Marker({ element: newEl })
           .setLngLat([hospital.lng!, hospital.lat!])
           .addTo(map.current!);
@@ -571,6 +601,10 @@ export default function MapLibreMap({
         // 호버 해제 시 원래 마커로 교체
         marker.remove();
         const newEl = createMarkerElementCallback(hospital, false);
+
+        // 이벤트 리스너 재연결
+        attachMarkerEventListeners(newEl, hospital);
+
         const newMarker = new maplibregl.Marker({ element: newEl })
           .setLngLat([hospital.lng!, hospital.lat!])
           .addTo(map.current!);
@@ -583,7 +617,7 @@ export default function MapLibreMap({
     if (!hoveredHospitalCode) {
       popupRef.current?.remove();
     }
-  }, [hoveredHospitalCode, filteredHospitals, createMarkerElementCallback, isLoaded, createPopupContent]);
+  }, [hoveredHospitalCode, filteredHospitals, createMarkerElementCallback, isLoaded, createPopupContent, attachMarkerEventListeners]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>

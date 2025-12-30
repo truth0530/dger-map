@@ -34,7 +34,7 @@ import { mapSidoName } from "@/lib/utils/regionMapping";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { DISEASE_CATEGORIES, getCategoryByKey, getDiseaseNamesByCategory, getMatchedSevereKeys } from "@/lib/constants/diseaseCategories";
-import { parseMessage, parseMessageWithHighlights, getHighlightClassWithTheme } from "@/lib/utils/messageClassifier";
+import { parseMessage, parseMessageWithHighlights, getHighlightClassWithTheme, replaceUnavailableWithX } from "@/lib/utils/messageClassifier";
 
 // 모바일 사이드바 상태
 type MobilePanelType = "filter" | "list" | null;
@@ -676,7 +676,7 @@ export function MapDashboard() {
               <div className="w-14 shrink-0">
                 <label className={`text-[11px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
                 <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
-                  <SelectTrigger size="xs" className={`[&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
+                  <SelectTrigger size="xs" className={`[&_svg]:size-2 ${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}>
@@ -744,12 +744,12 @@ export function MapDashboard() {
                 onValueChange={(v) => handleCategoryChange(v || null)}
                 placeholder="대분류 선택..."
                 size="xs"
-                triggerClassName={`${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}
+                triggerClassName={`${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}
                 contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-[#FAF7F2] border-[#d4cdc4] text-gray-900'}`}
               />
               <div className="flex items-center gap-0.5 mt-1">
                 <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
-                  <SelectTrigger size="xs" className={`w-[52px] [&_svg]:size-2 ${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}>
+                  <SelectTrigger size="xs" className={`w-[58px] [&_svg]:size-2 [&_svg]:ml-0 ${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}>
@@ -829,7 +829,7 @@ export function MapDashboard() {
                 onValueChange={(v) => setSelectedSevereType(v ? (v as SevereTypeKey) : null)}
                 placeholder="선택..."
                 size="xs"
-                triggerClassName={`${isDark ? 'bg-transparent border-none text-white' : 'bg-transparent border-none text-gray-900'}`}
+                triggerClassName={`${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}
                 contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-[#FAF7F2] border-[#d4cdc4] text-gray-900'}`}
               />
               {severeLoading && <span className="text-[10px] text-orange-400">로딩...</span>}
@@ -1184,11 +1184,12 @@ export function MapDashboard() {
                             진료제한 ({urgentItems.length})
                           </div>
                           {urgentItems.map((item, idx) => {
-                            // 메시지를 하이라이트 세그먼트로 분리
-                            const segments = parseMessageWithHighlights(item.content);
+                            // 모바일 정책 적용: 수용불가능 문구를 X로 대체
+                            const processedContent = replaceUnavailableWithX(item.content);
+                            const segments = parseMessageWithHighlights(processedContent);
                             return (
-                              <div key={idx} className="flex gap-1 text-[11px] leading-relaxed flex-wrap">
-                                <span className={`font-medium shrink-0 ${isDark ? 'text-red-400' : 'text-red-600'}`}>{item.label}</span>
+                              <div key={idx} className="text-[11px] leading-relaxed">
+                                <span className={`font-medium ${isDark ? 'text-red-400' : 'text-red-600'}`}>{item.label} </span>
                                 <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
                                   {segments.map((seg, segIdx) => (
                                     <span key={segIdx} className={getHighlightClassWithTheme(seg.type, isDark)}>
@@ -1266,7 +1267,7 @@ export function MapDashboard() {
                 <div>
                   <label className={`text-[10px] mb-1 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
                   <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
-                    <SelectTrigger size="xs" className={`bg-transparent border-none ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <SelectTrigger size="xs" className={`${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}>
@@ -1328,7 +1329,7 @@ export function MapDashboard() {
                   <div className="flex items-center justify-between mb-1">
                     <label className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>중증자원조사 42개</label>
                     <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
-                      <SelectTrigger size="xs" className={`w-16 bg-transparent border-none ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <SelectTrigger size="xs" className={`w-[68px] [&_svg]:size-2 [&_svg]:ml-0 ${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}>
@@ -1344,7 +1345,7 @@ export function MapDashboard() {
                     value={selectedDiseaseCategory || "none"}
                     onValueChange={(v) => handleCategoryChange(v === "none" ? null : v)}
                   >
-                    <SelectTrigger size="xs" className={`bg-transparent border-none ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <SelectTrigger size="xs" className={`${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                       <SelectValue placeholder="대분류 선택..." />
                     </SelectTrigger>
                     <SelectContent className={`max-h-64 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}`}>
@@ -1423,7 +1424,7 @@ export function MapDashboard() {
                     value={selectedSevereType || "none"}
                     onValueChange={(v) => setSelectedSevereType(v === "none" ? null : v as SevereTypeKey)}
                   >
-                    <SelectTrigger size="xs" className={`bg-transparent border-none ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <SelectTrigger size="xs" className={`${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                       <SelectValue placeholder="선택..." />
                     </SelectTrigger>
                     <SelectContent className={`max-h-64 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}`}>
@@ -1561,7 +1562,7 @@ export function MapDashboard() {
                 placeholder="병원명 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-transparent border-none text-gray-900 placeholder-gray-400'}`}
+                className={`w-full h-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-[#F5F0E8] border border-[#d4cdc4] text-gray-900 placeholder-gray-400'}`}
                 style={{ paddingLeft: '28px' }}
               />
               {searchQuery && (

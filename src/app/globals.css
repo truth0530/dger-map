@@ -134,45 +134,46 @@
   }
 }
 
-/* 라이트모드 색상 변수 */
+/* 라이트모드 색상 변수 - 아이보리 계열 (#F5F0E8) 적용 */
 html.light {
-  --background: oklch(1 0 0);
+  --background: #F5F0E8;
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  --card: #FAF7F2;
   --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
+  --popover: #FAF7F2;
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: #E8E2D8;
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted: #E8E2D8;
+  --muted-foreground: oklch(0.4 0 0);
+  --accent: #E8E2D8;
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #d4cdc4;
+  --input: #d4cdc4;
+  --ring: oklch(0.5 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: #F5F0E8;
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent: #E8E2D8;
   --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-border: #d4cdc4;
+  --sidebar-ring: oklch(0.5 0 0);
   color-scheme: light;
 }
 
 /* 라이트모드 네비게이션 */
 html.light nav {
-  @apply bg-white text-gray-900 border-b border-gray-200;
+  background-color: #F5F0E8 !important;
+  @apply text-gray-900 border-b border-[#d4cdc4];
 }
 
 html.light nav button:hover {
@@ -185,29 +186,31 @@ html.light nav a:hover {
 
 /* 라이트모드 사이드바 */
 html.light aside {
-  @apply bg-gray-50 border-r border-gray-200;
+  background-color: #F5F0E8 !important;
+  @apply border-r border-[#d4cdc4];
 }
 
 html.light aside button {
   @apply text-gray-900 hover:bg-gray-200;
 }
 
-/* 라이트모드 배경 변환 */
+/* 라이트모드 배경 변환 - 아이보리 계열 (#F5F0E8) */
 html.light body {
-  @apply bg-white text-gray-900;
+  background-color: #F5F0E8;
+  @apply text-gray-900;
 }
 
 html.light .bg-black,
 html.light .bg-gray-950 {
-  @apply bg-white;
+  background-color: #F5F0E8 !important;
 }
 
 html.light .bg-gray-900 {
-  @apply bg-white;
+  background-color: #F5F0E8 !important;
 }
 
 html.light .bg-gray-900\/95 {
-  @apply bg-white/95;
+  background-color: rgba(245, 240, 232, 0.95) !important;
 }
 
 html.light .bg-gray-800 {
@@ -236,6 +239,31 @@ html.light .bg-gray-700 {
 
 html.light .bg-gray-600 {
   @apply bg-gray-400;
+}
+
+/* 라이트모드 bg-white 계열 아이보리 변환 */
+html.light .bg-white {
+  background-color: #FAF7F2 !important;
+}
+
+html.light .bg-white\/90 {
+  background-color: rgba(250, 247, 242, 0.9) !important;
+}
+
+html.light .bg-white\/95 {
+  background-color: rgba(250, 247, 242, 0.95) !important;
+}
+
+html.light .bg-white\/98 {
+  background-color: rgba(250, 247, 242, 0.98) !important;
+}
+
+html.light .bg-gray-100 {
+  background-color: #E8E2D8 !important;
+}
+
+html.light .bg-gray-50 {
+  background-color: #F5F0E8 !important;
 }
 
 /* 라이트모드 텍스트 색상 */
@@ -401,7 +429,8 @@ input, textarea {
 /* 라이트 모드 입력 필드 */
 html.light input,
 html.light textarea {
-  @apply bg-white border-gray-300 text-gray-900 placeholder:text-gray-500;
+  background-color: #FAF7F2 !important;
+  @apply border-[#d4cdc4] text-gray-900 placeholder:text-gray-500;
 }
 
 html.light input:focus,
