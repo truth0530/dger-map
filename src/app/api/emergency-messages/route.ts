@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': 'application/xml',
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
         'X-Cache': 'HIT'
       }
     });
@@ -78,6 +79,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': 'application/xml',
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
         'X-Cache': 'MISS',
         'X-Sample-Data': result.usedSample ? 'true' : 'false'
       }
@@ -91,6 +93,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': 'application/xml',
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 's-maxage=30, stale-while-revalidate=120',
         'X-Cache': 'ERROR',
         'X-Sample-Data': 'true',
         'X-Error': error instanceof Error ? error.message : 'Unknown error'

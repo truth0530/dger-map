@@ -2,17 +2,16 @@
 
 /**
  * 중증질환 데이터 조회 훅
+ * - API가 JSON을 반환하므로 클라이언트에서 XML 파싱 불필요
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { parseXml, getXmlText, getXmlNumber, getXmlItems, checkResultCode } from '@/lib/utils/xmlParser';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
 
 export interface HospitalSevereData {
   hpid: string;
   dutyName: string;
   dutyEmclsName: string;
-  // 병상 정보
   hvec: number;
   hvs01: number;
   hv27: number;
@@ -21,7 +20,6 @@ export interface HospitalSevereData {
   hv30: number;
   hv15: number;
   hv16: number;
-  // 중증질환 가용성 (MKioskTy1 ~ MKioskTy27)
   severeStatus: Record<string, string>;
 }
 
@@ -36,6 +34,16 @@ export interface DiseaseStats {
   availableHospitals: HospitalSevereData[];
   unavailableHospitals: HospitalSevereData[];
   noInfoHospitals: HospitalSevereData[];
+}
+
+// API 응답 타입
+interface SevereDataApiResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  items: HospitalSevereData[];
+  totalCount: number;
+  usedSample: boolean;
 }
 
 const CACHE_TTL = 5 * 60 * 1000; // 5분
@@ -81,38 +89,13 @@ export function useSevereData() {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const xml = await response.text();
-      const doc = parseXml(xml);
+      const json: SevereDataApiResponse = await response.json();
 
-      const result = checkResultCode(doc);
-      if (!result.success) {
-        throw new Error(result.message || `API 오류: ${result.code}`);
+      if (!json.success) {
+        throw new Error(json.message || `API 오류: ${json.code}`);
       }
 
-      const items = getXmlItems(doc);
-      const hospitalData: HospitalSevereData[] = items.map(item => {
-        const severeStatus: Record<string, string> = {};
-
-        // MKioskTy1 ~ MKioskTy27 추출
-        SEVERE_TYPES.forEach(type => {
-          severeStatus[type.key] = getXmlText(item, type.key);
-        });
-
-        return {
-          hpid: getXmlText(item, 'hpid'),
-          dutyName: getXmlText(item, 'dutyName'),
-          dutyEmclsName: getXmlText(item, 'dutyEmclsName'),
-          hvec: getXmlNumber(item, 'hvec'),
-          hvs01: getXmlNumber(item, 'hvs01'),
-          hv27: getXmlNumber(item, 'hv27'),
-          hv28: getXmlNumber(item, 'hv28'),
-          hv29: getXmlNumber(item, 'hv29'),
-          hv30: getXmlNumber(item, 'hv30'),
-          hv15: getXmlNumber(item, 'hv15'),
-          hv16: getXmlNumber(item, 'hv16'),
-          severeStatus
-        };
-      });
+      const hospitalData = json.items;
 
       // 캐시 저장
       cacheRef.current.set(cacheKey, {

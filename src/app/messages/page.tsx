@@ -310,7 +310,7 @@ export default function MessagesPage() {
     return messages;
   }, []);
 
-  // 지역별 병원 목록 가져오기 (bed-info API 사용 - 더 완전한 목록)
+  // 지역별 병원 목록 가져오기 (bed-info API 사용 - JSON 형식)
   const fetchHospitalsForRegion = useCallback(async (region: string): Promise<Hospital[]> => {
     try {
       // 시도명 매핑
@@ -338,50 +338,44 @@ export default function MessagesPage() {
       const res = await fetch(`/api/bed-info?region=${encodeURIComponent(mappedRegion)}`);
       if (!res.ok) return [];
 
-      const text = await res.text();
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, 'text/xml');
+      // JSON 형식으로 파싱 (API가 JSON 반환)
+      const data = await res.json();
+      if (!data.success || !data.items) return [];
 
-      const items = xml.getElementsByTagName('item');
       const hospitalSet = new Map<string, Hospital>();
 
-      const getNum = (item: Element, tag: string): number => {
-        const val = item.getElementsByTagName(tag)[0]?.textContent;
-        return val ? parseInt(val, 10) || 0 : 0;
-      };
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const hpid = item.getElementsByTagName('hpid')[0]?.textContent || '';
-        const name = item.getElementsByTagName('dutyName')[0]?.textContent || '';
-        const tel = item.getElementsByTagName('dutyTel3')[0]?.textContent || '';
+      for (const item of data.items) {
+        const hpid = item.hpid || '';
+        const name = item.dutyName || '';
+        const tel = item.dutyTel3 || '';
 
         if (hpid && name && !hospitalSet.has(hpid)) {
           hospitalSet.set(hpid, {
             id: hpid,
             name,
             tel,
+            hpbd: item.hpbd || '',
             // 가용 병상
-            hvec: getNum(item, 'hvec'),
-            hvs01: getNum(item, 'hvs01'),
-            hvs59: getNum(item, 'hvs59'),
-            hv29: getNum(item, 'hv29'),
-            hv13: getNum(item, 'hv13'),
-            hv30: getNum(item, 'hv30'),
-            hv14: getNum(item, 'hv14'),
-            hv15: getNum(item, 'hv15'),
-            hv16: getNum(item, 'hv16'),
-            hvs17: getNum(item, 'hvs17'),
+            hvec: item.hvec || 0,
+            hvs01: item.hvs01 || 0,
+            hvs59: item.hvs59 || 0,
+            hv29: item.hv29 || 0,
+            hv13: item.hv13 || 0,
+            hv30: item.hv30 || 0,
+            hv14: item.hv14 || 0,
+            hv15: item.hv15 || 0,
+            hv16: item.hv16 || 0,
+            hvs17: item.hvs17 || 0,
             // 총 병상
-            hvs02: getNum(item, 'hvs02'),
-            hvs60: getNum(item, 'hvs60'),
-            hvs03: getNum(item, 'hvs03'),
-            hvs46: getNum(item, 'hvs46'),
-            hvs04: getNum(item, 'hvs04'),
-            hvs47: getNum(item, 'hvs47'),
-            hvs06: getNum(item, 'hvs06'),
-            hvs07: getNum(item, 'hvs07'),
-            hvs18: getNum(item, 'hvs18'),
+            hvs02: item.hvs02 || 0,
+            hvs60: item.hvs60 || 0,
+            hvs03: item.hvs03 || 0,
+            hvs46: item.hvs46 || 0,
+            hvs04: item.hvs04 || 0,
+            hvs47: item.hvs47 || 0,
+            hvs06: item.hvs06 || 0,
+            hvs07: item.hvs07 || 0,
+            hvs18: item.hvs18 || 0,
           });
         }
       }

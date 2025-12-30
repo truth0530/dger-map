@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import 'leaflet/dist/leaflet.css';
 import '@/styles/popup.css';
 import type { Hospital, AvailabilityStatus } from '@/types';
 import type { HospitalBedData } from '@/lib/hooks/useBedData';
@@ -115,33 +116,24 @@ export default function LeafletMap({
   // NOTE: 'minimal'과 'pure_dark' 테마는 지저분해서 사용 금지 (2024-12-28 제거)
   const [tileLayer, setTileLayer] = useState<'osm' | 'light' | 'dark' | 'neutral'>('light');
 
-  // Leaflet 동적 로드
+  // Leaflet 동적 로드 (npm 패키지에서 - CDN 대신 번들 사용으로 로딩 속도 개선)
   useEffect(() => {
-    // Leaflet 라이브러리 로드
-    if (typeof window !== 'undefined' && !window.L) {
-      const leafletScript = document.createElement('script');
-      leafletScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      leafletScript.async = true;
+    const loadLeaflet = async () => {
+      if (typeof window !== 'undefined') {
+        // 이미 로드된 경우 스킵
+        if (window.L) {
+          setLeafletLoaded(true);
+          return;
+        }
 
-      const leafletLink = document.createElement('link');
-      leafletLink.rel = 'stylesheet';
-      leafletLink.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-
-      document.head.appendChild(leafletLink);
-
-      leafletScript.onload = () => {
+        // npm 패키지에서 dynamic import (번들에 포함되어 CDN보다 빠름)
+        const L = (await import('leaflet')).default;
+        window.L = L;
         setLeafletLoaded(true);
-      };
+      }
+    };
 
-      document.head.appendChild(leafletScript);
-
-      return () => {
-        if (leafletScript.parentNode) leafletScript.parentNode.removeChild(leafletScript);
-        if (leafletLink.parentNode) leafletLink.parentNode.removeChild(leafletLink);
-      };
-    } else {
-      setLeafletLoaded(true);
-    }
+    loadLeaflet();
   }, []);
 
   // 병상 상태 색상 결정

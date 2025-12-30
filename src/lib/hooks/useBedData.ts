@@ -2,11 +2,12 @@
 
 /**
  * 병상 정보 데이터 조회 훅
+ * - API가 JSON을 반환하므로 클라이언트에서 XML 파싱 불필요
+ * - 병원 유형(hpbd)이 서버에서 포함되어 별도 로드 불필요
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { parseXml, getXmlText, getXmlNumber, getXmlItems, checkResultCode } from '@/lib/utils/xmlParser';
-import { BED_DEFINITIONS, getBedStatus, BedStatus } from '@/lib/constants/dger';
+import { useState, useCallback, useRef } from 'react';
+import { BedStatus } from '@/lib/constants/dger';
 
 // 병원 유형 (권역/센터/기관)
 export type HospitalOrgType = '권역응급의료센터' | '지역응급의료센터' | '전문응급의료센터' | '지역응급의료기관' | '';
@@ -15,77 +16,77 @@ export interface HospitalBedData {
   hpid: string;
   dutyName: string;
   dutyEmclsName: string;
-  hpbd: HospitalOrgType; // 병원 유형 (hosp_list.json에서 매핑)
+  hpbd: HospitalOrgType;
   dutyAddr: string;
   dutyTel3: string;
-  // 일반 병상
-  hvec: number;  // 응급실 가용
-  hvs01: number; // 응급실 총계
-  // 코호트 격리
-  hv27: number;  // 가용
-  HVS59: number; // 총계
-  // 응급실 음압격리
-  hv29: number;  // 가용
-  HVS03: number; // 총계
-  // 격리진료구역 음압격리 (일부 병원은 이 필드 사용)
-  hv13: number;  // 가용
-  HVS46: number; // 총계
-  // 응급실 일반격리
-  hv30: number;  // 가용
-  HVS04: number; // 총계
-  // 격리진료구역 일반격리 (일부 병원은 이 필드 사용)
-  hv14: number;  // 가용
-  HVS47: number; // 총계
-  // 소아 응급실
-  hv28: number;  // 가용
-  HVS02: number; // 총계
-  // 소아 음압격리
-  hv15: number;  // 가용
-  HVS48: number; // 총계
-  // 소아 일반격리
-  hv16: number;  // 가용
-  HVS49: number; // 총계
-  // 메시지 정보
-  hvidate: string; // 최종 업데이트 시간
-  // 계산된 값
-  occupancy: number; // 재실인원
-  occupancyRate: number; // 점유율
+  hvec: number;
+  hvs01: number;
+  hv27: number;
+  HVS59: number;
+  hv29: number;
+  HVS03: number;
+  hv13: number;
+  HVS46: number;
+  hv30: number;
+  HVS04: number;
+  hv14: number;
+  HVS47: number;
+  hv28: number;
+  HVS02: number;
+  hv15: number;
+  HVS48: number;
+  hv16: number;
+  HVS49: number;
+  hvidate: string;
+  occupancy: number;
+  occupancyRate: number;
   generalStatus: BedStatus;
 }
 
-const CACHE_TTL = 2 * 60 * 1000; // 2분 (병상 정보는 더 자주 갱신)
+// API 응답 타입
+interface BedInfoApiResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  items: Array<{
+    hpid: string;
+    dutyName: string;
+    dutyEmclsName: string;
+    hpbd: HospitalOrgType;
+    dutyAddr: string;
+    dutyTel3: string;
+    hvec: number;
+    hvs01: number;
+    hv27: number;
+    hvs59: number;
+    hv29: number;
+    hvs03: number;
+    hv13: number;
+    hvs46: number;
+    hv30: number;
+    hvs04: number;
+    hv14: number;
+    hvs47: number;
+    hv28: number;
+    hvs02: number;
+    hv15: number;
+    hvs48: number;
+    hv16: number;
+    hvs49: number;
+    hvidate: string;
+    occupancy: number;
+    occupancyRate: number;
+    generalStatus: BedStatus;
+  }>;
+  totalCount: number;
+  usedSample: boolean;
+}
+
+const CACHE_TTL = 2 * 60 * 1000; // 2분
 
 interface CacheEntry {
   data: HospitalBedData[];
   timestamp: number;
-}
-
-// 병원 유형 매핑 (hpid -> hpbd)
-let hospitalTypeMapCache: Record<string, HospitalOrgType> | null = null;
-
-async function loadHospitalTypeMap(): Promise<Record<string, HospitalOrgType>> {
-  if (hospitalTypeMapCache) return hospitalTypeMapCache;
-
-  try {
-    const response = await fetch('/data/hosp_list.json');
-    const data = await response.json();
-    const map: Record<string, HospitalOrgType> = {};
-
-    data.forEach((row: Record<string, unknown>) => {
-      const keys = Object.keys(row);
-      const hpid = row[keys[0]] as string;
-      const hpbd = (row['__EMPTY_3'] || '') as string;
-      if (hpid && hpbd && typeof hpid === 'string') {
-        map[hpid] = hpbd as HospitalOrgType;
-      }
-    });
-
-    hospitalTypeMapCache = map;
-    return map;
-  } catch (e) {
-    console.warn('병원 유형 매핑 로드 실패:', e);
-    return {};
-  }
 }
 
 export function useBedData() {
@@ -93,33 +94,8 @@ export function useBedData() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<HospitalBedData[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [hospitalTypeMap, setHospitalTypeMap] = useState<Record<string, HospitalOrgType>>({});
-  const [hospitalTypeMapReady, setHospitalTypeMapReady] = useState(false);
 
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
-
-  // 병원 유형 매핑 로드
-  useEffect(() => {
-    loadHospitalTypeMap().then(map => {
-      setHospitalTypeMap(map);
-      setHospitalTypeMapReady(true);
-      // 매핑 로드 후 캐시 클리어
-      cacheRef.current.clear();
-    });
-  }, []);
-
-  const calculateOccupancy = (hospital: Partial<HospitalBedData>): number => {
-    const total = hospital.hvs01 || 0;
-    const available = hospital.hvec || 0;
-    return Math.max(0, total - available);
-  };
-
-  const calculateOccupancyRate = (hospital: Partial<HospitalBedData>): number => {
-    const total = hospital.hvs01 || 0;
-    if (total === 0) return 0;
-    const occupancy = calculateOccupancy(hospital);
-    return Math.round((occupancy / total) * 100);
-  };
 
   const fetchBedData = useCallback(async (region: string, forceRefresh = false) => {
     const cacheKey = `bed_${region}`;
@@ -139,75 +115,50 @@ export function useBedData() {
     setError(null);
 
     try {
-      const params = new URLSearchParams({
-        region: region
-      });
-
+      const params = new URLSearchParams({ region });
       const response = await fetch(`/api/bed-info?${params.toString()}`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const xml = await response.text();
-      const doc = parseXml(xml);
+      const json: BedInfoApiResponse = await response.json();
 
-      const result = checkResultCode(doc);
-      if (!result.success) {
-        throw new Error(result.message || `API 오류: ${result.code}`);
+      if (!json.success) {
+        throw new Error(json.message || `API 오류: ${json.code}`);
       }
 
-      const items = getXmlItems(doc);
-      const hospitalData: HospitalBedData[] = items.map(item => {
-        const hpid = getXmlText(item, 'hpid');
-        const bedData: Partial<HospitalBedData> = {
-          hpid,
-          dutyName: getXmlText(item, 'dutyName'),
-          dutyEmclsName: getXmlText(item, 'dutyEmclsName'),
-          hpbd: hospitalTypeMap[hpid] || '', // 병원 유형 매핑
-          dutyAddr: getXmlText(item, 'dutyAddr'),
-          dutyTel3: getXmlText(item, 'dutyTel3'),
-          hvec: getXmlNumber(item, 'hvec'),
-          hvs01: getXmlNumber(item, 'hvs01'),
-          hv27: getXmlNumber(item, 'hv27'),
-          HVS59: getXmlNumber(item, 'hvs59'),
-          hv29: getXmlNumber(item, 'hv29'),
-          HVS03: getXmlNumber(item, 'hvs03'),
-          hv13: getXmlNumber(item, 'hv13'),
-          HVS46: getXmlNumber(item, 'hvs46'),
-          hv30: getXmlNumber(item, 'hv30'),
-          HVS04: getXmlNumber(item, 'hvs04'),
-          hv14: getXmlNumber(item, 'hv14'),
-          HVS47: getXmlNumber(item, 'hvs47'),
-          hv28: getXmlNumber(item, 'hv28'),
-          HVS02: getXmlNumber(item, 'hvs02'),
-          hv15: getXmlNumber(item, 'hv15'),
-          HVS48: getXmlNumber(item, 'hvs48'),
-          hv16: getXmlNumber(item, 'hv16'),
-          HVS49: getXmlNumber(item, 'hvs49'),
-          hvidate: getXmlText(item, 'hvidate')
-        };
-
-        return {
-          ...bedData,
-          occupancy: calculateOccupancy(bedData),
-          occupancyRate: calculateOccupancyRate(bedData),
-          generalStatus: getBedStatus(bedData.hvec || 0, bedData.hvs01 || 0)
-        } as HospitalBedData;
-      });
-
-      // 센터급 우선, 재실인원 내림차순 정렬 (hpbd 사용)
-      hospitalData.sort((a, b) => {
-        const centerTypes = ['권역응급의료센터', '지역응급의료센터', '전문응급의료센터'];
-        const aIsCenter = centerTypes.includes(a.hpbd) || centerTypes.includes(a.dutyEmclsName);
-        const bIsCenter = centerTypes.includes(b.hpbd) || centerTypes.includes(b.dutyEmclsName);
-
-        if (aIsCenter && !bIsCenter) return -1;
-        if (!aIsCenter && bIsCenter) return 1;
-
-        // 같은 급수 내에서는 재실인원 내림차순
-        return b.occupancy - a.occupancy;
-      });
+      // API 응답의 소문자 필드를 클라이언트 인터페이스의 대문자 필드로 매핑
+      const hospitalData: HospitalBedData[] = json.items.map(item => ({
+        hpid: item.hpid,
+        dutyName: item.dutyName,
+        dutyEmclsName: item.dutyEmclsName,
+        hpbd: item.hpbd,
+        dutyAddr: item.dutyAddr,
+        dutyTel3: item.dutyTel3,
+        hvec: item.hvec,
+        hvs01: item.hvs01,
+        hv27: item.hv27,
+        HVS59: item.hvs59,
+        hv29: item.hv29,
+        HVS03: item.hvs03,
+        hv13: item.hv13,
+        HVS46: item.hvs46,
+        hv30: item.hv30,
+        HVS04: item.hvs04,
+        hv14: item.hv14,
+        HVS47: item.hvs47,
+        hv28: item.hv28,
+        HVS02: item.hvs02,
+        hv15: item.hv15,
+        HVS48: item.hvs48,
+        hv16: item.hv16,
+        HVS49: item.hvs49,
+        hvidate: item.hvidate,
+        occupancy: item.occupancy,
+        occupancyRate: item.occupancyRate,
+        generalStatus: item.generalStatus,
+      }));
 
       // 캐시 저장
       cacheRef.current.set(cacheKey, {
@@ -226,7 +177,7 @@ export function useBedData() {
     } finally {
       setLoading(false);
     }
-  }, [hospitalTypeMap]);
+  }, []);
 
   const clearCache = useCallback(() => {
     cacheRef.current.clear();
@@ -239,6 +190,7 @@ export function useBedData() {
     lastUpdate,
     fetchBedData,
     clearCache,
-    hospitalTypeMapReady
+    // 하위 호환성: 서버에서 병원 유형을 포함하므로 항상 true
+    hospitalTypeMapReady: true
   };
 }

@@ -3,9 +3,10 @@
  * 원본: dger-api/api/get-bed-info.js
  *
  * - 서버 측 캐싱 (5분 TTL)
+ * - XML → JSON 변환 (클라이언트 파싱 비용 제거)
+ * - 병원 유형 매핑 포함 (hosp_list.json 별도 로드 불필요)
  * - API 장애 시 샘플 데이터 폴백
  * - Rate Limiting
- * - 구조화된 로깅
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,9 +15,132 @@ import { bedInfoCache } from '@/lib/cache/SimpleCache';
 import { SAMPLE_BED_DATA } from '@/lib/sampleData';
 import { createLogger } from '@/lib/utils/logger';
 import { checkRateLimit, getClientIP, getRateLimitHeaders } from '@/lib/middleware/rateLimit';
+import { parseXmlToJson, getItemText, getItemNumber } from '@/lib/utils/serverXmlParser';
+import { getHospitalOrgType, HospitalOrgType } from '@/lib/data/hospitalTypeMap';
+import { getBedStatus, BedStatus } from '@/lib/constants/dger';
 
 const logger = createLogger('api:bed-info');
 const API_NAME = 'bed-info';
+
+// JSON 응답 타입
+export interface BedInfoItem {
+  hpid: string;
+  dutyName: string;
+  dutyEmclsName: string;
+  hpbd: HospitalOrgType;
+  dutyAddr: string;
+  dutyTel3: string;
+  hvec: number;
+  hvs01: number;
+  hv27: number;
+  hvs59: number;
+  hv29: number;
+  hvs03: number;
+  hv13: number;
+  hvs46: number;
+  hv30: number;
+  hvs04: number;
+  hv14: number;
+  hvs47: number;
+  hv28: number;
+  hvs02: number;
+  hv15: number;
+  hvs48: number;
+  hv16: number;
+  hvs49: number;
+  hvidate: string;
+  occupancy: number;
+  occupancyRate: number;
+  generalStatus: BedStatus;
+}
+
+interface BedInfoResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  items: BedInfoItem[];
+  totalCount: number;
+  usedSample: boolean;
+}
+
+/**
+ * XML을 파싱하여 BedInfoItem 배열로 변환
+ */
+function parseXmlToBedInfo(xml: string, usedSample: boolean): BedInfoResponse {
+  const parsed = parseXmlToJson(xml);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      code: parsed.code,
+      message: parsed.message,
+      items: [],
+      totalCount: 0,
+      usedSample,
+    };
+  }
+
+  const items: BedInfoItem[] = parsed.items.map((item) => {
+    const hpid = getItemText(item, 'hpid');
+    const hvec = getItemNumber(item, 'hvec');
+    const hvs01 = getItemNumber(item, 'hvs01');
+
+    // 재실인원 및 점유율 계산
+    const occupancy = Math.max(0, hvs01 - hvec);
+    const occupancyRate = hvs01 > 0 ? Math.round((occupancy / hvs01) * 100) : 0;
+
+    return {
+      hpid,
+      dutyName: getItemText(item, 'dutyName'),
+      dutyEmclsName: getItemText(item, 'dutyEmclsName'),
+      hpbd: getHospitalOrgType(hpid),
+      dutyAddr: getItemText(item, 'dutyAddr'),
+      dutyTel3: getItemText(item, 'dutyTel3'),
+      hvec,
+      hvs01,
+      hv27: getItemNumber(item, 'hv27'),
+      hvs59: getItemNumber(item, 'hvs59'),
+      hv29: getItemNumber(item, 'hv29'),
+      hvs03: getItemNumber(item, 'hvs03'),
+      hv13: getItemNumber(item, 'hv13'),
+      hvs46: getItemNumber(item, 'hvs46'),
+      hv30: getItemNumber(item, 'hv30'),
+      hvs04: getItemNumber(item, 'hvs04'),
+      hv14: getItemNumber(item, 'hv14'),
+      hvs47: getItemNumber(item, 'hvs47'),
+      hv28: getItemNumber(item, 'hv28'),
+      hvs02: getItemNumber(item, 'hvs02'),
+      hv15: getItemNumber(item, 'hv15'),
+      hvs48: getItemNumber(item, 'hvs48'),
+      hv16: getItemNumber(item, 'hv16'),
+      hvs49: getItemNumber(item, 'hvs49'),
+      hvidate: getItemText(item, 'hvidate'),
+      occupancy,
+      occupancyRate,
+      generalStatus: getBedStatus(hvec, hvs01),
+    };
+  });
+
+  // 센터급 우선, 재실인원 내림차순 정렬
+  items.sort((a, b) => {
+    const centerTypes = ['권역응급의료센터', '지역응급의료센터', '전문응급의료센터'];
+    const aIsCenter = centerTypes.includes(a.hpbd) || centerTypes.includes(a.dutyEmclsName);
+    const bIsCenter = centerTypes.includes(b.hpbd) || centerTypes.includes(b.dutyEmclsName);
+
+    if (aIsCenter && !bIsCenter) return -1;
+    if (!aIsCenter && bIsCenter) return 1;
+    return b.occupancy - a.occupancy;
+  });
+
+  return {
+    success: true,
+    code: parsed.code,
+    message: parsed.message,
+    items,
+    totalCount: items.length,
+    usedSample,
+  };
+}
 
 export async function GET(request: NextRequest) {
   const startTime = performance.now();
@@ -28,12 +152,11 @@ export async function GET(request: NextRequest) {
 
   if (!rateLimitResult.allowed) {
     logger.warn('Rate limit exceeded', { clientIP, retryAfter: rateLimitResult.retryAfter });
-    return new NextResponse(
-      JSON.stringify({ error: 'Too many requests', retryAfter: rateLimitResult.retryAfter }),
+    return NextResponse.json(
+      { error: 'Too many requests', retryAfter: rateLimitResult.retryAfter },
       {
         status: 429,
         headers: {
-          'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
           ...rateLimitHeaders,
         },
@@ -47,8 +170,8 @@ export async function GET(request: NextRequest) {
 
   logger.logApiRequest('GET', '/api/bed-info', { region, hospId, clientIP });
 
-  // 캐시 키 생성
-  const cacheKey = `bed:${region}:${hospId}`;
+  // 캐시 키 생성 (JSON 버전)
+  const cacheKey = `bed-json:${region}:${hospId}`;
 
   // 캐시 확인
   const cachedData = bedInfoCache.get(cacheKey);
@@ -60,8 +183,9 @@ export async function GET(request: NextRequest) {
     return new NextResponse(cachedData, {
       status: 200,
       headers: {
-        'Content-Type': 'application/xml',
+        'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 's-maxage=120, stale-while-revalidate=600',
         'X-Cache': 'HIT',
         'X-Response-Time': `${duration.toFixed(2)}ms`,
         ...rateLimitHeaders,
@@ -92,20 +216,30 @@ export async function GET(request: NextRequest) {
       description: '병상 정보 조회(API)',
     });
 
+    // XML → JSON 변환
+    const jsonResponse = parseXmlToBedInfo(result.xml, result.usedSample);
+    const jsonString = JSON.stringify(jsonResponse);
+
     // 캐시에 저장 (샘플 데이터가 아닌 경우만)
     if (!result.usedSample) {
-      bedInfoCache.set(cacheKey, result.xml);
+      bedInfoCache.set(cacheKey, jsonString);
       logger.logCacheEvent('set', cacheKey);
     }
 
     const duration = performance.now() - startTime;
     logger.logApiResponse('GET', '/api/bed-info', 200, duration);
 
-    return new NextResponse(result.xml, {
+    // 샘플 데이터일 경우 CDN 캐시하지 않음
+    const cacheControl = result.usedSample
+      ? 'no-store, must-revalidate'
+      : 's-maxage=120, stale-while-revalidate=600';
+
+    return new NextResponse(jsonString, {
       status: 200,
       headers: {
-        'Content-Type': 'application/xml',
+        'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': cacheControl,
         'X-Cache': 'MISS',
         'X-Sample-Data': result.usedSample ? 'true' : 'false',
         'X-Response-Time': `${duration.toFixed(2)}ms`,
@@ -117,12 +251,17 @@ export async function GET(request: NextRequest) {
     logger.error('API call failed', error instanceof Error ? error : undefined, { region, hospId });
     logger.logApiResponse('GET', '/api/bed-info', 500, duration);
 
-    // 에러 시 샘플 데이터 반환
-    return new NextResponse(SAMPLE_BED_DATA, {
+    // 에러 시 샘플 데이터로 JSON 반환
+    const jsonResponse = parseXmlToBedInfo(SAMPLE_BED_DATA, true);
+    const jsonString = JSON.stringify(jsonResponse);
+
+    return new NextResponse(jsonString, {
       status: 200,
       headers: {
-        'Content-Type': 'application/xml',
+        'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
+        // 에러/샘플 응답은 CDN 캐시하지 않음 - 장애 복구 후 즉시 정상 응답 제공
+        'Cache-Control': 'no-store, must-revalidate',
         'X-Cache': 'ERROR',
         'X-Sample-Data': 'true',
         'X-Error': error instanceof Error ? error.message : 'Unknown error',

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "perf:lighthouse": "node scripts/lighthouse-all.js",
+    "perf:lighthouse:quick": "npx lighthouse http://localhost:3000 --preset=desktop --only-categories=performance --output=json --quiet | jq '.categories.performance.score * 100'"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -20,6 +22,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "fast-xml-parser": "^5.3.3",
     "googleapis": "^169.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.560.0",
