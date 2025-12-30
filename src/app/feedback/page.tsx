@@ -105,7 +105,19 @@ export default function FeedbackPage() {
   const { isDark } = useTheme();
 
   // 탭 상태
-  const [activeTab, setActiveTab] = useState<'release' | 'board'>('release');
+  const [activeTab, setActiveTab] = useState<'release' | 'board' | 'stats'>('release');
+
+  // 통계 데이터 상태
+  interface AnalyticsData {
+    realtime: { activeUsers: number };
+    today: { users: number; sessions: number };
+    average: { dailyUsers: number };
+    total: { users: number; sessions: number; pageViews: number; avgSessionDuration: number; since: string };
+    dailyTrend: Array<{ date: string; users: number; sessions: number }>;
+  }
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
   // 게시판 상태
   const [posts, setPosts] = useState<FeedbackPost[]>([]);
@@ -169,6 +181,36 @@ export default function FeedbackPage() {
       fetchPosts();
     }
   }, [activeTab, fetchPosts]);
+
+  // 통계 데이터 조회
+  const fetchAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+
+    try {
+      const res = await fetch('/api/analytics');
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAnalyticsError(data.error || '통계 데이터를 불러오지 못했습니다.');
+        return;
+      }
+
+      setAnalyticsData(data.data);
+    } catch (err) {
+      console.error('통계 조회 오류:', err);
+      setAnalyticsError('네트워크 오류가 발생했습니다.');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
+  // 탭 변경 시 통계 조회
+  useEffect(() => {
+    if (activeTab === 'stats') {
+      fetchAnalytics();
+    }
+  }, [activeTab, fetchAnalytics]);
 
   // 게시글 작성
   const handleSubmit = async (e: React.FormEvent) => {
@@ -310,21 +352,6 @@ export default function FeedbackPage() {
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-gradient-to-b from-gray-900 to-gray-950' : 'bg-gradient-to-b from-[#F5F0E8] to-[#EDE7DD]'}`}>
-      {/* 상단 히어로 섹션 */}
-      <div className={`relative overflow-hidden ${isDark ? 'bg-gray-800/50' : 'bg-[#E8E2D8]'} border-b ${isDark ? 'border-gray-700/50' : 'border-gray-300'}`}>
-        <div className="absolute inset-0 overflow-hidden">
-          <div className={`absolute -top-40 -right-40 w-80 h-80 rounded-full ${isDark ? 'bg-blue-500/5' : 'bg-blue-500/10'} blur-3xl`} />
-          <div className={`absolute -bottom-40 -left-40 w-80 h-80 rounded-full ${isDark ? 'bg-emerald-500/5' : 'bg-emerald-500/10'} blur-3xl`} />
-        </div>
-        <div className="relative max-w-[900px] mx-auto px-6 py-10">
-          <h1 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            DGER Release & Feedback
-          </h1>
-          <p className={`text-base mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            대구맞춤형 응급실 병상정보 시스템
-          </p>
-        </div>
-      </div>
 
       <main className="max-w-[900px] mx-auto px-6 py-8">
         {/* 탭 네비게이션 */}
@@ -341,12 +368,7 @@ export default function FeedbackPage() {
                   : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              릴리즈 노트
-            </span>
+            릴리즈 노트
           </button>
           <button
             onClick={() => setActiveTab('board')}
@@ -360,12 +382,21 @@ export default function FeedbackPage() {
                   : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-              피드백 게시판
-            </span>
+            피드백 게시판
+          </button>
+          <button
+            onClick={() => setActiveTab('stats')}
+            className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+              activeTab === 'stats'
+                ? isDark
+                  ? 'bg-gray-700 text-white shadow-lg'
+                  : 'bg-white text-gray-900 shadow-md'
+                : isDark
+                  ? 'text-gray-400 hover:text-gray-200'
+                  : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            방문자 통계
           </button>
         </div>
 
@@ -951,6 +982,329 @@ export default function FeedbackPage() {
                   </svg>
                 </button>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* 방문자 통계 탭 */}
+        {activeTab === 'stats' && (
+          <div className="space-y-4">
+            {/* 헤더 섹션 */}
+            <div className="flex items-center justify-end -mt-2">
+              <button
+                onClick={fetchAnalytics}
+                disabled={analyticsLoading}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  isDark
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                }`}
+              >
+                <svg className={`w-4 h-4 ${analyticsLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                새로고침
+              </button>
+            </div>
+
+            {analyticsLoading && !analyticsData ? (
+              <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                <svg className="animate-spin w-8 h-8 mb-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="text-sm">통계 데이터를 불러오는 중...</span>
+              </div>
+            ) : analyticsError ? (
+              <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-red-400' : 'text-red-500'}`}>
+                <svg className="w-12 h-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm">{analyticsError}</span>
+                <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  GA_PROPERTY_ID 환경변수 설정이 필요합니다
+                </p>
+              </div>
+            ) : analyticsData && (
+              <>
+                {/* 주요 지표 카드 - 6개 카드를 3x2 그리드로 */}
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                  {/* 1. 30분 접속자 */}
+                  <div className={`rounded-xl p-3 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <div className={`text-[10px] tracking-wider ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                      30분 접속자
+                    </div>
+                    <div className={`text-xl font-semibold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {analyticsData.realtime.activeUsers.toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* 2. 오늘 방문자 */}
+                  <div className={`rounded-xl p-3 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <div className={`text-[10px] tracking-wider ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                      오늘 방문자
+                    </div>
+                    <div className={`text-xl font-semibold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {analyticsData.today.users.toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* 3. 평균 체류시간 */}
+                  <div className={`rounded-xl p-3 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <div className={`text-[10px] tracking-wider ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                      평균 체류시간
+                    </div>
+                    <div className={`text-xl font-semibold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {(() => {
+                        const seconds = analyticsData.total.avgSessionDuration || 0;
+                        const mins = Math.floor(seconds / 60);
+                        const secs = Math.round(seconds % 60);
+                        return `${mins}:${secs.toString().padStart(2, '0')}`;
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* 4. 누적 방문자 */}
+                  <div className={`rounded-xl p-3 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <div className={`text-[10px] tracking-wider ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                      누적 방문자
+                    </div>
+                    <div className={`text-xl font-semibold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {analyticsData.total.users.toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* 5. 누적 세션 */}
+                  <div className={`rounded-xl p-3 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <div className={`text-[10px] tracking-wider ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                      누적 세션
+                    </div>
+                    <div className={`text-xl font-semibold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {analyticsData.total.sessions.toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* 6. 누적 페이지뷰 */}
+                  <div className={`rounded-xl p-3 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <div className={`text-[10px] tracking-wider ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                      누적 페이지뷰
+                    </div>
+                    <div className={`text-xl font-semibold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {analyticsData.total.pageViews?.toLocaleString() || '0'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 최근 30일 추이 */}
+                <div className={`rounded-2xl p-6 ${
+                  isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                }`}>
+                  <h3 className={`text-sm font-medium mb-4 ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>
+                    최근 30일 평균 {Math.round(analyticsData.dailyTrend.reduce((sum, d) => sum + d.users, 0) / analyticsData.dailyTrend.length)}명 방문
+                  </h3>
+
+                  {analyticsData.dailyTrend.length > 0 ? (
+                    <div className="space-y-2">
+                      {/* 꺾은선 차트 */}
+                      <div className="relative" style={{ height: '120px' }}>
+                        {/* 최고/최저 방문자 라벨 및 마커 (HTML로 렌더링하여 왜곡 방지) */}
+                        {(() => {
+                          const data = analyticsData.dailyTrend;
+                          const maxData = data.reduce((max, d) => d.users > max.users ? d : max, data[0]);
+                          const minData = data.reduce((min, d) => d.users < min.users ? d : min, data[0]);
+                          const maxIndex = data.findIndex(d => d === maxData);
+                          const minIndex = data.findIndex(d => d === minData);
+                          const maxDateStr = maxData.date;
+                          const minDateStr = minData.date;
+                          const maxFormattedDate = `${maxDateStr.slice(4, 6)}/${maxDateStr.slice(6, 8)}`;
+                          const minFormattedDate = `${minDateStr.slice(4, 6)}/${minDateStr.slice(6, 8)}`;
+
+                          // SVG와 동일한 계산 (SVG viewBox: 800x120, padding: top:25, right:10, bottom:10, left:10)
+                          const svgWidth = 800;
+                          const svgHeight = 120;
+                          const padding = { top: 25, right: 10, bottom: 10, left: 10 };
+                          const graphWidth = svgWidth - padding.left - padding.right; // 780
+                          const graphHeight = svgHeight - padding.top - padding.bottom; // 85
+
+                          const maxUsers = Math.max(...data.map(d => d.users));
+                          const minUsers = Math.min(...data.map(d => d.users));
+                          const range = maxUsers - minUsers || 1;
+
+                          // X 위치: SVG padding 고려 (padding.left/svgWidth ~ (svgWidth-padding.right)/svgWidth)
+                          const leftStart = (padding.left / svgWidth) * 100; // 1.25%
+                          const leftEnd = ((svgWidth - padding.right) / svgWidth) * 100; // 98.75%
+                          const leftRange = leftEnd - leftStart; // 97.5%
+
+                          const maxLeftPercent = leftStart + (maxIndex / (data.length - 1)) * leftRange;
+                          const minLeftPercent = leftStart + (minIndex / (data.length - 1)) * leftRange;
+
+                          // Y 위치: SVG와 동일한 계산
+                          const maxTopPx = padding.top + graphHeight - ((maxData.users - minUsers) / range) * graphHeight;
+                          const minTopPx = padding.top + graphHeight - ((minData.users - minUsers) / range) * graphHeight;
+
+                          const markerColor = isDark ? '#94a3b8' : '#6B7280';
+
+                          return (
+                            <>
+                              {/* 최고 방문자 마커 (원형) */}
+                              <div
+                                className="absolute rounded-full z-10"
+                                style={{
+                                  left: `${maxLeftPercent}%`,
+                                  top: `${maxTopPx}px`,
+                                  width: '8px',
+                                  height: '8px',
+                                  backgroundColor: markerColor,
+                                  transform: 'translate(-50%, -50%)',
+                                }}
+                              />
+                              {/* 최고 방문자 라벨 */}
+                              <div
+                                className={`absolute text-[11px] font-medium whitespace-nowrap z-10 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}
+                                style={{
+                                  left: `${Math.min(Math.max(maxLeftPercent, 8), 92)}%`,
+                                  top: `${maxTopPx - 16}px`,
+                                  transform: 'translateX(-50%)',
+                                }}
+                              >
+                                {maxFormattedDate} {maxData.users}명
+                              </div>
+                              {/* 최저 방문자 마커 (원형) */}
+                              <div
+                                className="absolute rounded-full z-10"
+                                style={{
+                                  left: `${minLeftPercent}%`,
+                                  top: `${minTopPx}px`,
+                                  width: '8px',
+                                  height: '8px',
+                                  backgroundColor: markerColor,
+                                  transform: 'translate(-50%, -50%)',
+                                }}
+                              />
+                              {/* 최저 방문자 라벨 */}
+                              <div
+                                className={`absolute text-[11px] font-medium whitespace-nowrap z-10 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}
+                                style={{
+                                  left: `${Math.min(Math.max(minLeftPercent, 8), 92)}%`,
+                                  top: `${minTopPx + 8}px`,
+                                  transform: 'translateX(-50%)',
+                                }}
+                              >
+                                {minFormattedDate} {minData.users}명
+                              </div>
+                            </>
+                          );
+                        })()}
+                        {(() => {
+                          const data = analyticsData.dailyTrend;
+                          const maxUsers = Math.max(...data.map(d => d.users), 1);
+                          const minUsers = Math.min(...data.map(d => d.users));
+                          const range = maxUsers - minUsers || 1;
+                          const padding = { top: 25, right: 10, bottom: 10, left: 10 };
+                          const svgWidth = 800;
+                          const svgHeight = 120;
+                          const graphWidth = svgWidth - padding.left - padding.right;
+                          const graphHeight = svgHeight - padding.top - padding.bottom;
+
+                          // SVG 포인트 계산
+                          const points = data.map((day, index) => {
+                            const x = padding.left + (index / (data.length - 1)) * graphWidth;
+                            const y = padding.top + graphHeight - ((day.users - minUsers) / range) * graphHeight;
+                            return { x, y, users: day.users, date: day.date };
+                          });
+
+                          // 폴리라인 포인트 문자열
+                          const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+
+                          // 영역 채우기를 위한 path
+                          const areaPath = `M ${padding.left},${svgHeight - padding.bottom} ` +
+                            points.map(p => `L ${p.x},${p.y}`).join(' ') +
+                            ` L ${svgWidth - padding.right},${svgHeight - padding.bottom} Z`;
+
+                          const gradientId = isDark ? 'areaGradientDark' : 'areaGradientLight';
+                          // 페이지 테마에 맞는 색상 (라이트: 따뜻한 회색-틸, 다크: 슬레이트)
+                          const lineColor = isDark ? '#94a3b8' : '#6B7280';
+                          const gradientStart = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(107, 114, 128, 0.15)';
+                          const gradientEnd = isDark ? 'rgba(148, 163, 184, 0)' : 'rgba(107, 114, 128, 0)';
+
+                          return (
+                            <svg className="w-full h-full" viewBox={`0 0 ${svgWidth} ${svgHeight}`} preserveAspectRatio="none">
+                              <defs>
+                                <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor={gradientStart} />
+                                  <stop offset="100%" stopColor={gradientEnd} />
+                                </linearGradient>
+                              </defs>
+
+                              {/* 영역 채우기 (그라데이션) */}
+                              <path
+                                d={areaPath}
+                                fill={`url(#${gradientId})`}
+                              />
+
+                              {/* 꺾은선 */}
+                              <polyline
+                                points={polylinePoints}
+                                fill="none"
+                                stroke={lineColor}
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+
+                              {/* 호버용 투명 원 (툴팁 표시) */}
+                              {points.map((point, index) => {
+                                const dateStr = point.date;
+                                const formattedDate = `${dateStr.slice(4, 6)}/${dateStr.slice(6, 8)}`;
+                                return (
+                                  <g key={index}>
+                                    <circle
+                                      cx={point.x}
+                                      cy={point.y}
+                                      r="12"
+                                      fill="transparent"
+                                      className="cursor-pointer"
+                                    />
+                                    <title>{formattedDate}: {point.users}명</title>
+                                  </g>
+                                );
+                              })}
+
+                            </svg>
+                          );
+                        })()}
+                      </div>
+
+                      {/* X축 라벨 */}
+                      <div className={`flex justify-between text-xs px-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        <span>30일 전</span>
+                        <span>오늘</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`text-center py-8 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                      <span className="text-sm">데이터가 없습니다</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 추가 정보 */}
+                <div className={`text-xs text-center ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  <p className="mt-1">DGER 방문 집계 시작일: {analyticsData.total.since}</p>
+                </div>
+              </>
             )}
           </div>
         )}
