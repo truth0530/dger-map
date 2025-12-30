@@ -13,6 +13,7 @@ import {
   getPostWithPassword,
   isGoogleSheetsConfigured,
 } from '@/lib/googleSheets';
+import { sendFeedbackNotification } from '@/lib/slack/feedback-notification';
 
 // CORS 헤더
 const corsHeaders = {
@@ -132,6 +133,19 @@ export async function POST(request: NextRequest) {
         { status: 500, headers: corsHeaders }
       );
     }
+
+    // 슬랙 알림 전송 (비동기, 실패해도 응답에 영향 없음)
+    sendFeedbackNotification({
+      id: post.id,
+      author: post.author,
+      category: category as '버그' | '건의' | '기타',
+      content: content.trim(),
+      isPublic: isPublic === true,
+      contact: contact || undefined,
+      createdAt: post.createdAt,
+    }).catch((err) => {
+      console.error('[feedback API] 슬랙 알림 전송 실패:', err);
+    });
 
     return NextResponse.json(
       {
