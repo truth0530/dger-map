@@ -1385,8 +1385,9 @@ export default function FeedbackPage() {
                                       cx={point.x}
                                       cy={point.y}
                                       r="12"
-                                      fill="transparent"
+                                      fill="rgba(0,0,0,0.001)"
                                       className="cursor-pointer"
+                                      style={{ pointerEvents: 'all' }}
                                     />
                                     <title>{formattedDate}: {point.users}명</title>
                                   </g>
