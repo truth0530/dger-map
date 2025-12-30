@@ -37,7 +37,7 @@ interface FeedbackPost {
 const RELEASE_NOTES: ReleaseNote[] = [
   // DGER 3.0 - React 프레임워크 기반
   { date: '2025.12.30', content: 'DGER 3.0', type: 'version', version: '3.0', tech: 'Next.js 16 (React 프레임워크 기반)' },
-  { date: '2025.12.30', content: 'Next.js 16 기반 DGER 이송지도 개발', type: 'init' },
+  { date: '2025.12.30', content: 'Next.js 16 기반 DGER 이송지도 개발, 피드백 게시판 신설, 방문자 통계 페이지 신설', type: 'init' },
 
   // DGER 2.0 - Node.js 서버 기반
   { date: '2025.09.08', content: 'DGER 2.0', type: 'version', version: '2.0', tech: 'Node.js Express (서버 기반)' },
@@ -64,6 +64,51 @@ const RELEASE_NOTES: ReleaseNote[] = [
 // 카테고리 목록
 const CATEGORIES = ['전체', '버그', '건의', '기타'] as const;
 type Category = typeof CATEGORIES[number];
+
+const REGION_NAME_MAP: Record<string, string> = {
+  Seoul: '서울',
+  'Seoul Special City': '서울',
+  Busan: '부산',
+  'Busan Metropolitan City': '부산',
+  Daegu: '대구',
+  'Daegu Metropolitan City': '대구',
+  Incheon: '인천',
+  'Incheon Metropolitan City': '인천',
+  Gwangju: '광주',
+  'Gwangju Metropolitan City': '광주',
+  Daejeon: '대전',
+  'Daejeon Metropolitan City': '대전',
+  Ulsan: '울산',
+  'Ulsan Metropolitan City': '울산',
+  Sejong: '세종',
+  'Sejong Special Self-Governing City': '세종',
+  'Gyeonggi-do': '경기',
+  'Gangwon-do': '강원도',
+  'Chungcheongbuk-do': '충북',
+  'Chungcheongnam-do': '충남',
+  'Jeollabuk-do': '전북',
+  'Jeonbuk-do': '전북',
+  'Jeonbuk State': '전북',
+  Jeonbuk: '전북',
+  'Jeollanam-do': '전남',
+  'Gyeongsangbuk-do': '경북',
+  'Gyeongsangnam-do': '경남도',
+  'Jeju-do': '제주',
+  Jeju: '제주',
+  California: '캘리포니아',
+  Berlin: '베를린',
+  Hessen: '헤센',
+  Hokkaido: '홋카이도',
+  Fukuoka: '후쿠오카',
+  Fukui: '후쿠이',
+  Tokyo: '도쿄',
+  'North Rhine-Westphalia': '노르트라인-베스트팔렌',
+  'Rhineland-Palatinate': '라인란트-팔츠',
+  Iowa: '아이오와',
+  '(not set)': '미설정',
+};
+
+const getRegionLabel = (region: string) => REGION_NAME_MAP[region] || region;
 
 // 릴리즈 타입별 스타일
 const getReleaseTypeStyle = (type: ReleaseNote['type'], isDark: boolean) => {
@@ -114,6 +159,9 @@ export default function FeedbackPage() {
     average: { dailyUsers: number };
     total: { users: number; sessions: number; pageViews: number; avgSessionDuration: number; since: string };
     dailyTrend: Array<{ date: string; users: number; sessions: number }>;
+    regionStats: Array<{ region: string; users: number }>;
+    deviceRatio: { desktop: number; mobile: number; tablet: number; total: number };
+    topPages: Array<{ name: string; pageViews: number; users: number; avgEngagementTime: number }>;
   }
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -1361,6 +1409,153 @@ export default function FeedbackPage() {
                       <span className="text-sm">데이터가 없습니다</span>
                     </div>
                   )}
+                </div>
+
+                {/* 3개 카드 영역: 지역별, 디바이스별, 페이지별 */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* 지역별 방문자 */}
+                  <div className={`rounded-2xl p-4 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <h3 className={`text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>
+                      지역별 방문자 <span className={`text-xs font-normal ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>(최근 30일)</span>
+                    </h3>
+                    {analyticsData.regionStats && analyticsData.regionStats.length > 0 ? (
+                      <div className="space-y-2">
+                        {analyticsData.regionStats.map((region, index) => {
+                          const maxUsers = analyticsData.regionStats[0]?.users || 1;
+                          const percentage = Math.round((region.users / maxUsers) * 100);
+                          return (
+                            <div key={index} className="flex items-center gap-2">
+                              <span className={`text-xs w-16 truncate ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
+                                {getRegionLabel(region.region)}
+                              </span>
+                              <div className="flex-1 h-2 rounded-full overflow-hidden bg-gray-200 dark:bg-slate-700">
+                                <div
+                                  className={`h-full rounded-full ${isDark ? 'bg-slate-500' : 'bg-gray-500'}`}
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                              <span className={`text-xs w-8 text-right ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                {region.users}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className={`text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        <span className="text-xs">데이터 없음</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 디바이스별 비율 - 단일 세로 막대 3등분 */}
+                  <div className={`rounded-2xl p-4 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <h3 className={`text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>
+                      디바이스 비율 <span className={`text-xs font-normal ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>(최근 30일)</span>
+                    </h3>
+                    {analyticsData.deviceRatio && analyticsData.deviceRatio.total > 0 ? (
+                      <div className="flex items-center gap-3">
+                        {/* 단일 세로 막대 (3등분) */}
+                        <div className="w-8 h-24 rounded-lg overflow-hidden flex flex-col-reverse bg-gray-200 dark:bg-slate-700">
+                          {(() => {
+                            const { mobile, desktop, tablet, total } = analyticsData.deviceRatio;
+                            const mobilePercent = (mobile / total) * 100;
+                            const desktopPercent = (desktop / total) * 100;
+                            const tabletPercent = (tablet / total) * 100;
+                            return (
+                              <>
+                                {mobilePercent > 0 && (
+                                  <div className={`w-full ${isDark ? 'bg-blue-500' : 'bg-blue-500'}`} style={{ height: `${mobilePercent}%` }} />
+                                )}
+                                {desktopPercent > 0 && (
+                                  <div className={`w-full ${isDark ? 'bg-slate-500' : 'bg-gray-500'}`} style={{ height: `${desktopPercent}%` }} />
+                                )}
+                                {tabletPercent > 0 && (
+                                  <div className={`w-full ${isDark ? 'bg-emerald-500' : 'bg-emerald-500'}`} style={{ height: `${tabletPercent}%` }} />
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                        {/* 범례 */}
+                        <div className="flex flex-col gap-1.5 text-xs">
+                          {(() => {
+                            const { mobile, desktop, tablet, total } = analyticsData.deviceRatio;
+                            const items = [
+                              { label: '모바일', value: mobile, color: isDark ? 'bg-blue-500' : 'bg-blue-500' },
+                              { label: '데스크탑', value: desktop, color: isDark ? 'bg-slate-500' : 'bg-gray-500' },
+                              { label: '태블릿', value: tablet, color: isDark ? 'bg-emerald-500' : 'bg-emerald-500' },
+                            ];
+                            return items.map((item, i) => {
+                              const percent = Math.round((item.value / total) * 100);
+                              if (percent === 0) return null;
+                              return (
+                                <div key={i} className="flex items-center gap-1.5">
+                                  <span className={`w-2 h-2 rounded-sm ${item.color}`} />
+                                  <span className={isDark ? 'text-slate-400' : 'text-gray-600'}>{item.label}</span>
+                                  <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{percent}%</span>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        <span className="text-xs">데이터 없음</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 페이지별 방문자 - 2열 너비 */}
+                  <div className={`md:col-span-2 rounded-2xl p-4 ${
+                    isDark ? 'bg-slate-900/40 border border-slate-700/60' : 'bg-white border border-gray-200 shadow-sm'
+                  }`}>
+                    <h3 className={`text-sm font-medium mb-3 ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>
+                      페이지별 방문 <span className={`text-xs font-normal ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>(최근 30일)</span>
+                    </h3>
+                    {analyticsData.topPages && analyticsData.topPages.length > 0 ? (
+                      <div className="space-y-1">
+                        {/* 테이블 헤더 */}
+                        <div className={`flex items-center text-[10px] mb-2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                          <span className="flex-1">페이지</span>
+                          <span className="w-16 text-right">조회수</span>
+                          <span className="w-14 text-right">사용자</span>
+                          <span className="w-12 text-right">평균</span>
+                        </div>
+                        {analyticsData.topPages.map((page, index) => {
+                          const avgTime = page.avgEngagementTime || 0;
+                          const mins = Math.floor(avgTime / 60);
+                          const secs = Math.round(avgTime % 60);
+                          const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                          return (
+                            <div key={index} className="flex items-center py-0.5">
+                              <span className={`text-xs flex-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+                                {page.name}
+                              </span>
+                              <span className={`text-xs w-16 text-right tabular-nums font-medium ${isDark ? 'text-slate-200' : 'text-gray-700'}`}>
+                                {page.pageViews.toLocaleString()}
+                              </span>
+                              <span className={`text-xs w-14 text-right tabular-nums ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                {page.users.toLocaleString()}
+                              </span>
+                              <span className={`text-xs w-12 text-right tabular-nums ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                {timeStr}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className={`text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        <span className="text-xs">데이터 없음</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* 추가 정보 */}

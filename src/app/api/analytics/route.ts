@@ -44,7 +44,7 @@ export async function GET() {
     const propertyId = `properties/${GA_PROPERTY_ID}`;
 
     // 병렬로 데이터 조회
-    const [realtimeResponse, todayResponse, last30DaysResponse, totalResponse] = await Promise.all([
+    const [realtimeResponse, todayResponse, last30DaysResponse, totalResponse, regionResponse, deviceResponse, pageResponse] = await Promise.all([
       // 1. 실시간 접속자 수
       analyticsData.properties.runRealtimeReport({
         property: propertyId,
@@ -98,6 +98,53 @@ export async function GET() {
         console.error('[Analytics] 누적 방문자 조회 오류:', err.message || err);
         return null;
       }),
+
+      // 5. 지역별 방문자 (최근 30일)
+      analyticsData.properties.runReport({
+        property: propertyId,
+        requestBody: {
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dimensions: [{ name: 'region' }],
+          metrics: [{ name: 'activeUsers' }],
+          orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }],
+          limit: '10',
+        },
+      }).catch((err) => {
+        console.error('[Analytics] 지역별 방문자 조회 오류:', err.message || err);
+        return null;
+      }),
+
+      // 6. 디바이스별 방문자 (최근 30일)
+      analyticsData.properties.runReport({
+        property: propertyId,
+        requestBody: {
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dimensions: [{ name: 'deviceCategory' }],
+          metrics: [{ name: 'activeUsers' }],
+        },
+      }).catch((err) => {
+        console.error('[Analytics] 디바이스별 방문자 조회 오류:', err.message || err);
+        return null;
+      }),
+
+      // 7. 페이지별 방문자 (최근 30일)
+      analyticsData.properties.runReport({
+        property: propertyId,
+        requestBody: {
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dimensions: [{ name: 'pagePath' }],
+          metrics: [
+            { name: 'screenPageViews' },
+            { name: 'activeUsers' },
+            { name: 'userEngagementDuration' },
+          ],
+          orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+          limit: '20',
+        },
+      }).catch((err) => {
+        console.error('[Analytics] 페이지별 방문자 조회 오류:', err.message || err);
+        return null;
+      }),
     ]);
 
     // 디버깅: 응답 상태 로깅
@@ -106,6 +153,9 @@ export async function GET() {
       today: todayResponse ? 'OK' : 'NULL',
       last30Days: last30DaysResponse ? 'OK' : 'NULL',
       total: totalResponse ? 'OK' : 'NULL',
+      region: regionResponse ? 'OK' : 'NULL',
+      device: deviceResponse ? 'OK' : 'NULL',
+      page: pageResponse ? 'OK' : 'NULL',
     });
 
     // 실시간 접속자
@@ -132,6 +182,108 @@ export async function GET() {
     const totalPageViews = totalResponse?.data?.rows?.[0]?.metricValues?.[2]?.value || '0';
     const avgSessionDuration = totalResponse?.data?.rows?.[0]?.metricValues?.[3]?.value || '0';
 
+    // 지역별 방문자
+    const regionData = regionResponse?.data?.rows?.map(row => ({
+      region: row.dimensionValues?.[0]?.value || '(unknown)',
+      users: parseInt(row.metricValues?.[0]?.value || '0', 10),
+    })).filter(r => r.region !== '(not set)') || [];
+
+    // 디바이스별 방문자
+    const deviceData = deviceResponse?.data?.rows?.map(row => ({
+      device: row.dimensionValues?.[0]?.value || 'unknown',
+      users: parseInt(row.metricValues?.[0]?.value || '0', 10),
+    })) || [];
+
+    // 디바이스 비율 계산
+    const totalDeviceUsers = deviceData.reduce((sum, d) => sum + d.users, 0);
+    const deviceRatio = {
+      desktop: deviceData.find(d => d.device === 'desktop')?.users || 0,
+      mobile: deviceData.find(d => d.device === 'mobile')?.users || 0,
+      tablet: deviceData.find(d => d.device === 'tablet')?.users || 0,
+      total: totalDeviceUsers,
+    };
+
+    // 페이지 경로 → 한글 이름 매핑 (DGER 3.0 + 2.0 통합)
+    const pageNameMap: { [key: string]: string } = {
+      // DGER 3.0 (Next.js) 경로
+      '/': '병상현황',
+      '/bed': '병상현황',
+      '/map': '지도',
+      '/message': '응급메시지',
+      '/messages': '응급메시지',
+      '/severe': '중증질환',
+      '/feedback': '피드백',
+      // DGER 2.0 (Node.js) 레거시 경로 - 같은 기능으로 통합 집계
+      '/index.html': '병상현황',
+      '/systommsg.html': '응급메시지',
+      '/27severe.html': '중증질환',
+    };
+
+    // 시스템 경로 - 통계에서 제외
+    const legacyPaths = ['/home', '/api/', '/_next/', '/favicon', '/temp.html', '/lab.html', '/feed.html', '/index3.html'];
+
+    // 페이지별 방문자
+    const pageData = pageResponse?.data?.rows?.map(row => {
+      const path = row.dimensionValues?.[0]?.value || '/';
+      // 쿼리스트링 제거 및 정규화
+      const cleanPath = path.split('?')[0].split('#')[0];
+
+      // 레거시/시스템 경로 제외
+      if (legacyPaths.some(legacy => cleanPath.startsWith(legacy))) return null;
+
+      const pageName = pageNameMap[cleanPath];
+      // 매핑되지 않은 경로는 제외
+      if (!pageName) return null;
+
+      const pageViews = parseInt(row.metricValues?.[0]?.value || '0', 10);
+      const users = parseInt(row.metricValues?.[1]?.value || '0', 10);
+      const totalEngagementDuration = parseFloat(row.metricValues?.[2]?.value || '0');
+      // 활성 사용자당 평균 참여 시간 (초)
+      const avgEngagementTime = users > 0 ? totalEngagementDuration / users : 0;
+
+      return {
+        path: cleanPath,
+        name: pageName,
+        pageViews,
+        users,
+        avgEngagementTime,
+      };
+    }).filter((p): p is NonNullable<typeof p> => p !== null) || [];
+
+    // 중복 페이지 통합 (같은 이름으로 매핑된 경로들)
+    // 주의: users는 합산하면 중복 집계됨 → 가장 큰 값 사용
+    const consolidatedPages = new Map<string, { name: string; pageViews: number; maxUsers: number; totalEngagement: number; totalEngagementUsers: number }>();
+    pageData.forEach(p => {
+      const existing = consolidatedPages.get(p.name);
+      if (existing) {
+        existing.pageViews += p.pageViews;
+        // users는 중복될 수 있으므로 가장 큰 값만 사용 (합산하면 중복 집계됨)
+        existing.maxUsers = Math.max(existing.maxUsers, p.users);
+        // 참여시간 가중평균 계산용
+        existing.totalEngagement += p.avgEngagementTime * p.users;
+        existing.totalEngagementUsers += p.users;
+      } else {
+        consolidatedPages.set(p.name, {
+          name: p.name,
+          pageViews: p.pageViews,
+          maxUsers: p.users,
+          totalEngagement: p.avgEngagementTime * p.users,
+          totalEngagementUsers: p.users,
+        });
+      }
+    });
+
+    // 상위 5개 페이지만 반환
+    const topPages = Array.from(consolidatedPages.values())
+      .sort((a, b) => b.pageViews - a.pageViews)
+      .slice(0, 5)
+      .map(p => ({
+        name: p.name,
+        pageViews: p.pageViews,
+        users: p.maxUsers, // 중복 방지를 위해 최대값 사용
+        avgEngagementTime: p.totalEngagementUsers > 0 ? p.totalEngagement / p.totalEngagementUsers : 0,
+      }));
+
     return NextResponse.json({
       success: true,
       data: {
@@ -153,6 +305,11 @@ export async function GET() {
           since: '2021-11-26',
         },
         dailyTrend: dailyData,
+        regionStats: regionData.slice(0, 8), // 상위 8개 지역
+        deviceRatio,
+        // 디버그: 지도 페이지 원본 데이터
+        _debug_mapPageRaw: pageData.filter(p => p.name === '지도'),
+        topPages,
       },
       updatedAt: new Date().toISOString(),
     });
