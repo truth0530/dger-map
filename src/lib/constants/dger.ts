@@ -57,8 +57,8 @@ export const BED_STATUS_COLORS = {
     description: '여유'
   },
   warning: {
-    color: '#f59e0b',
-    backgroundColor: '#fef3c7',
+    color: '#eab308',
+    backgroundColor: '#fef9c3',
     description: '주의'
   },
   danger: {

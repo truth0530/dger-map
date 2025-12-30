@@ -51,6 +51,11 @@ const LeafletMap = dynamic(() => import('@/components/maplibre/LeafletMap'), {
 
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
 
+interface UserLocation {
+  lat: number;
+  lng: number;
+}
+
 interface HybridMapProps {
   hospitals: Hospital[];
   bedDataMap?: Map<string, HospitalBedData>;
@@ -70,6 +75,9 @@ interface HybridMapProps {
   selectedStatus: AvailabilityStatus[];
   selectedBedTypes?: Set<BedType>;
   onBackToNational: () => void;
+  // 사용자 위치 및 10km 반경 표시
+  userLocation?: UserLocation | null;
+  showLocationRadius?: boolean;
 }
 
 type MapLayerType = 'maptiler' | 'leaflet'; // | 'kakao' - 심사 승인 후 활성화
@@ -92,6 +100,8 @@ export default function HybridMap({
   selectedStatus,
   selectedBedTypes,
   onBackToNational,
+  userLocation,
+  showLocationRadius,
 }: HybridMapProps) {
   const { isDark } = useTheme();
   const [mapLayer, setMapLayer] = useState<MapLayerType>('maptiler');
@@ -160,6 +170,8 @@ export default function HybridMap({
           onHospitalHover={onHospitalHover}
           onHospitalClick={onHospitalClick}
           onSwitchToLeaflet={() => setMapLayer('leaflet')}
+          userLocation={userLocation}
+          showLocationRadius={showLocationRadius}
           // onSwitchToKakao={() => setMapLayer('kakao')} // 심사 승인 후 활성화
         />
       )}
@@ -181,6 +193,8 @@ export default function HybridMap({
           onHospitalHover={onHospitalHover}
           onHospitalClick={onHospitalClick}
           onSwitchToMaptiler={() => setMapLayer('maptiler')}
+          userLocation={userLocation}
+          showLocationRadius={showLocationRadius}
           // onSwitchToKakao={() => setMapLayer('kakao')} // 심사 승인 후 활성화
         />
       )}

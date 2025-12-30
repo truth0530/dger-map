@@ -23,6 +23,11 @@ import type { HospitalBedData } from '@/lib/hooks/useBedData';
 import type { HospitalSevereData } from '@/lib/hooks/useSevereData';
 import type { ClassifiedMessages } from '@/lib/utils/messageClassifier';
 
+interface UserLocation {
+  lat: number;
+  lng: number;
+}
+
 interface MapLibreMapProps {
   hospitals: Hospital[];
   bedDataMap?: Map<string, HospitalBedData>;
@@ -39,6 +44,9 @@ interface MapLibreMapProps {
   onHospitalClick?: (hospital: Hospital) => void;
   onSwitchToLeaflet?: () => void;
   onSwitchToKakao?: () => void;
+  // 사용자 위치 및 10km 반경 표시
+  userLocation?: UserLocation | null;
+  showLocationRadius?: boolean;
 }
 
 export default function MapLibreMap({
@@ -57,6 +65,8 @@ export default function MapLibreMap({
   onHospitalClick,
   onSwitchToLeaflet,
   onSwitchToKakao,
+  userLocation,
+  showLocationRadius,
 }: MapLibreMapProps) {
   const { isDark } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -100,8 +110,8 @@ export default function MapLibreMap({
 
   // 마커 HTML 생성 (공통 유틸 사용)
   const createMarkerElementCallback = useCallback((hospital: Hospital, isHovered: boolean): HTMLElement => {
-    return createMarkerElement(hospital, bedDataMap, isHovered);
-  }, [bedDataMap]);
+    return createMarkerElement(hospital, bedDataMap, isHovered, diseaseStatusMap?.get(hospital.code), true);
+  }, [bedDataMap, diseaseStatusMap]);
 
   // 병상 상태 색상 결정
   const getBedStatusColor = (available: number, total: number): string => {
@@ -129,7 +139,7 @@ export default function MapLibreMap({
   // 배터리 SVG 생성 함수
   const createBatterySvg = (rate: number, isDarkMode: boolean) => {
     const fillWidth = Math.min(Math.max(rate, 0), 100) * 0.2; // 20px max width
-    const fillColor = rate >= 95 ? '#ef4444' : rate >= 60 ? '#f59e0b' : '#22c55e';
+    const fillColor = rate >= 95 ? '#ef4444' : rate >= 60 ? '#eab308' : '#22c55e';
     const bgColor = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
     return `<svg width="26" height="12" viewBox="0 0 26 12" style="vertical-align:middle;">
       <rect x="0" y="1" width="22" height="10" rx="2" fill="${bgColor}" stroke="${isDarkMode ? '#6b7280' : '#9ca3af'}" stroke-width="1"/>
@@ -188,7 +198,7 @@ export default function MapLibreMap({
 
     // 병상 정보
     const occupancy = bedData?.occupancyRate ?? 0;
-    const occColor = occupancy >= 95 ? '#ef4444' : occupancy >= 60 ? '#f59e0b' : '#22c55e';
+    const occColor = occupancy >= 95 ? '#ef4444' : occupancy >= 60 ? '#eab308' : '#22c55e';
     const erAvail = bedData?.hvec ?? 0;
     const erTotal = bedData?.hvs01 ?? 0;
     const occupied = erTotal - erAvail;  // 재실환자수
@@ -224,9 +234,9 @@ export default function MapLibreMap({
 
         // 42개 자원조사 가용상태 가져오기
         const diseaseStatus = diseaseStatusMap?.get(hospital.code);
-        const statusColor = diseaseStatus === '24시간' ? '#22c55e'
-          : diseaseStatus === '주간' ? '#3b82f6'
-          : diseaseStatus === '야간' ? '#a855f7'
+        const statusColor = diseaseStatus === '24시간' ? (isDarkMode ? '#6ee7b7' : '#16a34a')
+          : diseaseStatus === '주간' ? (isDarkMode ? '#93c5fd' : '#2563eb')
+          : diseaseStatus === '야간' ? (isDarkMode ? '#c4b5fd' : '#7c3aed')
           : '#6b7280';
         const statusBadge = diseaseStatus
           ? `<span style="font-size:10px;font-weight:600;color:${statusColor};background:${isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.7)'};padding:2px 6px;border-radius:3px;">${diseaseStatus}</span>`
@@ -255,9 +265,9 @@ export default function MapLibreMap({
     // [핵심] 선택된 질환 가용 여부 (최상단 강조)
     if (selectedDiseaseStatus) {
       const statusBg = selectedDiseaseStatus.available
-        ? (isDarkMode ? 'rgba(34,197,94,0.2)' : 'rgba(220,252,231,0.8)')
-        : (isDarkMode ? 'rgba(239,68,68,0.2)' : 'rgba(254,202,202,0.8)');
-      const statusColor = selectedDiseaseStatus.available ? '#22c55e' : '#ef4444';
+        ? (isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(220,252,231,0.8)')
+        : (isDarkMode ? 'rgba(248,113,113,0.1)' : 'rgba(254,202,202,0.8)');
+      const statusColor = selectedDiseaseStatus.available ? (isDarkMode ? '#6ee7b7' : '#16a34a') : (isDarkMode ? '#fca5a5' : '#dc2626');
       const statusText = selectedDiseaseStatus.available ? '진료가능' : '진료불가';
 
       content += `
@@ -319,8 +329,8 @@ export default function MapLibreMap({
             const availableLabels = matchedAvailable.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
             content += `
               <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:${matchedUnavailable.length > 0 ? '4px' : '0'};">
-                <span style="font-size:10px;color:#22c55e;">○</span>
-                <span style="font-size:10px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${availableLabels}</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#6ee7b7' : '#22c55e'};">○</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#a7f3d0' : '#16a34a'};line-height:1.4;">${availableLabels}</span>
               </div>
             `;
           }
@@ -330,8 +340,8 @@ export default function MapLibreMap({
             const unavailableLabels = matchedUnavailable.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
             content += `
               <div style="display:flex;align-items:baseline;gap:4px;">
-                <span style="font-size:10px;color:#ef4444;">✕</span>
-                <span style="font-size:10px;color:${isDarkMode ? '#fca5a5' : '#dc2626'};line-height:1.4;">${unavailableLabels}</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#fca5a5' : '#ef4444'};">✕</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#fecaca' : '#dc2626'};line-height:1.4;">${unavailableLabels}</span>
               </div>
             `;
           }
@@ -348,8 +358,8 @@ export default function MapLibreMap({
           const more = otherAvailableDiseases.length > displayCount ? ` +${otherAvailableDiseases.length - displayCount}` : '';
           content += `
             <div style="display:flex;align-items:baseline;gap:4px;">
-              <span style="font-size:10px;color:#22c55e;">○</span>
-              <span style="font-size:10px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${labels}${more}</span>
+              <span style="font-size:10px;color:${isDarkMode ? '#6ee7b7' : '#22c55e'};">○</span>
+              <span style="font-size:10px;color:${isDarkMode ? '#a7f3d0' : '#16a34a'};line-height:1.4;">${labels}${more}</span>
             </div>
           `;
         }
@@ -361,10 +371,10 @@ export default function MapLibreMap({
     // 긴급 알림 (진료불가/제한 실제 내용 표시) - 하이라이트 정책 적용 + X 대체 정책
     if (urgentItems.length > 0) {
       content += `
-        <div style="padding:8px 12px;background:${isDarkMode ? 'rgba(239,68,68,0.12)' : 'rgba(254,202,202,0.5)'};border-bottom:1px solid ${c.border};">
+        <div style="padding:8px 12px;background:${isDarkMode ? 'rgba(248,113,113,0.08)' : 'rgba(254,202,202,0.5)'};border-bottom:1px solid ${c.border};">
           ${urgentItems.slice(0, 3).map(item => `
             <div style="font-size:10px;line-height:1.5;">
-              <span style="font-weight:600;color:#ef4444;">${item.label} </span><span style="color:${c.muted};">${renderHighlightedMessage(replaceUnavailableWithX(item.content), isDarkMode)}</span>
+              <span style="font-weight:600;color:${isDarkMode ? '#fca5a5' : '#ef4444'};">${item.label} </span><span style="color:${c.muted};">${renderHighlightedMessage(replaceUnavailableWithX(item.content), isDarkMode)}</span>
             </div>
           `).join('')}
           ${urgentItems.length > 3 ? `<div style="font-size:9px;color:${c.muted};margin-top:2px;">+${urgentItems.length - 3}건 더</div>` : ''}
@@ -490,6 +500,7 @@ export default function MapLibreMap({
 
       // 호버 이벤트
       el.addEventListener('mouseenter', () => {
+        el.classList.add('marker-hovered');
         onHospitalHover?.(hospital.code);
 
         // 팝업 표시
@@ -509,6 +520,7 @@ export default function MapLibreMap({
       });
 
       el.addEventListener('mouseleave', () => {
+        el.classList.remove('marker-hovered');
         onHospitalHover?.(null);
         popupRef.current?.remove();
       });
@@ -524,11 +536,85 @@ export default function MapLibreMap({
 
       markersRef.current.set(hospital.code, marker);
     });
-  }, [filteredHospitals, isLoaded, createMarkerElement, createPopupContent, onHospitalHover, onHospitalClick]);
+  }, [filteredHospitals, isLoaded, createMarkerElementCallback, createPopupContent, onHospitalHover, onHospitalClick]);
+
+  // 10km 반경 원 표시/숨김
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+
+    const sourceId = 'user-location-radius';
+    const fillLayerId = 'user-location-radius-fill';
+    const lineLayerId = 'user-location-radius-line';
+
+    // 기존 레이어 및 소스 제거
+    if (map.current.getLayer(lineLayerId)) {
+      map.current.removeLayer(lineLayerId);
+    }
+    if (map.current.getLayer(fillLayerId)) {
+      map.current.removeLayer(fillLayerId);
+    }
+    if (map.current.getSource(sourceId)) {
+      map.current.removeSource(sourceId);
+    }
+
+    // 내위치순이 활성화되고 위치가 있을 때만 10km 반경 원 표시
+    if (showLocationRadius && userLocation) {
+      // 10km 반경 원을 GeoJSON 폴리곤으로 생성
+      const center = [userLocation.lng, userLocation.lat];
+      const radiusKm = 10;
+      const points = 64;
+      const coords = [];
+
+      for (let i = 0; i <= points; i++) {
+        const angle = (i / points) * 360;
+        const rad = (angle * Math.PI) / 180;
+        // 위도/경도 기반 거리 계산 (근사값)
+        const lat = userLocation.lat + (radiusKm / 111) * Math.sin(rad);
+        const lng = userLocation.lng + (radiusKm / (111 * Math.cos(userLocation.lat * Math.PI / 180))) * Math.cos(rad);
+        coords.push([lng, lat]);
+      }
+
+      map.current.addSource(sourceId, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Polygon',
+            coordinates: [coords]
+          }
+        }
+      });
+
+      // 채우기 레이어
+      map.current.addLayer({
+        id: fillLayerId,
+        type: 'fill',
+        source: sourceId,
+        paint: {
+          'fill-color': 'rgba(34, 197, 94, 0.1)',
+          'fill-opacity': isDark ? 0.8 : 1
+        }
+      });
+
+      // 테두리 레이어
+      map.current.addLayer({
+        id: lineLayerId,
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color': isDark ? 'rgba(34, 197, 94, 0.5)' : 'rgba(34, 197, 94, 0.6)',
+          'line-width': 1.5,
+          'line-dasharray': [6, 4]
+        }
+      });
+    }
+  }, [isLoaded, showLocationRadius, userLocation, isDark]);
 
   // 마커에 이벤트 리스너 연결 헬퍼 함수
   const attachMarkerEventListeners = useCallback((el: HTMLElement, hospital: Hospital) => {
     el.addEventListener('mouseenter', () => {
+      el.classList.add('marker-hovered');
       onHospitalHover?.(hospital.code);
 
       // 팝업 표시
@@ -548,6 +634,7 @@ export default function MapLibreMap({
     });
 
     el.addEventListener('mouseleave', () => {
+      el.classList.remove('marker-hovered');
       onHospitalHover?.(null);
       popupRef.current?.remove();
     });

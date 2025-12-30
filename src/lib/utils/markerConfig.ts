@@ -22,26 +22,26 @@ export interface MarkerConfig {
  */
 export const MARKER_CONFIG_BY_CLASSIFICATION: Record<string, MarkerConfig> = {
   '권역응급의료센터': {
-    shape: 'square',
-    size: 12,
+    shape: 'circle',
+    size: 20,
     strokeWidth: 2,
     priority: 1,
   },
   '지역응급의료센터': {
     shape: 'circle',
-    size: 10,
+    size: 20,
     strokeWidth: 2,
     priority: 2,
   },
   '지역응급의료기관': {
-    shape: 'triangle',
-    size: 8,
+    shape: 'circle',
+    size: 20,
     strokeWidth: 1,
     priority: 3,
   },
   '응급실운영신고기관': {
-    shape: 'square',
-    size: 8,
+    shape: 'circle',
+    size: 20,
     strokeWidth: 1,
     priority: 4,
   },

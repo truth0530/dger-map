@@ -7,7 +7,7 @@ export const DAYS_OF_WEEK: DayOfWeek[] = ["월", "화", "수", "목", "금", "�
 export const AVAILABILITY_COLORS: Record<AvailabilityStatus, string> = {
   "24시간": "bg-green-500",
   "주간": "bg-blue-500",
-  "야간": "bg-purple-500",
+  "야간": "bg-red-500",
   "불가": "bg-gray-300",
 };
 
@@ -15,7 +15,7 @@ export const AVAILABILITY_COLORS: Record<AvailabilityStatus, string> = {
 export const AVAILABILITY_TEXT_COLORS: Record<AvailabilityStatus, string> = {
   "24시간": "text-green-600",
   "주간": "text-blue-600",
-  "야간": "text-purple-600",
+  "야간": "text-red-600",
   "불가": "text-gray-400",
 };
 
@@ -23,7 +23,7 @@ export const AVAILABILITY_TEXT_COLORS: Record<AvailabilityStatus, string> = {
 export const AVAILABILITY_BADGE_STYLES: Record<AvailabilityStatus, string> = {
   "24시간": "bg-green-100 text-green-800 border-green-200",
   "주간": "bg-blue-100 text-blue-800 border-blue-200",
-  "야간": "bg-purple-100 text-purple-800 border-purple-200",
+  "야간": "bg-red-100 text-red-800 border-red-200",
   "불가": "bg-gray-100 text-gray-500 border-gray-200",
 };
 

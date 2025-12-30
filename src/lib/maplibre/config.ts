@@ -58,7 +58,7 @@ export const MAPTILER_CONFIG = {
 export const MARKER_COLORS = {
   available24h: '#22c55e',   // 녹색 - 24시간 가능
   availableDay: '#3b82f6',   // 파랑 - 주간 가능
-  availableNight: '#a855f7', // 보라 - 야간 가능
+  availableNight: '#ef4444', // 빨강 - 야간 가능
   unavailable: '#ef4444',    // 빨강 - 불가
   unknown: '#6b7280',        // 회색 - 정보없음
   default: '#60a5fa',        // 기본 파랑
@@ -67,26 +67,26 @@ export const MARKER_COLORS = {
 // 기관분류별 마커 설정
 export const CLASSIFICATION_MARKERS = {
   '권역응급의료센터': {
-    shape: 'diamond',
-    size: 12,
+    shape: 'circle',
+    size: 20,
     strokeWidth: 2,
     priority: 1,
   },
   '지역응급의료센터': {
     shape: 'circle',
-    size: 10,
+    size: 20,
     strokeWidth: 2,
     priority: 2,
   },
   '지역응급의료기관': {
-    shape: 'triangle',
-    size: 8,
+    shape: 'circle',
+    size: 20,
     strokeWidth: 1,
     priority: 3,
   },
   '응급실운영신고기관': {
     shape: 'circle',
-    size: 6,
+    size: 20,
     strokeWidth: 1,
     priority: 4,
   },

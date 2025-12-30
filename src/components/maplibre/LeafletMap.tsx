@@ -23,6 +23,11 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
 
+interface UserLocation {
+  lat: number;
+  lng: number;
+}
+
 interface LeafletMapProps {
   hospitals: Hospital[];
   bedDataMap?: Map<string, HospitalBedData>;
@@ -39,6 +44,9 @@ interface LeafletMapProps {
   onHospitalClick?: (hospital: Hospital) => void;
   onSwitchToMaptiler?: () => void;
   onSwitchToKakao?: () => void;
+  // 사용자 위치 및 10km 반경 표시
+  userLocation?: UserLocation | null;
+  showLocationRadius?: boolean;
 }
 
 // 지역별 중심 좌표 및 확대 레벨
@@ -79,6 +87,8 @@ export default function LeafletMap({
   onHospitalClick,
   onSwitchToMaptiler,
   onSwitchToKakao,
+  userLocation,
+  showLocationRadius,
 }: LeafletMapProps) {
   const { isDark } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -86,6 +96,7 @@ export default function LeafletMap({
   const tileLayerRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const popupRef = useRef<any>(null);
+  const radiusCircleRef = useRef<any>(null);
   // 콜백 ref - 의존성 배열에서 제거하여 불필요한 마커 재생성 방지
   const onHospitalHoverRef = useRef(onHospitalHover);
   const onHospitalClickRef = useRef(onHospitalClick);
@@ -159,7 +170,7 @@ export default function LeafletMap({
   // 배터리 SVG 생성 함수
   const createBatterySvg = (rate: number, isDarkMode: boolean) => {
     const fillWidth = Math.min(Math.max(rate, 0), 100) * 0.2; // 20px max width
-    const fillColor = rate >= 95 ? '#ef4444' : rate >= 60 ? '#f59e0b' : '#22c55e';
+    const fillColor = rate >= 95 ? '#ef4444' : rate >= 60 ? '#eab308' : '#22c55e';
     const bgColor = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
     return `<svg width="26" height="12" viewBox="0 0 26 12" style="vertical-align:middle;">
       <rect x="0" y="1" width="22" height="10" rx="2" fill="${bgColor}" stroke="${isDarkMode ? '#6b7280' : '#9ca3af'}" stroke-width="1"/>
@@ -218,7 +229,7 @@ export default function LeafletMap({
 
     // 병상 정보
     const occupancy = bedData?.occupancyRate ?? 0;
-    const occColor = occupancy >= 95 ? '#ef4444' : occupancy >= 60 ? '#f59e0b' : '#22c55e';
+    const occColor = occupancy >= 95 ? '#ef4444' : occupancy >= 60 ? '#eab308' : '#22c55e';
     const erAvail = bedData?.hvec ?? 0;
     const erTotal = bedData?.hvs01 ?? 0;
     const occupied = erTotal - erAvail;  // 재실환자수
@@ -254,18 +265,19 @@ export default function LeafletMap({
 
         // 42개 자원조사 가용상태 가져오기
         const diseaseStatus = diseaseStatusMap?.get(hospital.code);
-        const statusColor = diseaseStatus === '24시간' ? '#22c55e'
-          : diseaseStatus === '주간' ? '#3b82f6'
-          : diseaseStatus === '야간' ? '#a855f7'
+        // 다크모드: 차분한 색상, 라이트모드: 선명한 색상
+        const statusColor = diseaseStatus === '24시간' ? (isDarkMode ? '#6ee7b7' : '#16a34a')
+          : diseaseStatus === '주간' ? (isDarkMode ? '#93c5fd' : '#2563eb')
+          : diseaseStatus === '야간' ? (isDarkMode ? '#c4b5fd' : '#7c3aed')
           : '#6b7280';
         const statusBadge = diseaseStatus
           ? `<span style="font-size:10px;font-weight:600;color:${statusColor};background:${isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.7)'};padding:2px 6px;border-radius:3px;">${diseaseStatus}</span>`
           : '';
 
         content += `
-          <div style="padding:6px 12px;background:${isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(219,234,254,0.8)'};border-bottom:1px solid ${c.border};">
+          <div style="padding:6px 12px;background:${isDarkMode ? 'rgba(147,197,253,0.08)' : 'rgba(219,234,254,0.8)'};border-bottom:1px solid ${c.border};">
             <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:11px;font-weight:600;color:${isDarkMode ? '#60a5fa' : '#2563eb'};">${category.label}</span>
+              <span style="font-size:11px;font-weight:600;color:${isDarkMode ? '#93c5fd' : '#2563eb'};">${category.label}</span>
               ${statusBadge}
             </div>
             <div style="font-size:9px;color:${c.muted};margin-top:2px;line-height:1.4;">${subcategoryLabels}</div>
@@ -285,9 +297,12 @@ export default function LeafletMap({
     // [핵심] 선택된 질환 가용 여부 (최상단 강조)
     if (selectedDiseaseStatus) {
       const statusBg = selectedDiseaseStatus.available
-        ? (isDarkMode ? 'rgba(34,197,94,0.2)' : 'rgba(220,252,231,0.8)')
-        : (isDarkMode ? 'rgba(239,68,68,0.2)' : 'rgba(254,202,202,0.8)');
-      const statusColor = selectedDiseaseStatus.available ? '#22c55e' : '#ef4444';
+        ? (isDarkMode ? 'rgba(110,231,183,0.12)' : 'rgba(220,252,231,0.8)')
+        : (isDarkMode ? 'rgba(248,113,113,0.12)' : 'rgba(254,202,202,0.8)');
+      // 다크모드: 차분한 색상
+      const statusColor = selectedDiseaseStatus.available
+        ? (isDarkMode ? '#6ee7b7' : '#16a34a')
+        : (isDarkMode ? '#fca5a5' : '#dc2626');
       const statusText = selectedDiseaseStatus.available ? '진료가능' : '진료불가';
 
       content += `
@@ -344,24 +359,24 @@ export default function LeafletMap({
 
         // 연관 질환 섹션 (상위 배치)
         if (hasMatchedContent) {
-          // 가용 질환
+          // 가용 질환 - 다크모드에서 차분한 민트 그린
           if (matchedAvailable.length > 0) {
             const availableLabels = matchedAvailable.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
             content += `
               <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:${matchedUnavailable.length > 0 ? '4px' : '0'};">
-                <span style="font-size:10px;color:#22c55e;">○</span>
-                <span style="font-size:10px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${availableLabels}</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#6ee7b7' : '#22c55e'};">○</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#a7f3d0' : '#16a34a'};line-height:1.4;">${availableLabels}</span>
               </div>
             `;
           }
 
-          // 불가 질환
+          // 불가 질환 - 다크모드에서 차분한 산호색
           if (matchedUnavailable.length > 0) {
             const unavailableLabels = matchedUnavailable.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
             content += `
               <div style="display:flex;align-items:baseline;gap:4px;">
-                <span style="font-size:10px;color:#ef4444;">✕</span>
-                <span style="font-size:10px;color:${isDarkMode ? '#fca5a5' : '#dc2626'};line-height:1.4;">${unavailableLabels}</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#fca5a5' : '#ef4444'};">✕</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#fecaca' : '#dc2626'};line-height:1.4;">${unavailableLabels}</span>
               </div>
             `;
           }
@@ -378,8 +393,8 @@ export default function LeafletMap({
           const more = otherAvailableDiseases.length > displayCount ? ` +${otherAvailableDiseases.length - displayCount}` : '';
           content += `
             <div style="display:flex;align-items:baseline;gap:4px;">
-              <span style="font-size:10px;color:#22c55e;">○</span>
-              <span style="font-size:10px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${labels}${more}</span>
+              <span style="font-size:10px;color:${isDarkMode ? '#6ee7b7' : '#22c55e'};">○</span>
+              <span style="font-size:10px;color:${isDarkMode ? '#a7f3d0' : '#16a34a'};line-height:1.4;">${labels}${more}</span>
             </div>
           `;
         }
@@ -390,11 +405,13 @@ export default function LeafletMap({
 
     // 긴급 알림 (진료불가/제한 실제 내용 표시) - 하이라이트 정책 적용 + X 대체 정책
     if (urgentItems.length > 0) {
+      // 다크모드: 차분한 배경과 텍스트 색상
+      const urgentLabelColor = isDarkMode ? '#fca5a5' : '#dc2626';
       content += `
-        <div style="padding:8px 12px;background:${isDarkMode ? 'rgba(239,68,68,0.12)' : 'rgba(254,202,202,0.5)'};border-bottom:1px solid ${c.border};">
+        <div style="padding:8px 12px;background:${isDarkMode ? 'rgba(248,113,113,0.08)' : 'rgba(254,202,202,0.5)'};border-bottom:1px solid ${c.border};">
           ${urgentItems.slice(0, 3).map(item => `
             <div style="font-size:10px;line-height:1.5;">
-              <span style="font-weight:600;color:#ef4444;">${item.label} </span><span style="color:${c.muted};">${renderHighlightedMessage(replaceUnavailableWithX(item.content), isDarkMode)}</span>
+              <span style="font-weight:600;color:${urgentLabelColor};">${item.label} </span><span style="color:${c.muted};">${renderHighlightedMessage(replaceUnavailableWithX(item.content), isDarkMode)}</span>
             </div>
           `).join('')}
           ${urgentItems.length > 3 ? `<div style="font-size:9px;color:${c.muted};margin-top:2px;">+${urgentItems.length - 3}건 더</div>` : ''}
@@ -526,7 +543,9 @@ export default function LeafletMap({
       const markerElement = createMarkerElement(
         hospital,
         bedDataMap,
-        hoveredHospitalCode === hospital.code
+        hoveredHospitalCode === hospital.code,
+        diseaseStatusMap?.get(hospital.code),
+        false
       );
 
       const customMarker = window.L.marker([hospital.lat, hospital.lng], {
@@ -546,6 +565,7 @@ export default function LeafletMap({
       // MapLibre와 동일한 방식 - mouseover/mouseout은 자식 요소에서 버블링되어 깜빡임 발생
       if (markerDom) {
         markerDom.addEventListener('mouseenter', () => {
+          markerDom.classList.add('marker-hovered');
           // 팝업 표시
           if (popupRef.current) {
             popupRef.current.remove();
@@ -558,7 +578,7 @@ export default function LeafletMap({
             offset: [0, -40],
             className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
           })
-            .setLatLng([hospital.lat, hospital.lng])
+            .setLatLng([hospital.lat!, hospital.lng!])
             .setContent(createPopupContentRef.current?.(hospital, isDark) || '')
             .addTo(mapInstance.current);
 
@@ -567,6 +587,7 @@ export default function LeafletMap({
         });
 
         markerDom.addEventListener('mouseleave', () => {
+          markerDom.classList.remove('marker-hovered');
           // 팝업 제거
           if (popupRef.current) {
             popupRef.current.remove();
@@ -587,7 +608,30 @@ export default function LeafletMap({
 
       markersRef.current.set(hospital.code, customMarker);
     });
-  }, [leafletLoaded, hospitals, bedDataMap, isDark]);
+  }, [leafletLoaded, hospitals, bedDataMap, diseaseStatusMap, isDark]);
+
+  // 10km 반경 원 표시/숨김
+  useEffect(() => {
+    if (!mapInstance.current || !leafletLoaded) return;
+
+    // 기존 반경 원 제거
+    if (radiusCircleRef.current) {
+      mapInstance.current.removeLayer(radiusCircleRef.current);
+      radiusCircleRef.current = null;
+    }
+
+    // 내위치순이 활성화되고 위치가 있을 때만 10km 반경 원 표시
+    if (showLocationRadius && userLocation) {
+      radiusCircleRef.current = window.L.circle([userLocation.lat, userLocation.lng], {
+        radius: 10000, // 10km in meters
+        color: isDark ? 'rgba(34, 197, 94, 0.5)' : 'rgba(34, 197, 94, 0.6)',
+        fillColor: isDark ? 'rgba(34, 197, 94, 0.08)' : 'rgba(34, 197, 94, 0.1)',
+        fillOpacity: 1,
+        weight: 1.5,
+        dashArray: '6, 4',
+      }).addTo(mapInstance.current);
+    }
+  }, [leafletLoaded, showLocationRadius, userLocation, isDark]);
 
   // hoveredHospitalCode 변경 시 팝업 표시/숨김 및 마커 강조
   useEffect(() => {

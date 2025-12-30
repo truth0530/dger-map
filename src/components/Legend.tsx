@@ -35,10 +35,16 @@ export function Legend({
         <div className="space-y-1.5">
           {/* 권역응급의료센터 */}
           <div className="flex items-center gap-2.5 flex-nowrap">
-            <div
-              className="w-3 h-3 flex-shrink-0 bg-emerald-500 shadow-sm"
+            <svg
+              className="w-3 h-3 flex-shrink-0"
+              viewBox="0 0 24 24"
               style={{ minWidth: '12px' }}
-            />
+            >
+              <path
+                d="M12 4a8 8 0 110 16 8 8 0 010-16z"
+                fill={isDark ? '#9ca3af' : '#6b7280'}
+              />
+            </svg>
             <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
               권역응급의료센터
             </span>
@@ -46,10 +52,16 @@ export function Legend({
 
           {/* 지역응급의료센터 */}
           <div className="flex items-center gap-2.5 flex-nowrap">
-            <div
-              className="w-3 h-3 flex-shrink-0 bg-emerald-500 rounded-full shadow-sm"
+            <svg
+              className="w-3 h-3 flex-shrink-0"
+              viewBox="0 0 24 24"
               style={{ minWidth: '12px' }}
-            />
+            >
+              <path
+                d="M12 4a8 8 0 110 16 8 8 0 010-16z"
+                fill={isDark ? '#9ca3af' : '#6b7280'}
+              />
+            </svg>
             <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
               지역응급의료센터
             </span>
@@ -57,14 +69,16 @@ export function Legend({
 
           {/* 지역응급의료기관 */}
           <div className="flex items-center gap-2.5 flex-nowrap">
-            <div
-              className="w-0 h-0 flex-shrink-0 shadow-sm"
-              style={{
-                borderLeft: '6px solid transparent',
-                borderRight: '6px solid transparent',
-                borderBottom: '10px solid rgb(16, 185, 129)'
-              }}
-            />
+            <svg
+              className="w-3 h-3 flex-shrink-0"
+              viewBox="0 0 24 24"
+              style={{ minWidth: '12px' }}
+            >
+              <path
+                d="M12 4a8 8 0 110 16 8 8 0 010-16z"
+                fill={isDark ? '#9ca3af' : '#6b7280'}
+              />
+            </svg>
             <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
               지역응급의료기관
             </span>
@@ -90,7 +104,7 @@ export function Legend({
 
             {/* 적정 수준 */}
             <div className="flex items-center gap-2.5 flex-nowrap">
-              <div className="w-2 h-2 flex-shrink-0 bg-blue-500 rounded-full shadow-sm" />
+              <div className="w-2 h-2 flex-shrink-0 bg-yellow-500 rounded-full shadow-sm" />
               <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 적정 수준
               </span>
@@ -101,6 +115,47 @@ export function Legend({
               <div className="w-2 h-2 flex-shrink-0 bg-red-500 rounded-full shadow-sm" />
               <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 부족
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 42개 자원조사 시간대 */}
+      {showBedStatus && (
+        <div className={`border-t pt-2.5 mt-2.5 ${isDark ? 'border-gray-700/50' : 'border-gray-300/50'}`}>
+          <div className={`font-semibold text-[9px] uppercase mb-1.5 tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            42개 자원조사 시간대
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div
+                className="w-3 h-3 flex-shrink-0 rounded-full border-green-500"
+                style={{ minWidth: '12px', borderWidth: '2px' }}
+              />
+              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                24시간
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div
+                className="w-3 h-3 flex-shrink-0 rounded-full border-blue-500"
+                style={{ minWidth: '12px', borderWidth: '2px' }}
+              />
+              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                주간
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <div
+                className="w-3 h-3 flex-shrink-0 rounded-full border-red-500"
+                style={{ minWidth: '12px', borderWidth: '2px' }}
+              />
+              <span className={`text-[9px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                야간
               </span>
             </div>
           </div>

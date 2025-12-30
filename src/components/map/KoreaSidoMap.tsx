@@ -9,7 +9,7 @@ import { BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { parseMessage, getStatusColorClasses } from "@/lib/utils/messageClassifier";
-import { getSvgMarkerInfo, type SvgMarkerInfo } from "@/lib/utils/markerRenderer";
+import { getSvgMarkerInfo, getMarkerPath, type SvgMarkerInfo } from "@/lib/utils/markerRenderer";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import { Legend } from "@/components/Legend";
 import { latLngToSvgAffine } from "@/lib/utils/coordinateCalibration";
@@ -426,50 +426,21 @@ export function KoreaSidoMap({
   ) => {
     const markerInfo = getSvgMarkerInfo(hospital, bedDataMap, isHovered, !hasDiseaseData);
 
-    switch (markerInfo.shape) {
-      case "square":
-        // 사각형 (응급실운영신고기관)
-        const squareSize = markerInfo.size * 0.9;
-        return (
-          <rect
-            x={x - squareSize}
-            y={y - squareSize}
-            width={squareSize * 2}
-            height={squareSize * 2}
-            fill={markerInfo.color}
-            stroke={markerInfo.strokeColor}
-            strokeWidth={markerInfo.strokeWidth}
-            opacity={markerInfo.opacity}
-            rx={0.5}
-          />
-        );
-      case "triangle":
-        // 삼각형 (지역응급의료기관)
-        const triangleSize = markerInfo.size * 1.1;
-        return (
-          <polygon
-            points={`${x},${y - triangleSize} ${x + triangleSize},${y + triangleSize * 0.5} ${x - triangleSize},${y + triangleSize * 0.5}`}
-            fill={markerInfo.color}
-            stroke={markerInfo.strokeColor}
-            strokeWidth={markerInfo.strokeWidth}
-            opacity={markerInfo.opacity}
-          />
-        );
-      case "circle":
-      default:
-        // 원형 (지역응급의료센터)
-        return (
-          <circle
-            cx={x}
-            cy={y}
-            r={markerInfo.size}
-            fill={markerInfo.color}
-            stroke={markerInfo.strokeColor}
-            strokeWidth={markerInfo.strokeWidth}
-            opacity={markerInfo.opacity}
-          />
-        );
-    }
+    // 모든 마커 형태에 공통 path 렌더링 적용
+    const scale = markerInfo.size / 12;
+    const translateX = x - 12 * scale;
+    const translateY = y - 12 * scale;
+    const d = getMarkerPath(markerInfo.shape);
+    return (
+      <path
+        d={d}
+        transform={`translate(${translateX}, ${translateY}) scale(${scale})`}
+        fill={markerInfo.color}
+        stroke={markerInfo.strokeColor}
+        strokeWidth={markerInfo.strokeWidth}
+        opacity={markerInfo.opacity}
+      />
+    );
   };
 
   // 시도별 병원 수 계산

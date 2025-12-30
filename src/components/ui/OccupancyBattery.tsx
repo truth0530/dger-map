@@ -23,10 +23,18 @@ export function OccupancyBattery({ rate, isDark, size = 'medium' }: OccupancyBat
 
   const config = sizeConfig[size];
 
-  // 텍스트 색상: 채워진 부분이 많으면 흰색, 적으면 배경에 맞게
-  const textColor = rate >= 50
-    ? 'text-white'
-    : isDark ? 'text-gray-200' : 'text-gray-700';
+  // 텍스트 색상: 배경색과 모드에 따라 가독성 확보
+  // - 빨강(95%+): 흰색
+  // - 노랑/주황(60-94%): 다크모드=흰색, 라이트모드=진한 갈색
+  // - 초록(50-59%): 흰색
+  // - 낮은 비율(<50): 배경색에 맞게
+  const getTextColor = () => {
+    if (rate >= 95) return 'text-white'; // 빨간 배경
+    if (rate >= 60) return isDark ? 'text-white' : 'text-amber-900'; // 노란/주황 배경
+    if (rate >= 50) return 'text-white'; // 초록 배경
+    return isDark ? 'text-gray-200' : 'text-gray-700'; // 채워지지 않은 부분
+  };
+  const textColor = getTextColor();
 
   return (
     <div className="inline-flex items-center justify-center">

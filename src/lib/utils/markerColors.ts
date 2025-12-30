@@ -9,7 +9,7 @@ import type { HospitalBedData } from '@/lib/hooks/useBedData';
 // 색상 상수
 export const MARKER_COLOR_VALUES = {
   available: '#22c55e',   // 녹색 - 여유있음 (hvec > 5)
-  moderate: '#3b82f6',    // 파랑 - 적정수준 (0 < hvec <= 5)
+  moderate: '#eab308',    // 노랑 - 적정수준 (0 < hvec <= 5)
   shortage: '#ef4444',    // 빨강 - 부족 (hvec = 0)
   default: '#22c55e',     // 기본값 (데이터 있음) - 녹색
   unknown: '#6b7280',     // 회색 - 정보없음
@@ -30,7 +30,7 @@ export function getMarkerColorByBedStatus(
     const bedData = bedDataMap.get(hospital.code);
     if (bedData && bedData.hvec !== undefined) {
       if (bedData.hvec > 5) return MARKER_COLOR_VALUES.available;   // 녹색 - 여유있음
-      if (bedData.hvec > 0) return MARKER_COLOR_VALUES.moderate;    // 파랑 - 적정수준
+      if (bedData.hvec > 0) return MARKER_COLOR_VALUES.moderate;    // 노랑 - 적정수준
       return MARKER_COLOR_VALUES.shortage;                          // 빨강 - 부족
     }
   }

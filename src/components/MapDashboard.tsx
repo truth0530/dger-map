@@ -86,7 +86,7 @@ export function MapDashboard() {
   ]);
   const [selectedRegion, setSelectedRegion] = useState<string>("대구광역시");
   const [hoveredHospitalCode, setHoveredHospitalCode] = useState<string | null>(null);
-  const [selectedBedTypes, setSelectedBedTypes] = useState<Set<BedType>>(new Set(['general']));
+  const [selectedBedTypes, setSelectedBedTypes] = useState<Set<BedType>>(new Set());
   const [selectedBedStatus, setSelectedBedStatus] = useState<BedStatus[]>(["여유", "적정", "부족"]);  // 병상 상태 필터
   const [selectedSevereType, setSelectedSevereType] = useState<SevereTypeKey | null>(null);  // 선택된 27개 중증질환
   const [searchQuery, setSearchQuery] = useState<string>("");  // 병원명 검색어
@@ -227,9 +227,9 @@ export function MapDashboard() {
     return false;
   }, [selectedBedTypes, hasBedType]);
 
-  // 선택된 지역의 병원 목록 (사이드바용)
+  // 분류 제외 기본 필터 (기관분류 카운트 계산용)
   // 모든 필터가 AND 조건으로 작동
-  const filteredHospitals = useMemo(() => {
+  const baseFilteredHospitals = useMemo(() => {
     // 전국 선택 시 대구 병원만 표시 (진료정보 있음), 그 외는 해당 지역 병원 전체
     const targetRegion = selectedRegion === "all" ? "대구광역시" : selectedRegion;
     const isDaeguRegion = selectedRegion === "all" || selectedRegion === "대구광역시";
@@ -252,21 +252,12 @@ export function MapDashboard() {
       // 2. 대구 지역은 진료정보 있는 병원만
       if (isDaeguRegion && !hospital.hasDiseaseData) return false;
 
-      // 3. 기관 종류 필터
-      if (
-        selectedClassifications.length > 0 &&
-        hospital.classification &&
-        !selectedClassifications.includes(hospital.classification as EmergencyClassification)
-      ) {
-        return false;
-      }
-
-      // 4. 병상 유형 필터 - 선택된 병상 유형을 운영하는 병원만
+      // 3. 병상 유형 필터 - 선택된 병상 유형을 운영하는 병원만
       if (!hasAnySelectedBedType(hospital.code)) {
         return false;
       }
 
-      // 5. 병상 상태 필터
+      // 4. 병상 상태 필터
       if (selectedBedStatus.length < 3) {
         const bedStatus = getBedStatusForHospital(hospital.code);
         if (bedStatus && !selectedBedStatus.includes(bedStatus)) {
@@ -274,14 +265,14 @@ export function MapDashboard() {
         }
       }
 
-      // 6. 27개 중증질환 필터 (AND 조건)
+      // 5. 27개 중증질환 필터 (AND 조건)
       if (selectedSevereType) {
         if (!severeAvailableHospitals.has(hospital.code)) {
           return false;
         }
       }
 
-      // 7. 42개 자원조사 필터 (소분류끼리는 OR 조건, 다른 필터와는 AND)
+      // 6. 42개 자원조사 필터 (소분류끼리는 OR 조건, 다른 필터와는 AND)
       if (isDaeguRegion && selectedDiseaseSubcategories.size > 0) {
         // 소분류 중 하나라도 가용성 조건 만족하면 통과 (OR)
         let hasMatchingDisease = false;
@@ -302,7 +293,35 @@ export function MapDashboard() {
 
       return true;
     });
-  }, [hospitals, allData, selectedRegion, selectedDiseaseSubcategories, selectedDay, selectedStatus, selectedClassifications, selectedSevereType, severeData, selectedBedStatus, getBedStatusForHospital, hasAnySelectedBedType]);
+  }, [hospitals, allData, selectedRegion, selectedDiseaseSubcategories, selectedDay, selectedStatus, selectedSevereType, severeData, selectedBedStatus, getBedStatusForHospital, hasAnySelectedBedType]);
+
+  // 기관분류 필터 적용 (사이드바 리스트용)
+  const filteredHospitals = useMemo(() => {
+    if (selectedClassifications.length === 0) return baseFilteredHospitals;
+
+    return baseFilteredHospitals.filter((hospital) => {
+      if (!hospital.classification) return false;
+      return selectedClassifications.includes(hospital.classification as EmergencyClassification);
+    });
+  }, [baseFilteredHospitals, selectedClassifications]);
+
+  // 기관분류 카운트 (권역/센터/기관)
+  const classificationCounts = useMemo(() => {
+    const counts = { 권역: 0, 센터: 0, 기관: 0 };
+    baseFilteredHospitals.forEach((hospital) => {
+      const classification = hospital.classification || '';
+      if (classification.includes('권역') || classification.includes('전문')) {
+        counts.권역 += 1;
+      } else if (classification.includes('지역응급의료센터')) {
+        counts.센터 += 1;
+      } else if (classification.includes('지역응급의료기관')) {
+        counts.기관 += 1;
+      } else {
+        counts.기관 += 1;
+      }
+    });
+    return counts;
+  }, [baseFilteredHospitals]);
 
   // 센터급 여부 확인 (권역응급의료센터, 지역응급의료센터는 센터급)
   const isCenterLevel = (classification: string | undefined): boolean => {
@@ -389,9 +408,7 @@ export function MapDashboard() {
     setSelectedBedTypes(prev => {
       const next = new Set(prev);
       if (next.has(type)) {
-        if (next.size > 1) {
-          next.delete(type);
-        }
+        next.delete(type);
       } else {
         next.add(type);
       }
@@ -461,13 +478,14 @@ export function MapDashboard() {
     return "불가";
   };
 
-  // 상태별 색상
+  // 상태별 색상 - 다크모드에서 차분한 색상 사용
   const getStatusColor = (status: AvailabilityStatus | null, isDarkMode: boolean = true): string => {
     if (isDarkMode) {
+      // 다크모드: 채도 낮은 파스텔 톤
       switch (status) {
-        case "24시간": return "text-green-400";
-        case "주간": return "text-blue-400";
-        case "야간": return "text-purple-400";
+        case "24시간": return "text-emerald-300";
+        case "주간": return "text-sky-300";
+        case "야간": return "text-violet-300";
         case "불가": return "text-gray-500";
         default: return "text-gray-400";
       }
@@ -476,7 +494,7 @@ export function MapDashboard() {
       switch (status) {
         case "24시간": return "text-green-600";
         case "주간": return "text-blue-600";
-        case "야간": return "text-purple-600";
+        case "야간": return "text-red-600";
         case "불가": return "text-gray-500";
         default: return "text-gray-500";
       }
@@ -485,20 +503,21 @@ export function MapDashboard() {
 
   const getStatusBgColor = (status: AvailabilityStatus | null, isHovered: boolean, isDarkMode: boolean = true): string => {
     if (isDarkMode) {
+      // 다크모드: 차분한 배경색과 테두리
       if (isHovered) {
         switch (status) {
-          case "24시간": return "bg-green-500/30 border-green-400";
-          case "주간": return "bg-blue-500/30 border-blue-400";
-          case "야간": return "bg-purple-500/30 border-purple-400";
-          case "불가": return "bg-gray-500/30 border-gray-400";
+          case "24시간": return "bg-emerald-500/20 border-emerald-400/60";
+          case "주간": return "bg-sky-500/20 border-sky-400/60";
+          case "야간": return "bg-violet-500/20 border-violet-400/60";
+          case "불가": return "bg-gray-500/20 border-gray-400/60";
           default: return "bg-gray-700 border-gray-500";
         }
       }
       switch (status) {
-        case "24시간": return "bg-green-500/20 border-green-500/40";
-        case "주간": return "bg-blue-500/20 border-blue-500/40";
-        case "야간": return "bg-purple-500/20 border-purple-500/40";
-        case "불가": return "bg-gray-500/20 border-gray-500/40";
+        case "24시간": return "bg-emerald-500/10 border-emerald-500/30";
+        case "주간": return "bg-sky-500/10 border-sky-500/30";
+        case "야간": return "bg-violet-500/10 border-violet-500/30";
+        case "불가": return "bg-gray-500/10 border-gray-500/30";
         default: return "bg-gray-800 border-gray-700";
       }
     } else {
@@ -507,7 +526,7 @@ export function MapDashboard() {
         switch (status) {
           case "24시간": return "bg-green-100 border-green-500";
           case "주간": return "bg-blue-100 border-blue-500";
-          case "야간": return "bg-purple-100 border-purple-500";
+          case "야간": return "bg-red-100 border-red-500";
           case "불가": return "bg-[#ddd6cc] border-[#c8c2b8]";
           default: return "bg-[#ddd6cc] border-[#c8c2b8]";
         }
@@ -515,7 +534,7 @@ export function MapDashboard() {
       switch (status) {
         case "24시간": return "bg-green-50 border-green-300";
         case "주간": return "bg-blue-50 border-blue-300";
-        case "야간": return "bg-purple-50 border-purple-300";
+        case "야간": return "bg-red-50 border-red-300";
         case "불가": return "bg-[#E8E2D8] border-[#d4cdc4]";
         default: return "bg-[#E8E2D8] border-[#d4cdc4]";
       }
@@ -564,28 +583,31 @@ export function MapDashboard() {
   }, [fetchEmergencyMessages]);
 
   // 사이드바에 표시할 필터 조건 요약
-  const getFilterSummary = (): string => {
+  const getFilterSummary = (count?: number): string => {
     const parts: string[] = [];
 
-    // 1. 지역
-    if (selectedRegion === "all") {
-      parts.push("대구");
-    } else {
-      const region = REGIONS.find((r) => r.value === selectedRegion);
-      parts.push(region?.label || selectedRegion);
-    }
-
-    // 2. 요일 (질환 선택 시에만)
-    if (selectedDiseaseCategory) {
-      parts.push(`${selectedDay}요일`);
-    }
-
-    // 3. 질환 대분류
+    // 1. 질환 대분류 (가장 우선)
     if (selectedDiseaseCategory) {
       const category = DISEASE_CATEGORIES.find((c) => c.key === selectedDiseaseCategory);
       if (category) {
-        parts.push(category.label);
+        const countText = typeof count === 'number' ? `(${count})` : '';
+        parts.push(`${category.label}${countText}`);
       }
+    }
+
+    // 2. 지역
+    if (selectedRegion === "all") {
+      const countText = !selectedDiseaseCategory && typeof count === 'number' ? `(${count})` : '';
+      parts.push(`대구${countText}`);
+    } else {
+      const region = REGIONS.find((r) => r.value === selectedRegion);
+      const countText = !selectedDiseaseCategory && typeof count === 'number' ? `(${count})` : '';
+      parts.push(`${region?.label || selectedRegion}${countText}`);
+    }
+
+    // 3. 요일 (질환 선택 시에만)
+    if (selectedDiseaseCategory) {
+      parts.push(`${selectedDay}요일`);
     }
 
     // 4. 실시간 중증질환
@@ -672,9 +694,9 @@ export function MapDashboard() {
           <div className={`flex-1 overflow-y-auto ${isDark ? '' : 'bg-[#E8E2D8]'}`}>
           {/* 지역 + 기관분류 */}
           <div className={`px-2 py-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#E8E2D8]'}`}>
-            <div className="flex items-start gap-1">
-              <div className="w-14 shrink-0">
-                <label className={`text-[11px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
+            <div className="flex items-end gap-1.5">
+              <div className="w-12 shrink-0 flex flex-col gap-0.5">
+                <label className={`text-[10px] block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
                 <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
                   <SelectTrigger size="xs" className={`[&_svg]:size-2 ${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                     <SelectValue />
@@ -688,43 +710,38 @@ export function MapDashboard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex-1 min-w-0">
-                <label className={`text-[11px] mb-0.5 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
-                <div className="flex gap-0.5 items-center">
+              <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                <label className={`text-[10px] block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
+                <div className="flex flex-wrap gap-0.5">
                   <button
                     onClick={() => toggleClassification("권역응급의료센터")}
-                    className={`flex items-center gap-0.5 h-6 text-[10px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
+                    className={`h-6 text-[9px] px-0.5 rounded transition-colors whitespace-nowrap ${
                       selectedClassifications.includes("권역응급의료센터")
                         ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
                         : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    <span className={`w-2 h-2 shrink-0 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : isDark ? "bg-gray-500" : "bg-gray-400"}`} />
-                    권역
+                    권역({classificationCounts.권역})
                   </button>
                   <button
                     onClick={() => toggleClassification("지역응급의료센터")}
-                    className={`flex items-center gap-0.5 h-6 text-[10px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
+                    className={`h-6 text-[9px] px-0.5 rounded transition-colors whitespace-nowrap ${
                       selectedClassifications.includes("지역응급의료센터")
                         ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
                         : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    <span className={`w-2 h-2 shrink-0 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : isDark ? "bg-gray-500" : "bg-gray-400"}`} />
-                    센터
+                    센터({classificationCounts.센터})
                   </button>
                   <button
                     onClick={() => toggleClassification("지역응급의료기관")}
-                    className={`flex items-center gap-0.5 h-6 text-[10px] px-1 py-0.5 rounded transition-colors whitespace-nowrap ${
+                    className={`h-6 text-[9px] px-0.5 rounded transition-colors whitespace-nowrap ${
                       selectedClassifications.includes("지역응급의료기관")
                         ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
                         : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    <svg className={`w-2 h-2 shrink-0 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : isDark ? "fill-gray-500" : "fill-gray-400"}`} viewBox="0 0 10 10">
-                      <polygon points="5,0 10,10 0,10" />
-                    </svg>
-                    기관
+                    기관({classificationCounts.기관})
                   </button>
                 </div>
               </div>
@@ -767,7 +784,7 @@ export function MapDashboard() {
                     !selectedDiseaseCategory
                       ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                       : selectedStatus.includes("24시간")
-                        ? isDark ? "border border-green-500 text-green-400" : "border border-green-600 text-green-700 bg-green-50"
+                        ? isDark ? "border border-emerald-500/50 text-emerald-300" : "border border-green-600 text-green-700 bg-green-50"
                         : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
@@ -780,7 +797,7 @@ export function MapDashboard() {
                     !selectedDiseaseCategory
                       ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                       : selectedStatus.includes("주간")
-                        ? isDark ? "border border-blue-500 text-blue-400" : "border border-blue-600 text-blue-700 bg-blue-50"
+                        ? isDark ? "border border-sky-500/50 text-sky-300" : "border border-blue-600 text-blue-700 bg-blue-50"
                         : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
@@ -793,7 +810,7 @@ export function MapDashboard() {
                     !selectedDiseaseCategory
                       ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                       : selectedStatus.includes("야간")
-                        ? isDark ? "border border-purple-500 text-purple-400" : "border border-purple-600 text-purple-700 bg-purple-50"
+                        ? isDark ? "border border-violet-500/50 text-violet-300" : "border border-red-600 text-red-700 bg-red-50"
                         : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
@@ -832,22 +849,55 @@ export function MapDashboard() {
                 triggerClassName={`${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}
                 contentClassName={`${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-[#FAF7F2] border-[#d4cdc4] text-gray-900'}`}
               />
-              {severeLoading && <span className="text-[10px] text-orange-400">로딩...</span>}
+              {severeLoading && <span className={`text-[10px] ${isDark ? 'text-amber-300/70' : 'text-orange-500'}`}>로딩...</span>}
             </div>
             {severeStats && (
               <div className="flex items-center gap-3 text-[11px]">
-                <span className={isDark ? "text-green-400" : "text-green-600"}>가능 {severeStats.available}</span>
-                <span className={isDark ? "text-red-400" : "text-red-600"}>불가 {severeStats.unavailable}</span>
+                <span className={isDark ? "text-emerald-300" : "text-green-600"}>가능 {severeStats.available}</span>
+                <span className={isDark ? "text-rose-300" : "text-red-600"}>불가 {severeStats.unavailable}</span>
               </div>
             )}
           </div>
 
           {/* 병상 */}
           <div className={`px-2 py-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#E8E2D8]'}`}>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between gap-1 mb-1">
               <label className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>병상 정보</label>
-              {bedLoading && <span className={`text-[10px] ${isDark ? 'text-orange-400' : 'text-orange-500'}`}>로딩...</span>}
+              <div className="flex items-center gap-0.5 flex-nowrap">
+                <button
+                  onClick={() => toggleBedStatus("여유")}
+                  className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("여유")
+                      ? isDark ? "bg-green-600 text-white font-medium" : "bg-green-600 text-white font-medium"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  여유
+                </button>
+                <button
+                  onClick={() => toggleBedStatus("적정")}
+                  className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("적정")
+                      ? isDark ? "bg-yellow-500 text-white font-medium" : "bg-yellow-500 text-white font-medium"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  적정
+                </button>
+                <button
+                  onClick={() => toggleBedStatus("부족")}
+                  className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                    selectedBedStatus.includes("부족")
+                      ? isDark ? "bg-red-600 text-white font-medium" : "bg-red-600 text-white font-medium"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  부족
+                </button>
+              </div>
+              {bedLoading && <span className={`text-[10px] ${isDark ? 'text-amber-300/70' : 'text-orange-500'}`}>로딩...</span>}
             </div>
+            <div className={`h-px ${isDark ? 'bg-gray-800/40' : 'bg-[#d4cdc4]/50'} mb-1`} />
             <div className="flex flex-wrap gap-0.5">
               {(Object.entries(BED_TYPE_CONFIG) as [BedType, typeof BED_TYPE_CONFIG[BedType]][]).map(([type, config]) => (
                 <button
@@ -863,38 +913,6 @@ export function MapDashboard() {
                 </button>
               ))}
             </div>
-            <div className="flex gap-1 mt-1">
-              <button
-                onClick={() => toggleBedStatus("여유")}
-                className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                  selectedBedStatus.includes("여유")
-                    ? isDark ? "bg-green-600 text-white font-medium" : "bg-green-600 text-white font-medium"
-                    : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                여유
-              </button>
-              <button
-                onClick={() => toggleBedStatus("적정")}
-                className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                  selectedBedStatus.includes("적정")
-                    ? isDark ? "bg-yellow-500 text-white font-medium" : "bg-yellow-500 text-white font-medium"
-                    : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                적정
-              </button>
-              <button
-                onClick={() => toggleBedStatus("부족")}
-                className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                  selectedBedStatus.includes("부족")
-                    ? isDark ? "bg-red-600 text-white font-medium" : "bg-red-600 text-white font-medium"
-                    : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                부족
-              </button>
-            </div>
           </div>
 
           </div>
@@ -905,7 +923,7 @@ export function MapDashboard() {
           <div className={`px-1.5 py-1.5 space-y-1.5 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#ddd6cc]'}`}>
             <div className="flex items-center justify-between">
               <label className={`text-[10px] font-medium ${isDark ? 'text-gray-400' : 'text-[#4A5D5D]'}`}>
-                {getFilterSummary()} ({searchedHospitals.length})
+                {getFilterSummary(searchedHospitals.length)}
               </label>
               {(locationLoading || travelTimeLoading) && (
                 <span className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin border-current opacity-50"></span>
@@ -937,7 +955,7 @@ export function MapDashboard() {
               </button>
             </div>
             {locationError && (
-              <div className="text-[11px] text-red-400">{locationError}</div>
+              <div className={`text-[11px] ${isDark ? 'text-rose-300' : 'text-red-500'}`}>{locationError}</div>
             )}
             <div className="relative">
               <svg
@@ -953,8 +971,8 @@ export function MapDashboard() {
                 placeholder="병원명 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-5 pr-2 text-[11px] rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-[#F5F0E8] border border-[#d4cdc4] text-gray-900 placeholder-gray-400'}`}
-                style={{ paddingLeft: '20px' }}
+                className={`w-full h-6 pr-2 text-[11px] rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-[#F5F0E8] border border-[#d4cdc4] text-gray-900 placeholder-gray-400'}`}
+                style={{ paddingLeft: '22px' }}
               />
               {searchQuery && (
                 <button
@@ -972,7 +990,12 @@ export function MapDashboard() {
             ref={hospitalListRef}
             className={`flex-1 overflow-y-auto p-1.5 space-y-0.5 ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}
           >
-            {searchedHospitals.map((hospital) => {
+            {sortMode === "travelTime" && (
+              <div className={`text-[9px] pb-0.5 text-right ${isDark ? 'text-rose-300/70' : 'text-red-500'}`}>
+                반경 10km밖의 기관은 거리계산 제외
+              </div>
+            )}
+            {searchedHospitals.map((hospital, index) => {
               const status = getHospitalStatus(hospital);
               const isHovered = hoveredHospitalCode === hospital.code;
               const shortClass = getClassificationShort(hospital.classification);
@@ -1047,7 +1070,7 @@ export function MapDashboard() {
                   data-hospital-code={hospital.code}
                   className={`rounded text-[11px] cursor-pointer transition-all duration-200 ${bgClass} ${
                     isHovered ? (isDark ? 'ring-1 ring-white/30' : 'ring-1 ring-gray-400/30') : ''
-                  }`}
+                  } ${sortMode === "travelTime" && index === 0 ? 'mt-0.5' : ''}`}
                   onMouseEnter={() => handleHospitalHover(hospital.code)}
                   onMouseLeave={() => handleHospitalHover(null)}
                 >
@@ -1066,30 +1089,41 @@ export function MapDashboard() {
                     </span>
                     {/* 소요시간 (활성화 시) */}
                     {sortMode === "travelTime" && (
-                      <span className="shrink-0 text-[9px] font-medium text-blue-400 whitespace-nowrap">
+                      <span className={`shrink-0 text-[9px] font-medium ${isDark ? 'text-sky-300' : 'text-blue-500'} whitespace-nowrap`}>
                         {formatDuration(travelTimes.get(hospital.code)?.duration ?? null)}
                       </span>
                     )}
-                    {/* 선택된 질환명(대분류) - 작게 표시 */}
+                    {/* 선택된 42개 중증자원조사 대분류 + 상태 - 작게 표시 */}
                     {selectedDiseaseCategory && currentCategory && (
                       <span
                         className={`shrink-0 text-[8px] px-1 py-0.5 rounded truncate ${
-                          isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700'
+                          isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-blue-100 text-blue-700'
                         }`}
-                        style={{ maxWidth: '50px' }}
-                        title={currentCategory.label}
+                        style={{ maxWidth: '65px' }}
+                        title={`${currentCategory.label} (${status || '정보없음'})`}
                       >
-                        {currentCategory.label.length > 4 ? currentCategory.label.slice(0, 4) : currentCategory.label}
+                        {currentCategory.label.length > 3 ? currentCategory.label.slice(0, 3) : currentCategory.label}
+                        {status && <span className={`ml-0.5 ${getStatusColor(status, isDark)}`}>{status.slice(0, 2)}</span>}
                       </span>
                     )}
-                    {/* 가용상태 */}
-                    {selectedSevereType && isSevereAvailable ? (
-                      <span className="shrink-0 text-[10px] text-green-400 whitespace-nowrap">가능</span>
-                    ) : status && !selectedSevereType ? (
-                      <span className={`shrink-0 text-[10px] ${getStatusColor(status, isDark)}`}>
-                        {status}
-                      </span>
-                    ) : null}
+                    {/* 선택된 27개 중증질환명 - 작게 표시 */}
+                    {selectedSevereType && (() => {
+                      const severeType = SEVERE_TYPES.find(t => t.key === selectedSevereType);
+                      const shortLabel = severeType?.label.replace(/\[.*?\]\s*/, '') || '';
+                      return (
+                        <span
+                          className={`shrink-0 text-[8px] px-1 py-0.5 rounded truncate ${
+                            isSevereAvailable
+                              ? (isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-green-100 text-green-700')
+                              : (isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-red-100 text-red-600')
+                          }`}
+                          style={{ maxWidth: '55px' }}
+                          title={severeType?.label}
+                        >
+                          {shortLabel.length > 4 ? shortLabel.slice(0, 4) : shortLabel}
+                        </span>
+                      );
+                    })()}
                     {/* 배터리 (항상 우측) */}
                     <div className="flex-1" />
                     {occupancyRate !== null && (
@@ -1106,51 +1140,160 @@ export function MapDashboard() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
-
                   {/* 확장된 상세 정보 */}
                   {isExpanded && (
-                    <div className={`px-1.5 py-1 border-t space-y-1 ${isDark ? 'border-gray-700 bg-gray-800/50' : 'border-[#d4cdc4] bg-[#EDE7DD]'}`}>
-                      {/* 병상 현황 */}
+                    <div className={`px-1.5 py-1 border-t space-y-0.5 ${isDark ? 'border-gray-700 bg-gray-800/50' : 'border-[#d4cdc4] bg-[#EDE7DD]'}`}>
+                      {/* 병상 현황 - 선택된 병상 유형만 표시 */}
                       {bedInfo && (
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>응급실</span>
-                          <span className={`text-[10px] font-semibold ${
-                            (bedInfo.hvec ?? 0) > 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>{bedInfo.hvec ?? 0}</span>
-                          <span className={`text-[11px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>/ {bedInfo.hvs01 ?? 0}</span>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          {/* 항상 응급실(일반) 표시하거나, 선택된 것만 표시 */}
+                          {(selectedBedTypes.size === 0 || selectedBedTypes.has('general')) && (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>응급</span>
+                              <span className={`text-[9px] font-semibold ${(bedInfo.hvec ?? 0) > 0 ? (isDark ? 'text-emerald-300' : 'text-green-600') : (isDark ? 'text-rose-300' : 'text-red-600')}`}>
+                                {bedInfo.hvec ?? 0}/{bedInfo.hvs01 ?? 0}
+                              </span>
+                            </div>
+                          )}
+                          {selectedBedTypes.has('cohort') && (bedInfo.hv27 !== undefined || bedInfo.HVS59 !== undefined) && (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>코호트</span>
+                              <span className={`text-[9px] font-semibold ${(bedInfo.hv27 ?? 0) > 0 ? (isDark ? 'text-emerald-300' : 'text-green-600') : (isDark ? 'text-rose-300' : 'text-red-600')}`}>
+                                {bedInfo.hv27 ?? 0}/{bedInfo.HVS59 ?? 0}
+                              </span>
+                            </div>
+                          )}
+                          {selectedBedTypes.has('erNegative') && (bedInfo.hv29 !== undefined || bedInfo.HVS03 !== undefined) && (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>음압</span>
+                              <span className={`text-[9px] font-semibold ${(bedInfo.hv29 ?? 0) > 0 ? (isDark ? 'text-emerald-300' : 'text-green-600') : (isDark ? 'text-rose-300' : 'text-red-600')}`}>
+                                {bedInfo.hv29 ?? 0}/{bedInfo.HVS03 ?? 0}
+                              </span>
+                            </div>
+                          )}
+                          {selectedBedTypes.has('erGeneral') && (bedInfo.hv30 !== undefined || bedInfo.HVS04 !== undefined) && (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>격리</span>
+                              <span className={`text-[9px] font-semibold ${(bedInfo.hv30 ?? 0) > 0 ? (isDark ? 'text-emerald-300' : 'text-green-600') : (isDark ? 'text-rose-300' : 'text-red-600')}`}>
+                                {bedInfo.hv30 ?? 0}/{bedInfo.HVS04 ?? 0}
+                              </span>
+                            </div>
+                          )}
+                          {selectedBedTypes.has('pediatric') && (bedInfo.hv28 !== undefined || bedInfo.HVS02 !== undefined) && (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>소아</span>
+                              <span className={`text-[9px] font-semibold ${(bedInfo.hv28 ?? 0) > 0 ? (isDark ? 'text-emerald-300' : 'text-green-600') : (isDark ? 'text-rose-300' : 'text-red-600')}`}>
+                                {bedInfo.hv28 ?? 0}/{bedInfo.HVS02 ?? 0}
+                              </span>
+                            </div>
+                          )}
+                          {selectedBedTypes.has('pediatricNegative') && (bedInfo.hv15 !== undefined || bedInfo.HVS48 !== undefined) && (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>소아음압</span>
+                              <span className={`text-[9px] font-semibold ${(bedInfo.hv15 ?? 0) > 0 ? (isDark ? 'text-emerald-300' : 'text-green-600') : (isDark ? 'text-rose-300' : 'text-red-600')}`}>
+                                {bedInfo.hv15 ?? 0}/{bedInfo.HVS48 ?? 0}
+                              </span>
+                            </div>
+                          )}
+                          {selectedBedTypes.has('pediatricGeneral') && (bedInfo.hv16 !== undefined || bedInfo.HVS49 !== undefined) && (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>소아격리</span>
+                              <span className={`text-[9px] font-semibold ${(bedInfo.hv16 ?? 0) > 0 ? (isDark ? 'text-emerald-300' : 'text-green-600') : (isDark ? 'text-rose-300' : 'text-red-600')}`}>
+                                {bedInfo.hv16 ?? 0}/{bedInfo.HVS49 ?? 0}
+                              </span>
+                            </div>
+                          )}
                           <span className="flex-1" />
                           {bedInfo.hvidate && (
-                            <span className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                              {bedInfo.hvidate.slice(0, 4)}-{bedInfo.hvidate.slice(4, 6)}-{bedInfo.hvidate.slice(6, 8)} {bedInfo.hvidate.slice(8, 10)}:{bedInfo.hvidate.slice(10, 12)} 기준
+                            <span className={`text-[9px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                              {bedInfo.hvidate.slice(4, 6)}-{bedInfo.hvidate.slice(6, 8)} {bedInfo.hvidate.slice(8, 10)}:{bedInfo.hvidate.slice(10, 12)} 기준
                             </span>
                           )}
                         </div>
                       )}
 
+                      {/* 42개 중증자원조사 (선택된 질환이 있을 때만) */}
+                      {selectedDiseaseSubcategories.size > 0 && (() => {
+                        const hospitalDiseaseStatus = getHospitalStatus(hospital);
+                        // 다크모드: 차분한 색상
+                        const statusColor = hospitalDiseaseStatus === '24시간' ? (isDark ? 'text-emerald-300' : 'text-green-600')
+                          : hospitalDiseaseStatus === '주간' ? (isDark ? 'text-sky-300' : 'text-blue-600')
+                          : hospitalDiseaseStatus === '야간' ? (isDark ? 'text-violet-300' : 'text-purple-600')
+                          : (isDark ? 'text-gray-500' : 'text-gray-400');
+                        const selectedLabels = currentCategory?.subcategories
+                          .filter(sub => selectedDiseaseSubcategories.has(sub.key))
+                          .map(sub => sub.label) || [];
+                        return (
+                          <div className="flex items-baseline gap-1">
+                            <span className={`text-[9px] shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>42개</span>
+                            <span className={`text-[9px] font-semibold shrink-0 ${statusColor}`}>
+                              {hospitalDiseaseStatus || '정보없음'}
+                            </span>
+                            <span className={`text-[9px] truncate ${isDark ? 'text-gray-400' : 'text-gray-500'}`} title={selectedLabels.join(', ')}>
+                              {selectedLabels.length > 0 ? selectedLabels.join(', ') : currentCategory?.label}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {/* 선택된 27개 중증질환 (강조 표시) */}
+                      {selectedSevereType && (() => {
+                        const severeType = SEVERE_TYPES.find(t => t.key === selectedSevereType);
+                        const shortLabel = severeType?.label.replace(/\[.*?\]\s*/, '') || '';
+                        return (
+                          <div className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded ${
+                            isSevereAvailable
+                              ? (isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-green-50 border border-green-300')
+                              : (isDark ? 'bg-rose-500/10 border border-rose-500/20' : 'bg-red-50 border border-red-200')
+                          }`}>
+                            <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${
+                              isDark ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600'
+                            }`}>
+                              {shortLabel}
+                            </span>
+                            <span className={`text-[9px] font-semibold ${
+                              isSevereAvailable
+                                ? (isDark ? 'text-emerald-300' : 'text-green-600')
+                                : (isDark ? 'text-rose-300' : 'text-red-600')
+                            }`}>
+                              {isSevereAvailable ? '진료가능' : '진료불가'}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
                       {/* 실시간 중증질환 (27개) */}
                       <div>
-                        <div className={`text-[11px] mb-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                          실시간 중증질환 ({totalAvailable}/{SEVERE_TYPES.length})
+                        <div className={`text-[9px] mb-0.5 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                          27개 ({totalAvailable}/{SEVERE_TYPES.length})
                         </div>
 
-                        {/* 연관 질환 (상위 배치) */}
+                        {/* 42개 연관 질환 (상위 배치) */}
                         {hasMatchedContent && (
-                          <div className="mb-1">
-                            {/* 가용 연관 질환 */}
+                          <div className="mb-0.5">
+                            {/* 가용 연관 질환 - 다크모드 차분한 색상 */}
                             {matchedAvailable.length > 0 && (
                               <div className="flex items-baseline gap-1 mb-0.5">
-                                <span className="text-[10px] text-green-500">○</span>
-                                <span className={`text-[11px] leading-relaxed ${isDark ? 'text-green-400' : 'text-green-600'}`}>
-                                  {matchedAvailable.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ')}
+                                <span className={`text-[10px] ${isDark ? 'text-emerald-400' : 'text-green-500'}`}>○</span>
+                                <span className={`text-[10px] leading-tight ${isDark ? 'text-emerald-300' : 'text-green-600'}`}>
+                                  {matchedAvailable.map(d => {
+                                    const label = d.label.replace(/\[.*?\]\s*/, '');
+                                    const isSelected = d.key === selectedSevereType;
+                                    return isSelected ? null : label;
+                                  }).filter(Boolean).join(', ')}
                                 </span>
                               </div>
                             )}
-                            {/* 불가 연관 질환 */}
+                            {/* 불가 연관 질환 - 다크모드 차분한 색상 */}
                             {matchedUnavailable.length > 0 && (
                               <div className="flex items-baseline gap-1">
-                                <span className="text-[10px] text-red-500">✕</span>
-                                <span className={`text-[11px] leading-relaxed ${isDark ? 'text-red-400' : 'text-red-600'}`}>
-                                  {matchedUnavailable.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ')}
+                                <span className={`text-[10px] ${isDark ? 'text-rose-400' : 'text-red-500'}`}>✕</span>
+                                <span className={`text-[10px] leading-tight ${isDark ? 'text-rose-300' : 'text-red-600'}`}>
+                                  {matchedUnavailable.map(d => {
+                                    const label = d.label.replace(/\[.*?\]\s*/, '');
+                                    const isSelected = d.key === selectedSevereType;
+                                    return isSelected ? null : label;
+                                  }).filter(Boolean).join(', ')}
                                 </span>
                               </div>
                             )}
@@ -1161,26 +1304,30 @@ export function MapDashboard() {
                         {otherAvailableDiseases.length > 0 && (
                           <>
                             {hasMatchedContent && (
-                              <div className={`border-t border-dashed my-1 ${isDark ? 'border-gray-700' : 'border-gray-300'}`} />
+                              <div className={`border-t border-dashed my-0.5 ${isDark ? 'border-gray-700' : 'border-gray-300'}`} />
                             )}
                             <div className="flex items-baseline gap-1">
-                              <span className="text-[10px] text-green-500">○</span>
-                              <span className={`text-[11px] leading-relaxed ${isDark ? 'text-green-400' : 'text-green-600'}`}>
-                                {otherAvailableDiseases.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ')}
+                              <span className={`text-[10px] ${isDark ? 'text-emerald-400' : 'text-green-500'}`}>○</span>
+                              <span className={`text-[10px] leading-tight ${isDark ? 'text-emerald-300' : 'text-green-600'}`}>
+                                {otherAvailableDiseases.map(d => {
+                                  const label = d.label.replace(/\[.*?\]\s*/, '');
+                                  const isSelected = d.key === selectedSevereType;
+                                  return isSelected ? null : label;
+                                }).filter(Boolean).join(', ')}
                               </span>
                             </div>
                           </>
                         )}
 
-                        {totalAvailable === 0 && !hasMatchedContent && (
-                          <div className={`text-[11px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>없음</div>
+                        {totalAvailable === 0 && !hasMatchedContent && !selectedSevereType && (
+                          <div className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>없음</div>
                         )}
                       </div>
 
                       {/* 진료 제한 (있을 때만 표시) - 하이라이트 정책 적용 */}
                       {urgentItems.length > 0 && (
-                        <div className={`p-1 rounded ${isDark ? 'bg-red-900/20' : 'bg-red-50'}`}>
-                          <div className={`text-[11px] mb-0.5 font-medium ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                        <div className={`p-1 rounded ${isDark ? 'bg-rose-900/10' : 'bg-red-50'}`}>
+                          <div className={`text-[10px] mb-0.5 font-medium ${isDark ? 'text-rose-300' : 'text-red-600'}`}>
                             진료제한 ({urgentItems.length})
                           </div>
                           {urgentItems.map((item, idx) => {
@@ -1188,8 +1335,8 @@ export function MapDashboard() {
                             const processedContent = replaceUnavailableWithX(item.content);
                             const segments = parseMessageWithHighlights(processedContent);
                             return (
-                              <div key={idx} className="text-[11px] leading-relaxed">
-                                <span className={`font-medium ${isDark ? 'text-red-400' : 'text-red-600'}`}>{item.label} </span>
+                              <div key={idx} className="text-[10px] leading-tight">
+                                <span className={`font-medium ${isDark ? 'text-rose-300' : 'text-red-600'}`}>{item.label} </span>
                                 <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
                                   {segments.map((seg, segIdx) => (
                                     <span key={segIdx} className={getHighlightClassWithTheme(seg.type, isDark)}>
@@ -1234,6 +1381,8 @@ export function MapDashboard() {
             selectedStatus={selectedStatus}
             selectedBedTypes={selectedBedTypes}
             onBackToNational={handleBackToNational}
+            userLocation={userLocation}
+            showLocationRadius={sortMode === "travelTime" && !!userLocation}
           />
         </main>
 
@@ -1281,41 +1430,36 @@ export function MapDashboard() {
                 </div>
                 <div>
                   <label className={`text-[10px] mb-1 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
-                  <div className="flex flex-wrap gap-1.5 items-center">
+                  <div className="flex flex-wrap gap-1 items-center">
                     <button
                       onClick={() => toggleClassification("권역응급의료센터")}
-                      className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
                         selectedClassifications.includes("권역응급의료센터")
                           ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
                           : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <span className={`w-2.5 h-2.5 ${selectedClassifications.includes("권역응급의료센터") ? "bg-white" : isDark ? "bg-gray-500" : "bg-gray-400"}`} />
-                      권역
+                      권역({classificationCounts.권역})
                     </button>
                     <button
                       onClick={() => toggleClassification("지역응급의료센터")}
-                      className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
                         selectedClassifications.includes("지역응급의료센터")
                           ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
                           : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <span className={`w-2.5 h-2.5 rounded-full ${selectedClassifications.includes("지역응급의료센터") ? "bg-white" : isDark ? "bg-gray-500" : "bg-gray-400"}`} />
-                      센터
+                      센터({classificationCounts.센터})
                     </button>
                     <button
                       onClick={() => toggleClassification("지역응급의료기관")}
-                      className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                      className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
                         selectedClassifications.includes("지역응급의료기관")
                           ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
                           : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <svg className={`w-2.5 h-2.5 ${selectedClassifications.includes("지역응급의료기관") ? "fill-white" : isDark ? "fill-gray-500" : "fill-gray-400"}`} viewBox="0 0 10 10">
-                        <polygon points="5,0 10,10 0,10" />
-                      </svg>
-                      기관
+                      기관({classificationCounts.기관})
                     </button>
                   </div>
                 </div>
@@ -1384,7 +1528,7 @@ export function MapDashboard() {
                         !selectedDiseaseCategory
                           ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("24시간")
-                            ? isDark ? "border border-green-500 text-green-400" : "border border-green-600 text-green-700 bg-green-50"
+                            ? isDark ? "border border-emerald-500/50 text-emerald-300" : "border border-green-600 text-green-700 bg-green-50"
                             : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
@@ -1397,7 +1541,7 @@ export function MapDashboard() {
                         !selectedDiseaseCategory
                           ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("주간")
-                            ? isDark ? "border border-blue-500 text-blue-400" : "border border-blue-600 text-blue-700 bg-blue-50"
+                            ? isDark ? "border border-sky-500/50 text-sky-300" : "border border-blue-600 text-blue-700 bg-blue-50"
                             : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
@@ -1410,7 +1554,7 @@ export function MapDashboard() {
                         !selectedDiseaseCategory
                           ? isDark ? "text-gray-700 cursor-not-allowed" : "text-gray-400 cursor-not-allowed"
                           : selectedStatus.includes("야간")
-                            ? isDark ? "border border-purple-500 text-purple-400" : "border border-purple-600 text-purple-700 bg-purple-50"
+                            ? isDark ? "border border-violet-500/50 text-violet-300" : "border border-red-600 text-red-700 bg-red-50"
                             : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
@@ -1444,26 +1588,10 @@ export function MapDashboard() {
             <div className="px-3 py-3">
               <div className="flex items-center justify-between mb-2">
                 <label className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>실시간 병상정보</label>
-                {bedLoading && <span className={`text-[11px] ${isDark ? 'text-orange-400' : 'text-orange-500'}`}>로딩...</span>}
-              </div>
-              {/* 병상 유형 */}
-              <div className="flex flex-wrap gap-1 mb-2">
-                {(Object.entries(BED_TYPE_CONFIG) as [BedType, typeof BED_TYPE_CONFIG[BedType]][]).map(([type, config]) => (
-                  <button
-                    key={type}
-                    onClick={() => toggleBedType(type)}
-                    className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
-                      selectedBedTypes.has(type)
-                        ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
-                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {config.shortLabel}
-                  </button>
-                ))}
+                {bedLoading && <span className={`text-[11px] ${isDark ? 'text-amber-300/70' : 'text-orange-500'}`}>로딩...</span>}
               </div>
               {/* 병상 상태 */}
-              <div className="flex gap-1.5">
+              <div className="flex gap-1.5 mb-2">
                 <button
                   onClick={() => toggleBedStatus("여유")}
                   className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
@@ -1495,6 +1623,23 @@ export function MapDashboard() {
                   부족
                 </button>
               </div>
+              <div className={`h-px ${isDark ? 'bg-gray-800/40' : 'bg-[#d4cdc4]/50'} mb-2`} />
+              {/* 병상 유형 */}
+              <div className="flex flex-wrap gap-1">
+                {(Object.entries(BED_TYPE_CONFIG) as [BedType, typeof BED_TYPE_CONFIG[BedType]][]).map(([type, config]) => (
+                  <button
+                    key={type}
+                    onClick={() => toggleBedType(type)}
+                    className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                      selectedBedTypes.has(type)
+                        ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {config.shortLabel}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -1507,7 +1652,7 @@ export function MapDashboard() {
         >
           <div className={`p-2 border-b ${isDark ? 'border-gray-800 bg-gray-900' : 'border-[#d4cdc4] bg-[#ddd6cc]'}`}>
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#4A5D5D]'}`}>{getFilterSummary()} ({searchedHospitals.length})</span>
+              <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#4A5D5D]'}`}>{getFilterSummary(searchedHospitals.length)}</span>
               <button onClick={closeMobilePanel} className={`p-1 ${isDark ? 'text-gray-400 hover:text-white' : 'text-[#4A5D5D] hover:text-[#3a4a4a]'}`}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1543,14 +1688,14 @@ export function MapDashboard() {
               </button>
             </div>
             {locationError && (
-              <div className="text-[10px] text-red-400 mt-1">{locationError}</div>
+              <div className={`text-[10px] mt-1 ${isDark ? 'text-rose-300' : 'text-red-500'}`}>{locationError}</div>
             )}
           </div>
           {/* 검색창 */}
           <div className={`p-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
             <div className="relative">
               <svg
-                className={`absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}
+                className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -1562,8 +1707,8 @@ export function MapDashboard() {
                 placeholder="병원명 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-7 pr-2 text-xs rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-[#F5F0E8] border border-[#d4cdc4] text-gray-900 placeholder-gray-400'}`}
-                style={{ paddingLeft: '28px' }}
+                className={`w-full h-6 pr-2 text-[11px] rounded focus:outline-none ${isDark ? 'bg-transparent border-none text-white placeholder-gray-500' : 'bg-[#F5F0E8] border border-[#d4cdc4] text-gray-900 placeholder-gray-400'}`}
+                style={{ paddingLeft: '24px' }}
               />
               {searchQuery && (
                 <button
@@ -1579,7 +1724,12 @@ export function MapDashboard() {
           </div>
           {/* 병원 목록 */}
           <div className={`overflow-y-auto h-[calc(100%-96px)] p-2 space-y-0.5 ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}>
-            {searchedHospitals.map((hospital) => {
+            {sortMode === "travelTime" && (
+              <div className={`text-[9px] pb-0.5 text-right ${isDark ? 'text-rose-300/70' : 'text-red-500'}`}>
+                반경 10km밖의 기관은 거리계산 제외
+              </div>
+            )}
+            {searchedHospitals.map((hospital, index) => {
               const status = getHospitalStatus(hospital);
               const isHovered = hoveredHospitalCode === hospital.code;
               const shortClass = getClassificationShort(hospital.classification);
@@ -1595,7 +1745,7 @@ export function MapDashboard() {
               return (
                 <div
                   key={hospital.code}
-                  className={`px-1.5 py-1 rounded border text-xs cursor-pointer transition-all duration-200 ${bgClass}`}
+                  className={`px-1.5 py-1 rounded border text-xs cursor-pointer transition-all duration-200 ${bgClass} ${sortMode === "travelTime" && index === 0 ? 'mt-0.5' : ''}`}
                   onClick={() => {
                     handleHospitalHover(hospital.code);
                     closeMobilePanel();
@@ -1612,7 +1762,7 @@ export function MapDashboard() {
                     </span>
                     {/* 소요시간 (활성화 시) */}
                     {sortMode === "travelTime" && travelTimes.get(hospital.code)?.duration && (
-                      <span className="shrink-0 text-[9px] font-medium text-blue-400">
+                      <span className={`shrink-0 text-[9px] font-medium ${isDark ? 'text-sky-300' : 'text-blue-500'}`}>
                         {formatDuration(travelTimes.get(hospital.code)?.duration ?? null)}
                       </span>
                     )}
@@ -1620,7 +1770,7 @@ export function MapDashboard() {
                     {selectedDiseaseCategory && currentCategory && (
                       <span
                         className={`shrink-0 text-[8px] px-1 py-0.5 rounded truncate ${
-                          isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700'
+                          isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-blue-100 text-blue-700'
                         }`}
                         style={{ maxWidth: '45px' }}
                         title={currentCategory.label}
@@ -1630,7 +1780,7 @@ export function MapDashboard() {
                     )}
                     {/* 가용상태 */}
                     {selectedSevereType && isSevereAvailable ? (
-                      <span className="shrink-0 text-[10px] text-green-400">가능</span>
+                      <span className={`shrink-0 text-[10px] ${isDark ? 'text-emerald-300' : 'text-green-600'}`}>가능</span>
                     ) : status && !selectedSevereType ? (
                       <span className={`shrink-0 text-[10px] ${getStatusColor(status, isDark)}`}>
                         {status}
