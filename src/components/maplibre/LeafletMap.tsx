@@ -86,7 +86,21 @@ export default function LeafletMap({
   const tileLayerRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const popupRef = useRef<any>(null);
+  // 콜백 ref - 의존성 배열에서 제거하여 불필요한 마커 재생성 방지
+  const onHospitalHoverRef = useRef(onHospitalHover);
+  const onHospitalClickRef = useRef(onHospitalClick);
+  // createPopupContent ref - 의존성 배열에서 제거하여 불필요한 마커 재생성 방지
+  const createPopupContentRef = useRef<((hospital: Hospital, isDarkMode?: boolean) => string) | null>(null);
+  // 이전 호버 마커 추적 - 외부(리스트) 호버 처리용
+  const prevHoveredCodeRef = useRef<string | null>(null);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
+
+  // 콜백 ref 업데이트
+  useEffect(() => {
+    onHospitalHoverRef.current = onHospitalHover;
+    onHospitalClickRef.current = onHospitalClick;
+  }, [onHospitalHover, onHospitalClick]);
+
   // NOTE: 'minimal'과 'pure_dark' 테마는 지저분해서 사용 금지 (2024-12-28 제거)
   const [tileLayer, setTileLayer] = useState<'osm' | 'light' | 'dark' | 'neutral'>('light');
 
@@ -406,6 +420,11 @@ export default function LeafletMap({
     return content;
   }, [bedDataMap, severeDataMap, emergencyMessages, selectedSevereType, selectedDiseaseCategory, selectedDiseases, diseaseStatusMap, isDark]);
 
+  // createPopupContent ref 업데이트 - 마커 재생성 없이 최신 함수 참조 유지
+  useEffect(() => {
+    createPopupContentRef.current = createPopupContent;
+  }, [createPopupContent]);
+
   // 타일 레이어 URL 및 설정
   // NOTE: minimal, pure_dark 테마는 지저분하여 제거됨 (2024-12-28)
   const getTileLayerConfig = (layer: 'osm' | 'light' | 'dark' | 'neutral') => {
@@ -523,79 +542,74 @@ export default function LeafletMap({
       // 마커 DOM 요소 참조
       const markerDom = customMarker.getElement();
 
-      // 팝업 표시/숨김 함수
-      const showPopup = () => {
-        if (popupRef.current) {
-          popupRef.current.remove();
-        }
+      // 네이티브 DOM 이벤트 사용 (mouseenter/mouseleave)
+      // MapLibre와 동일한 방식 - mouseover/mouseout은 자식 요소에서 버블링되어 깜빡임 발생
+      if (markerDom) {
+        markerDom.addEventListener('mouseenter', () => {
+          // 팝업 표시
+          if (popupRef.current) {
+            popupRef.current.remove();
+          }
 
-        // 마커 강조 효과
-        if (markerDom) {
-          markerDom.classList.add('marker-hovered');
-        }
+          popupRef.current = window.L.popup({
+            closeButton: false,
+            closeOnClick: false,
+            autoPan: false,
+            offset: [0, -40],
+            className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
+          })
+            .setLatLng([hospital.lat, hospital.lng])
+            .setContent(createPopupContentRef.current?.(hospital, isDark) || '')
+            .addTo(mapInstance.current);
 
-        const popupElement = window.L.popup({
-          closeButton: false,
-          closeOnClick: false,
-          autoPan: false,  // 지도 자동 이동 방지 - 깜빡임 방지
-          offset: [0, -40],  // 마커 위쪽으로 충분히 이동
-          className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
-        })
-          .setLatLng([hospital.lat!, hospital.lng!])
-          .setContent(createPopupContent(hospital, isDark))
-          .addTo(mapInstance.current);
+          // 부모에게 호버 상태 알림 (리스트 하이라이트용)
+          onHospitalHoverRef.current?.(hospital.code);
+        });
 
-        popupRef.current = popupElement;
-      };
+        markerDom.addEventListener('mouseleave', () => {
+          // 팝업 제거
+          if (popupRef.current) {
+            popupRef.current.remove();
+            popupRef.current = null;
+          }
 
-      const hidePopup = () => {
-        popupRef.current?.remove();
-        popupRef.current = null;
-        // 마커 강조 효과 제거
-        if (markerDom) {
-          markerDom.classList.remove('marker-hovered');
-        }
-      };
-
-      // 호버 이벤트 - MapLibreMap과 동일하게 처리
-      customMarker.on('mouseover', () => {
-        if (onHospitalHover) {
-          onHospitalHover(hospital.code);
-        }
-        showPopup();
-      });
-
-      customMarker.on('mouseout', () => {
-        if (onHospitalHover) {
-          onHospitalHover(null);
-        }
-        hidePopup();
-      });
+          // 부모에게 호버 해제 알림
+          onHospitalHoverRef.current?.(null);
+        });
+      }
 
       // 클릭 이벤트
       customMarker.on('click', () => {
-        if (onHospitalClick) {
-          onHospitalClick(hospital);
+        if (onHospitalClickRef.current) {
+          onHospitalClickRef.current(hospital);
         }
       });
 
       markersRef.current.set(hospital.code, customMarker);
     });
-  }, [leafletLoaded, hospitals, bedDataMap, onHospitalClick, onHospitalHover, isDark, createPopupContent]);
+  }, [leafletLoaded, hospitals, bedDataMap, isDark]);
 
   // hoveredHospitalCode 변경 시 팝업 표시/숨김 및 마커 강조
   useEffect(() => {
     if (!mapInstance.current || !leafletLoaded) return;
 
-    // 모든 마커에서 hover 클래스 제거
-    markersRef.current.forEach((marker) => {
-      const markerDom = marker.getElement?.();
-      if (markerDom) {
-        markerDom.classList.remove('marker-hovered');
-      }
-    });
+    // 같은 마커인 경우 무시 (중복 실행 방지)
+    if (prevHoveredCodeRef.current === hoveredHospitalCode) {
+      return;
+    }
 
-    // 이전 팝업 닫기
+    // 이전 호버 마커에서만 hover 클래스 제거 (모든 마커 순회 대신)
+    if (prevHoveredCodeRef.current) {
+      const prevMarker = markersRef.current.get(prevHoveredCodeRef.current);
+      if (prevMarker) {
+        const markerDom = prevMarker.getElement?.();
+        if (markerDom) {
+          markerDom.classList.remove('marker-hovered');
+        }
+      }
+    }
+
+    // 이전 팝업만 제거
     if (popupRef.current) {
       popupRef.current.remove();
       popupRef.current = null;
@@ -623,13 +637,16 @@ export default function LeafletMap({
           className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
         })
           .setLatLng([hospital.lat, hospital.lng])
-          .setContent(createPopupContent(hospital, isDark))
+          .setContent(createPopupContentRef.current?.(hospital, isDark) || '')
           .addTo(mapInstance.current);
 
         popupRef.current = popupElement;
       }
     }
-  }, [hoveredHospitalCode, hospitals, isDark, createPopupContent, leafletLoaded]);
+
+    // 현재 호버 코드 저장
+    prevHoveredCodeRef.current = hoveredHospitalCode;
+  }, [hoveredHospitalCode, hospitals, isDark, leafletLoaded]);
 
   if (!leafletLoaded) {
     return (

@@ -749,7 +749,7 @@ export function MapDashboard() {
               />
               <div className="flex items-center gap-0.5 mt-1">
                 <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
-                  <SelectTrigger size="xs" className={`w-[58px] [&_svg]:size-2 [&_svg]:ml-0 ${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
+                  <SelectTrigger size="xs" className={`w-[58px] [&_svg]:w-[5px] [&_svg]:h-[5px] [&_svg]:ml-0 ${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}>
