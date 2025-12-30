@@ -134,9 +134,76 @@ export default function FeedbackPage() {
   const [formContent, setFormContent] = useState('');
   const [formIsPublic, setFormIsPublic] = useState(false); // 기본값: 비공개
   const [formContact, setFormContact] = useState(''); // 연락처 (선택)
+  const [contactError, setContactError] = useState<string | null>(null); // 연락처 유효성 오류
   const [formPassword, setFormPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // 전화번호 포맷팅 (한국 전화번호)
+  const formatPhoneNumber = (value: string): string => {
+    // 숫자만 추출
+    const numbers = value.replace(/[^0-9]/g, '');
+
+    // 휴대폰 번호 (010, 011, 016, 017, 018, 019)
+    if (numbers.startsWith('01')) {
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+      return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+    }
+    // 서울 지역번호 (02)
+    if (numbers.startsWith('02')) {
+      if (numbers.length <= 2) return numbers;
+      if (numbers.length <= 5) return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
+      if (numbers.length <= 9) return `${numbers.slice(0, 2)}-${numbers.slice(2, 5)}-${numbers.slice(5)}`;
+      return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6, 10)}`;
+    }
+    // 기타 지역번호 (031, 032, 033, 041, 042, 043, 044, 051, 052, 053, 054, 055, 061, 062, 063, 064)
+    if (numbers.startsWith('0') && numbers.length > 1) {
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 6) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+      if (numbers.length <= 10) return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
+      return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+    }
+    return value;
+  };
+
+  // 이메일 유효성 검사
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // 연락처가 전화번호인지 확인 (이메일이 아닌 경우에만)
+  const isPhoneNumber = (value: string): boolean => {
+    // @가 포함되어 있으면 이메일로 처리 (숫자로 시작해도)
+    if (value.includes('@')) return false;
+
+    const numbers = value.replace(/[^0-9]/g, '');
+    // 숫자만 있고, 0으로 시작하고, 숫자가 전체 길이의 대부분을 차지하면 전화번호
+    const nonNumbers = value.replace(/[0-9\-\s]/g, '');
+    return numbers.length > 0 && numbers.startsWith('0') && nonNumbers.length === 0;
+  };
+
+  // 연락처 변경 핸들러
+  const handleContactChange = (value: string) => {
+    setContactError(null);
+
+    // @가 포함되어 있으면 무조건 이메일로 처리
+    if (value.includes('@')) {
+      setFormContact(value);
+      if (value.length > 3 && !validateEmail(value)) {
+        setContactError('올바른 이메일 형식이 아닙니다');
+      }
+      return;
+    }
+
+    // 전화번호로 시작하면 포맷팅
+    if (isPhoneNumber(value)) {
+      setFormContact(formatPhoneNumber(value));
+    } else {
+      setFormContact(value);
+    }
+  };
 
   // 비밀글 열람 상태
   const [viewingPostId, setViewingPostId] = useState<string | null>(null);
@@ -512,52 +579,43 @@ export default function FeedbackPage() {
 
         {/* 피드백 게시판 탭 */}
         {activeTab === 'board' && (
-          <div className="space-y-8">
+          <div className="space-y-4">
             {/* 작성 폼 - 모던 카드 스타일 */}
             <form onSubmit={handleSubmit} className={`relative overflow-hidden rounded-2xl ${
               isDark ? 'bg-gray-800/50 border border-gray-700/50' : 'bg-[#FAF7F2] border border-gray-300 shadow-sm'
             }`}>
               {/* 폼 헤더 */}
-              <div className={`px-6 py-4 border-b ${isDark ? 'border-gray-700/50 bg-gray-800/30' : 'border-gray-100 bg-gray-50/50'}`}>
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg ${isDark ? 'bg-emerald-500/20' : 'bg-[#4A5D5D]/10'} flex items-center justify-center`}>
-                    <svg className={`w-4 h-4 ${isDark ? 'text-emerald-400' : 'text-[#4A5D5D]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className={`text-base font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      피드백 작성
-                    </h3>
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      버그 신고, 기능 건의 등을 남겨주세요
-                    </p>
-                  </div>
-                </div>
+              <div className={`px-4 py-2.5 border-b ${isDark ? 'border-gray-700/50 bg-gray-800/30' : 'border-gray-100 bg-gray-50/50'}`}>
+                <p className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  버그 신고, 기능 건의 등을 남겨주세요
+                </p>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  그 외 시스템 운영과 무관한 수용불가, 부적절 이송에 대한 내용은 예고없이 삭제될 수 있습니다.
+                </p>
               </div>
 
-              <div className="p-6 space-y-5">
-                {/* 1행: 분류 + 작성자 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div className="p-3 space-y-2">
+                {/* 1행: 분류 + 작성자 + 연락처 + 비공개 + 비밀번호 */}
+                <div className="flex gap-2 items-end flex-wrap">
+                  <div className="shrink-0">
+                    <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                       분류
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex">
                       {(['건의', '버그', '기타'] as const).map((cat) => (
                         <button
                           key={cat}
                           type="button"
                           onClick={() => setFormCategory(cat)}
-                          className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
+                          className={`px-1.5 py-1 text-[10px] font-medium border transition-all first:rounded-l last:rounded-r -ml-px first:ml-0 ${
                             formCategory === cat
                               ? cat === '버그'
                                 ? isDark
-                                  ? 'bg-red-500/20 border-red-500 text-red-400'
-                                  : 'bg-red-50 border-red-500 text-red-600'
+                                  ? 'bg-red-500/20 border-red-500 text-red-400 z-10'
+                                  : 'bg-red-50 border-red-500 text-red-600 z-10'
                                 : isDark
-                                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                  : 'bg-[#4A5D5D]/10 border-[#4A5D5D] text-[#4A5D5D]'
+                                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 z-10'
+                                  : 'bg-[#4A5D5D]/10 border-[#4A5D5D] text-[#4A5D5D] z-10'
                               : isDark
                                 ? 'bg-gray-800 border-gray-600 text-gray-400 hover:border-gray-500'
                                 : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
@@ -569,9 +627,9 @@ export default function FeedbackPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      작성자 (선택)
+                  <div className="w-20">
+                    <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      작성자
                     </label>
                     <input
                       type="text"
@@ -579,7 +637,79 @@ export default function FeedbackPage() {
                       onChange={(e) => setFormAuthor(e.target.value)}
                       placeholder="익명"
                       maxLength={20}
-                      className={`w-full px-4 py-2.5 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 ${
+                      className={`w-full px-2 py-1 rounded border text-xs transition-colors focus:outline-none focus:ring-1 ${
+                        isDark
+                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
+                          : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex-1 min-w-[100px] relative">
+                    <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      연락처
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formContact}
+                        onChange={(e) => handleContactChange(e.target.value)}
+                        placeholder="이메일/전화번호"
+                        maxLength={50}
+                        className={`w-full px-2 py-1 rounded border text-xs transition-colors focus:outline-none focus:ring-1 ${
+                          contactError
+                            ? isDark
+                              ? 'bg-gray-800 border-red-500 text-white placeholder-gray-500 focus:ring-red-500/50 focus:border-red-500'
+                              : 'bg-white border-red-400 text-gray-800 placeholder-gray-400 focus:ring-red-300 focus:border-red-400'
+                            : isDark
+                              ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
+                              : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
+                        }`}
+                      />
+                      {contactError && (
+                        <div className={`absolute -bottom-4 left-0 text-[9px] ${isDark ? 'text-red-400' : 'text-red-500'}`}>
+                          {contactError}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center shrink-0">
+                    <label className={`flex items-center gap-1.5 cursor-pointer ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={formIsPublic}
+                          onChange={(e) => setFormIsPublic(e.target.checked)}
+                          className="sr-only"
+                        />
+                        <div className={`w-7 h-4 rounded-full transition-colors ${
+                          formIsPublic
+                            ? isDark ? 'bg-emerald-500' : 'bg-[#4A5D5D]'
+                            : isDark ? 'bg-gray-600' : 'bg-gray-300'
+                        }`}>
+                          <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${
+                            formIsPublic ? 'translate-x-3.5' : 'translate-x-0.5'
+                          }`} />
+                        </div>
+                      </div>
+                      <span className="text-[10px]">
+                        {formIsPublic ? '공개' : '비공개'}
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="w-24">
+                    <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      비밀번호
+                    </label>
+                    <input
+                      type="password"
+                      value={formPassword}
+                      onChange={(e) => setFormPassword(e.target.value)}
+                      placeholder="4~20자"
+                      maxLength={20}
+                      className={`w-full px-2 py-1 rounded border text-xs transition-colors focus:outline-none focus:ring-1 ${
                         isDark
                           ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
                           : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
@@ -590,103 +720,36 @@ export default function FeedbackPage() {
 
                 {/* 2행: 내용 */}
                 <div>
-                  <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    내용
-                  </label>
                   <textarea
                     value={formContent}
                     onChange={(e) => setFormContent(e.target.value)}
-                    placeholder="피드백을 입력해주세요..."
+                    placeholder="피드백 내용을 입력해주세요..."
                     maxLength={1000}
-                    rows={4}
-                    className={`w-full px-4 py-3 rounded-lg border text-sm resize-none transition-colors focus:outline-none focus:ring-2 ${
+                    rows={2}
+                    className={`w-full px-2 py-1.5 rounded border text-sm resize-none transition-colors focus:outline-none focus:ring-1 ${
                       isDark
                         ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
                         : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
                     }`}
                   />
-                  <div className={`text-xs mt-1.5 text-right ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  <div className={`text-[10px] mt-0.5 text-right ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                     {formContent.length}/1000
-                  </div>
-                </div>
-
-                {/* 3행: 연락처 + 공개여부 + 비밀번호 */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      연락처 (선택)
-                    </label>
-                    <input
-                      type="text"
-                      value={formContact}
-                      onChange={(e) => setFormContact(e.target.value)}
-                      placeholder="이메일/전화번호"
-                      maxLength={50}
-                      className={`w-full px-4 py-2.5 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 ${
-                        isDark
-                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
-                          : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
-                      }`}
-                    />
-                  </div>
-
-                  <div className="flex items-end pb-1">
-                    <label className={`flex items-center gap-3 cursor-pointer ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                      <div className="relative">
-                        <input
-                          type="checkbox"
-                          checked={formIsPublic}
-                          onChange={(e) => setFormIsPublic(e.target.checked)}
-                          className="sr-only"
-                        />
-                        <div className={`w-10 h-6 rounded-full transition-colors ${
-                          formIsPublic
-                            ? isDark ? 'bg-emerald-500' : 'bg-[#4A5D5D]'
-                            : isDark ? 'bg-gray-600' : 'bg-gray-300'
-                        }`}>
-                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                            formIsPublic ? 'translate-x-5' : 'translate-x-1'
-                          }`} />
-                        </div>
-                      </div>
-                      <span className="text-sm">
-                        {formIsPublic ? '공개' : '비공개'}
-                      </span>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className={`block text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      비밀번호 (본인 확인용)
-                    </label>
-                    <input
-                      type="password"
-                      value={formPassword}
-                      onChange={(e) => setFormPassword(e.target.value)}
-                      placeholder="4~20자"
-                      maxLength={20}
-                      className={`w-full px-4 py-2.5 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 ${
-                        isDark
-                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500 focus:ring-emerald-500/50 focus:border-emerald-500'
-                          : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:ring-[#4A5D5D]/30 focus:border-[#4A5D5D]'
-                      }`}
-                    />
                   </div>
                 </div>
 
                 {/* 제출 메시지 */}
                 {submitMessage && (
-                  <div className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm ${
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
                     submitMessage.type === 'success'
                       ? isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-600'
                       : isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600'
                   }`}>
                     {submitMessage.type === 'success' ? (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     )}
@@ -699,7 +762,7 @@ export default function FeedbackPage() {
                   <button
                     type="submit"
                     disabled={submitting || !isConfigured}
-                    className={`px-8 py-2.5 text-sm font-medium rounded-lg transition-all disabled:opacity-50 ${
+                    className={`px-6 py-1.5 text-sm font-medium rounded-lg transition-all disabled:opacity-50 ${
                       isDark
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
                         : 'bg-[#4A5D5D] hover:bg-[#3A4D4D] text-white shadow-lg shadow-[#4A5D5D]/30'

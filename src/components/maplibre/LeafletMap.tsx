@@ -115,8 +115,8 @@ export default function LeafletMap({
     onHospitalClickRef.current = onHospitalClick;
   }, [onHospitalHover, onHospitalClick]);
 
-  // NOTE: 'minimal'과 'pure_dark' 테마는 지저분해서 사용 금지 (2024-12-28 제거)
-  const [tileLayer, setTileLayer] = useState<'osm' | 'light' | 'dark' | 'neutral'>('light');
+  // NOTE: 'minimal', 'pure_dark', 'neutral', 'osm' 테마는 지저분해서 사용 금지
+  const [tileStyle, setTileStyle] = useState<'clean' | 'classic'>('clean');
 
   // Leaflet 동적 로드 (npm 패키지에서 - CDN 대신 번들 사용으로 로딩 속도 개선)
   useEffect(() => {
@@ -438,40 +438,28 @@ export default function LeafletMap({
 
   // 타일 레이어 URL 및 설정
   // NOTE: minimal, pure_dark 테마는 지저분하여 제거됨 (2024-12-28)
-  const getTileLayerConfig = (layer: 'osm' | 'light' | 'dark' | 'neutral') => {
-    switch (layer) {
-      case 'light':
-        return {
-          url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          maxZoom: 19,
-          subdomains: 'abcd',
-        };
-      case 'dark':
-        return {
-          url: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          maxZoom: 19,
-          subdomains: 'abcd',
-        };
-      case 'neutral':
-        return {
-          url: 'https://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}.png',
-          attribution:
-            '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 20,
-        };
-      case 'osm':
-      default:
-        return {
-          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 19,
-        };
+  const getTileLayerConfig = (style: 'clean' | 'classic', darkMode: boolean) => {
+    if (style === 'classic') {
+      return {
+        url: darkMode
+          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+          : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        maxZoom: 19,
+        subdomains: 'abcd',
+      };
     }
+
+    return {
+      url: darkMode
+        ? 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 19,
+      subdomains: 'abcd',
+    };
   };
 
   // 지도 초기화 (1회만)
@@ -487,14 +475,14 @@ export default function LeafletMap({
       );
 
       // 초기 타일 레이어 추가
-      const tileConfig = getTileLayerConfig(tileLayer);
+      const tileConfig = getTileLayerConfig(tileStyle, isDark);
       tileLayerRef.current = window.L.tileLayer(tileConfig.url, {
         attribution: tileConfig.attribution,
         maxZoom: tileConfig.maxZoom,
         subdomains: tileConfig.subdomains || 'abc',
       }).addTo(mapInstance.current);
     }
-  }, [leafletLoaded]);
+  }, [leafletLoaded, tileStyle, isDark]);
 
   // 지역 변경 시 뷰 업데이트
   useEffect(() => {
@@ -507,7 +495,7 @@ export default function LeafletMap({
   useEffect(() => {
     if (!mapInstance.current || !tileLayerRef.current) return;
 
-    const tileConfig = getTileLayerConfig(tileLayer);
+    const tileConfig = getTileLayerConfig(tileStyle, isDark);
 
     // 기존 타일 레이어 제거
     mapInstance.current.removeLayer(tileLayerRef.current);
@@ -518,7 +506,7 @@ export default function LeafletMap({
       maxZoom: tileConfig.maxZoom,
       subdomains: tileConfig.subdomains || 'abc',
     }).addTo(mapInstance.current);
-  }, [tileLayer]);
+  }, [tileStyle, isDark]);
 
   // 마커 업데이트
   // 최적화: requestAnimationFrame으로 배치 렌더링하여 TBT 감소
@@ -765,52 +753,22 @@ export default function LeafletMap({
         {/* 구분선 */}
         <div className={`w-px h-5 ${isDark ? 'bg-gray-700/50' : 'bg-gray-400/50'}`} />
 
-        {/* 타일 레이어 선택 */}
-        <div className="flex items-center gap-1">
+        <div className="relative group">
           <button
-            onClick={() => setTileLayer('light')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
-              tileLayer === 'light'
-                ? 'bg-green-500 text-white'
-                : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-            }`}
-            title="밝은 스타일"
+            onClick={() => setTileStyle(tileStyle === 'clean' ? 'classic' : 'clean')}
+            className={`w-9 h-9 rounded-md transition-all flex items-center justify-center ${isDark ? 'hover:bg-gray-700/80 text-white' : 'hover:bg-gray-200/80 text-gray-900'}`}
           >
-            Light
+            <svg className={`w-4 h-4 ${isDark ? 'text-blue-300' : 'text-blue-600'}`} fill="currentColor" viewBox="0 0 20 20">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+            </svg>
           </button>
-          <button
-            onClick={() => setTileLayer('neutral')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
-              tileLayer === 'neutral'
-                ? 'bg-green-500 text-white'
-                : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-            }`}
-            title="중립 스타일"
-          >
-            Neutral
-          </button>
-          <button
-            onClick={() => setTileLayer('dark')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
-              tileLayer === 'dark'
-                ? 'bg-green-500 text-white'
-                : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-            }`}
-            title="어두운 스타일"
-          >
-            Dark
-          </button>
-          <button
-            onClick={() => setTileLayer('osm')}
-            className={`px-2 py-1 text-xs font-medium rounded transition-all ${
-              tileLayer === 'osm'
-                ? 'bg-green-500 text-white'
-                : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-            }`}
-            title="기본 OSM"
-          >
-            OSM
-          </button>
+          <div className={`absolute top-full right-0 mt-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 ${isDark ? 'text-white bg-gray-900' : 'text-gray-900 bg-white'}`}>
+            {tileStyle === 'clean' ? '지도 스타일 변경' : '데이터 시각화 보기'}
+          </div>
+        </div>
+
+        <div className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 bg-gray-800/70' : 'text-gray-600 bg-gray-100'}`}>
+          Theme: {isDark ? 'Dark' : 'Light'}
         </div>
       </div>
 

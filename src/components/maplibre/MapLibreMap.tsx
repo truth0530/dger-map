@@ -789,7 +789,7 @@ export default function MapLibreMap({
           </button>
 
           {/* 마우스 오버시 표시되는 텍스트 */}
-          <div className={`absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 ${isDark ? 'text-white bg-gray-900' : 'text-gray-900 bg-white'}`}>
+          <div className={`absolute top-full right-0 mt-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 ${isDark ? 'text-white bg-gray-900' : 'text-gray-900 bg-white'}`}>
             {mapStyleMode === 'dataviz' ? '지도 스타일 변경' : '데이터 시각화 보기'}
           </div>
         </div>
