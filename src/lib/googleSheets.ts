@@ -23,8 +23,8 @@ export interface FeedbackPost {
 
 // Google Sheets 인증
 function getGoogleSheetsClient(): sheets_v4.Sheets | null {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim();
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')?.trim();
 
   if (!email || !privateKey) {
     console.error('[GoogleSheets] 서비스 계정 환경변수 미설정');
@@ -58,16 +58,18 @@ function getSpreadsheetId(): string | null {
  * @param page 페이지 번호 (1부터 시작)
  * @param limit 페이지당 항목 수
  */
+export type FeedbackListStatus = 'ok' | 'error';
+
 export async function getFeedbackList(
   category?: string,
   page: number = 1,
   limit: number = 20
-): Promise<{ posts: FeedbackPost[]; total: number }> {
+): Promise<{ posts: FeedbackPost[]; total: number; status: FeedbackListStatus; errorMessage?: string }> {
   const sheets = getGoogleSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
   if (!sheets || !spreadsheetId) {
-    return { posts: [], total: 0 };
+    return { posts: [], total: 0, status: 'error', errorMessage: 'Google Sheets 미설정' };
   }
 
   try {
@@ -88,17 +90,20 @@ export async function getFeedbackList(
       const replyPublicValue = row[10]?.toUpperCase?.();  // K열 (인덱스 10)
 
       // 답변공개여부 로직:
-      // - K열이 'Y'면 답변 공개
-      // - K열이 'N'이면 답변 비공개
-      // - K열이 빈값이면 게시글 공개여부(F열) 따름
+      // - K열이 'Y'면 답변 공개 (비공개 글이어도 답변만 공개 가능)
+      // - 비공개 글(isPublic=false)이면 K열이 Y가 아닌 한 답변도 비공개
+      // - 공개 글이고 K열이 'N'이면 답변 비공개
+      // - 공개 글이고 K열이 빈값이면 답변도 공개
       let replyPublic: boolean | undefined;
       if (replyPublicValue === 'Y') {
+        // K열이 Y면 답변 공개 (비공개 글이어도 답변만 공개 가능)
         replyPublic = true;
-      } else if (replyPublicValue === 'N') {
+      } else if (!isPublic || replyPublicValue === 'N') {
+        // 비공개 글이거나, K열이 N이면 답변 비공개
         replyPublic = false;
       } else {
-        // 빈값이면 게시글 공개여부 따름
-        replyPublic = isPublic;
+        // 공개 글이고 K열이 빈값이면 답변도 공개
+        replyPublic = true;
       }
 
       return {
@@ -161,10 +166,11 @@ export async function getFeedbackList(
       contact: undefined, // 연락처는 목록에서 숨김
     }));
 
-    return { posts: sanitizedPosts, total };
+    return { posts: sanitizedPosts, total, status: 'ok' };
   } catch (error) {
-    console.error('[GoogleSheets] 데이터 조회 오류:', error);
-    return { posts: [], total: 0 };
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[GoogleSheets] 데이터 조회 오류:', message, error);
+    return { posts: [], total: 0, status: 'error', errorMessage: message };
   }
 }
 

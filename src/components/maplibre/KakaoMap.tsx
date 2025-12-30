@@ -159,8 +159,8 @@ export default function KakaoMap({
     const c = {
       text: isDark ? '#f1f5f9' : '#1f2937',
       subtext: isDark ? '#94a3b8' : '#6b7280',
-      bg: isDark ? '#1f2937' : '#ffffff',
-      border: isDark ? '#374151' : '#e5e7eb',
+      bg: isDark ? '#1f2937' : '#F5F0E8',
+      border: isDark ? '#374151' : '#d4cdc4',
     };
 
     let html = `

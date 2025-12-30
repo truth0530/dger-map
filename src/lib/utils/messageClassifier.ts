@@ -515,7 +515,7 @@ export function parseMessageWithHighlights(message: string): HighlightedSegment[
 }
 
 /**
- * 하이라이트 타입별 CSS 클래스
+ * 하이라이트 타입별 CSS 클래스 (다크모드 기본)
  */
 export function getHighlightClass(type: HighlightType): string {
   switch (type) {
@@ -532,6 +532,71 @@ export function getHighlightClass(type: HighlightType): string {
     default:
       return '';
   }
+}
+
+/**
+ * 하이라이트 타입별 CSS 클래스 (라이트/다크모드 지원)
+ */
+export function getHighlightClassWithTheme(type: HighlightType, isDark: boolean): string {
+  if (isDark) {
+    return getHighlightClass(type);
+  }
+
+  // 라이트모드
+  switch (type) {
+    case 'department':  // 진료과목 - 파란색
+      return 'text-blue-600 font-semibold';
+    case 'staff':       // 의료진 - 빨간색
+      return 'text-red-600 font-semibold';
+    case 'equipment':   // 장비 - 초록색
+      return 'text-green-600 font-semibold';
+    case 'disease':     // 질환명 - 보라색
+      return 'text-purple-600 font-semibold';
+    case 'unavailable': // 불가능 문구 - 회색 (연하게)
+      return 'text-gray-500 opacity-70';
+    default:
+      return '';
+  }
+}
+
+/**
+ * 하이라이트 타입별 인라인 스타일 색상 (팝업용)
+ */
+export function getHighlightColor(type: HighlightType, isDark: boolean): string {
+  if (isDark) {
+    switch (type) {
+      case 'department': return '#60a5fa';  // blue-400
+      case 'staff': return '#f87171';       // red-400
+      case 'equipment': return '#4ade80';   // green-400
+      case 'disease': return '#c084fc';     // purple-400
+      case 'unavailable': return '#9ca3af'; // gray-400
+      default: return 'inherit';
+    }
+  } else {
+    switch (type) {
+      case 'department': return '#2563eb';  // blue-600
+      case 'staff': return '#dc2626';       // red-600
+      case 'equipment': return '#16a34a';   // green-600
+      case 'disease': return '#9333ea';     // purple-600
+      case 'unavailable': return '#6b7280'; // gray-500
+      default: return 'inherit';
+    }
+  }
+}
+
+/**
+ * 메시지를 하이라이트된 HTML로 변환 (팝업용)
+ */
+export function renderHighlightedMessage(message: string, isDark: boolean): string {
+  const segments = parseMessageWithHighlights(message);
+  return segments.map(seg => {
+    if (seg.type === 'none') {
+      return seg.text;
+    }
+    const color = getHighlightColor(seg.type, isDark);
+    const fontWeight = seg.type !== 'unavailable' ? 'font-weight:600;' : 'opacity:0.7;';
+    return `<span style="color:${color};${fontWeight}">${seg.text}</span>`;
+  }).join('');
 }
 
 /**

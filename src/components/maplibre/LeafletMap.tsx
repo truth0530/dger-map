@@ -10,14 +10,14 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import '@/styles/popup.css';
-import type { Hospital } from '@/types';
+import type { Hospital, AvailabilityStatus } from '@/types';
 import type { HospitalBedData } from '@/lib/hooks/useBedData';
 import type { HospitalSevereData } from '@/lib/hooks/useSevereData';
 import type { ClassifiedMessages } from '@/lib/utils/messageClassifier';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
 import { getCategoryByKey, getMatchedSevereKeys } from '@/lib/constants/diseaseCategories';
 import { createMarkerElement } from '@/lib/utils/markerRenderer';
-import { parseMessage } from '@/lib/utils/messageClassifier';
+import { parseMessage, renderHighlightedMessage } from '@/lib/utils/messageClassifier';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
@@ -31,6 +31,7 @@ interface LeafletMapProps {
   selectedSevereType?: SevereTypeKey | null;
   selectedDiseaseCategory?: string | null;  // 42개 중증자원조사 대분류 선택
   selectedDiseases?: Set<string>;  // 선택된 소분류 질환명들
+  diseaseStatusMap?: Map<string, AvailabilityStatus>;  // 42개 자원조사 가용상태 맵
   selectedClassifications: string[];
   hoveredHospitalCode: string | null;
   onHospitalHover?: (code: string | null) => void;
@@ -70,6 +71,7 @@ export default function LeafletMap({
   selectedSevereType,
   selectedDiseaseCategory,
   selectedDiseases,
+  diseaseStatusMap,
   selectedClassifications,
   hoveredHospitalCode,
   onHospitalHover,
@@ -217,14 +219,34 @@ export default function LeafletMap({
               : category.subcategories.map(sub => sub.label).join(', '))
           : category.label;
 
+        // 42개 자원조사 가용상태 가져오기
+        const diseaseStatus = diseaseStatusMap?.get(hospital.code);
+        const statusColor = diseaseStatus === '24시간' ? '#22c55e'
+          : diseaseStatus === '주간' ? '#3b82f6'
+          : diseaseStatus === '야간' ? '#a855f7'
+          : '#6b7280';
+        const statusBadge = diseaseStatus
+          ? `<span style="font-size:10px;font-weight:600;color:${statusColor};background:${isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.7)'};padding:2px 6px;border-radius:3px;">${diseaseStatus}</span>`
+          : '';
+
         content += `
           <div style="padding:6px 12px;background:${isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(219,234,254,0.8)'};border-bottom:1px solid ${c.border};">
-            <div style="font-size:11px;font-weight:600;color:${isDarkMode ? '#60a5fa' : '#2563eb'};">${category.label}</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:11px;font-weight:600;color:${isDarkMode ? '#60a5fa' : '#2563eb'};">${category.label}</span>
+              ${statusBadge}
+            </div>
             <div style="font-size:9px;color:${c.muted};margin-top:2px;line-height:1.4;">${subcategoryLabels}</div>
             <div style="font-size:8px;color:${c.muted};text-align:right;margin-top:2px;opacity:0.7;">25년 9월말 DGEMS 자원조사 기준</div>
           </div>
         `;
       }
+    } else {
+      // 42개 자원조사 필터 미선택 시 안내 메시지
+      content += `
+        <div style="padding:8px 12px;background:${isDarkMode ? 'rgba(100,116,139,0.1)' : 'rgba(148,163,184,0.15)'};border-bottom:1px solid ${c.border};">
+          <div style="font-size:10px;color:${c.muted};text-align:center;">좌측 패널에서 42개 자원조사 항목을 선택해주세요</div>
+        </div>
+      `;
     }
 
     // [핵심] 선택된 질환 가용 여부 (최상단 강조)
@@ -243,6 +265,94 @@ export default function LeafletMap({
           </div>
         </div>
       `;
+    }
+
+    // [통합 섹션] 실시간 중증질환 (27개)
+    if (severeData?.severeStatus) {
+      const matchedSevereKeys = selectedDiseaseCategory ? getMatchedSevereKeys(selectedDiseaseCategory) : [];
+      const hasMatchedFilter = matchedSevereKeys.length > 0;
+
+      // 연관 질환 중 가용/불가 분리
+      const matchedAvailable: typeof SEVERE_TYPES[number][] = [];
+      const matchedUnavailable: typeof SEVERE_TYPES[number][] = [];
+
+      if (hasMatchedFilter) {
+        matchedSevereKeys.forEach(key => {
+          const disease = SEVERE_TYPES.find(t => t.key === key);
+          if (disease) {
+            const status = severeData.severeStatus[key];
+            if (status === 'Y') {
+              matchedAvailable.push(disease);
+            } else {
+              matchedUnavailable.push(disease);
+            }
+          }
+        });
+      }
+
+      // 연관 질환 제외한 가용 질환
+      const otherAvailableDiseases = Object.entries(severeData.severeStatus)
+        .filter(([key, status]) => status === 'Y' && key !== selectedSevereType && !matchedSevereKeys.includes(key))
+        .map(([key]) => SEVERE_TYPES.find(t => t.key === key))
+        .filter((t): t is typeof SEVERE_TYPES[0] => !!t);
+
+      // 연관 질환이나 수용가능 질환이 있을 때만 카드 표시
+      const hasMatchedContent = matchedAvailable.length > 0 || matchedUnavailable.length > 0;
+      const hasOtherContent = otherAvailableDiseases.length > 0;
+
+      // 전체 가용 개수 계산
+      const totalAvailable = matchedAvailable.length + otherAvailableDiseases.length;
+
+      if (hasMatchedContent || hasOtherContent) {
+        content += `<div style="padding:8px 12px;border-bottom:1px solid ${c.border};">`;
+
+        // 통합 타이틀: 실시간 중증질환
+        content += `<div style="font-size:10px;color:${c.muted};margin-bottom:6px;">실시간 중증질환 (${totalAvailable}/${SEVERE_TYPES.length})</div>`;
+
+        // 연관 질환 섹션 (상위 배치)
+        if (hasMatchedContent) {
+          // 가용 질환
+          if (matchedAvailable.length > 0) {
+            const availableLabels = matchedAvailable.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
+            content += `
+              <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:${matchedUnavailable.length > 0 ? '4px' : '0'};">
+                <span style="font-size:10px;color:#22c55e;">○</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${availableLabels}</span>
+              </div>
+            `;
+          }
+
+          // 불가 질환
+          if (matchedUnavailable.length > 0) {
+            const unavailableLabels = matchedUnavailable.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
+            content += `
+              <div style="display:flex;align-items:baseline;gap:4px;">
+                <span style="font-size:10px;color:#ef4444;">✕</span>
+                <span style="font-size:10px;color:${isDarkMode ? '#fca5a5' : '#dc2626'};line-height:1.4;">${unavailableLabels}</span>
+              </div>
+            `;
+          }
+        }
+
+        // 기타 가용 질환 (연관 없는 질환) - 시각적 구분
+        if (hasOtherContent) {
+          if (hasMatchedContent) {
+            content += `<div style="border-top:1px dashed ${c.border};margin:6px 0;"></div>`;
+          }
+
+          const displayCount = Math.min(6, otherAvailableDiseases.length);
+          const labels = otherAvailableDiseases.slice(0, displayCount).map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
+          const more = otherAvailableDiseases.length > displayCount ? ` +${otherAvailableDiseases.length - displayCount}` : '';
+          content += `
+            <div style="display:flex;align-items:baseline;gap:4px;">
+              <span style="font-size:10px;color:#22c55e;">○</span>
+              <span style="font-size:10px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${labels}${more}</span>
+            </div>
+          `;
+        }
+
+        content += `</div>`;
+      }
     }
 
     // 병상 현황 (컴팩트 1줄 + 배터리 표시)
@@ -268,60 +378,14 @@ export default function LeafletMap({
       `;
     }
 
-    // 진료 가능 질환 (선택된 질환 외 다른 질환들)
-    if (severeData?.severeStatus) {
-      const availableDiseases = Object.entries(severeData.severeStatus)
-        .filter(([key, status]) => status === 'Y' && key !== selectedSevereType)
-        .map(([key]) => SEVERE_TYPES.find(t => t.key === key))
-        .filter((t): t is typeof SEVERE_TYPES[0] => !!t);
-
-      if (availableDiseases.length > 0) {
-        // 42개 대분류가 선택된 경우 매칭된 질환과 나머지를 구분
-        const matchedSevereKeys = selectedDiseaseCategory ? getMatchedSevereKeys(selectedDiseaseCategory) : [];
-        const hasMatchedFilter = matchedSevereKeys.length > 0;
-
-        // 매칭된 질환과 나머지 분리
-        const matchedDiseases = hasMatchedFilter
-          ? availableDiseases.filter(d => matchedSevereKeys.includes(d.key))
-          : [];
-        const otherDiseases = hasMatchedFilter
-          ? availableDiseases.filter(d => !matchedSevereKeys.includes(d.key))
-          : availableDiseases;
-
-        content += `<div style="padding:8px 12px;border-bottom:1px solid ${c.border};">`;
-        content += `<div style="font-size:10px;color:${c.muted};margin-bottom:4px;">수용가능(실시간) (${availableDiseases.length})</div>`;
-
-        // 매칭된 질환 (하이라이트 표시)
-        if (matchedDiseases.length > 0) {
-          const matchedLabels = matchedDiseases.map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
-          content += `
-            <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px;">
-              <span style="font-size:9px;font-weight:600;color:${isDarkMode ? '#60a5fa' : '#2563eb'};background:${isDarkMode ? 'rgba(59,130,246,0.2)' : 'rgba(219,234,254,0.9)'};padding:2px 5px;border-radius:3px;flex-shrink:0;line-height:1;">연관</span>
-              <span style="font-size:10px;color:${isDarkMode ? '#93c5fd' : '#1d4ed8'};font-weight:500;line-height:1.4;">${matchedLabels}</span>
-            </div>
-          `;
-        }
-
-        // 나머지 질환
-        if (otherDiseases.length > 0) {
-          const displayCount = Math.min(hasMatchedFilter ? 4 : 6, otherDiseases.length);
-          const labels = otherDiseases.slice(0, displayCount).map(d => d.label.replace(/\[.*?\]\s*/, '')).join(', ');
-          const more = otherDiseases.length > displayCount ? ` +${otherDiseases.length - displayCount}` : '';
-          content += `<div style="font-size:10px;color:${isDarkMode ? '#86efac' : '#16a34a'};line-height:1.4;">${labels}${more}</div>`;
-        }
-
-        content += `</div>`;
-      }
-    }
-
-    // 긴급 알림 (진료불가/제한 실제 내용 표시) - 맨 아래로 이동
+    // 긴급 알림 (진료불가/제한 실제 내용 표시) - 하이라이트 정책 적용
     if (urgentItems.length > 0) {
       content += `
         <div style="padding:8px 12px;background:${isDarkMode ? 'rgba(239,68,68,0.12)' : 'rgba(254,202,202,0.5)'};border-bottom:1px solid ${c.border};">
           ${urgentItems.slice(0, 3).map(item => `
             <div style="display:flex;gap:6px;font-size:10px;line-height:1.5;">
               <span style="font-weight:600;color:#ef4444;flex-shrink:0;">${item.label}</span>
-              <span style="color:${c.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.content}</span>
+              <span style="color:${c.muted};">${renderHighlightedMessage(item.content, isDarkMode)}</span>
             </div>
           `).join('')}
           ${urgentItems.length > 3 ? `<div style="font-size:9px;color:${c.muted};margin-top:2px;">+${urgentItems.length - 3}건 더</div>` : ''}
@@ -345,7 +409,7 @@ export default function LeafletMap({
 
     content += '</div>';
     return content;
-  }, [bedDataMap, severeDataMap, emergencyMessages, selectedSevereType, selectedDiseaseCategory, selectedDiseases, isDark]);
+  }, [bedDataMap, severeDataMap, emergencyMessages, selectedSevereType, selectedDiseaseCategory, selectedDiseases, diseaseStatusMap, isDark]);
 
   // 타일 레이어 URL 및 설정
   // NOTE: minimal, pure_dark 테마는 지저분하여 제거됨 (2024-12-28)
@@ -461,17 +525,25 @@ export default function LeafletMap({
         }),
       }).addTo(mapInstance.current);
 
+      // 마커 DOM 요소 참조
+      const markerDom = customMarker.getElement();
+
       // 팝업 표시/숨김 함수
       const showPopup = () => {
         if (popupRef.current) {
           popupRef.current.remove();
         }
 
+        // 마커 강조 효과
+        if (markerDom) {
+          markerDom.classList.add('marker-hovered');
+        }
+
         const popupElement = window.L.popup({
           closeButton: false,
           closeOnClick: false,
-          offset: [15, 0],
-          className: 'leaflet-popup-custom',
+          offset: [0, -40],  // 마커 위쪽으로 충분히 이동
+          className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
         })
           .setLatLng([hospital.lat!, hospital.lng!])
           .setContent(createPopupContent(hospital, isDark))
@@ -483,6 +555,10 @@ export default function LeafletMap({
       const hidePopup = () => {
         popupRef.current?.remove();
         popupRef.current = null;
+        // 마커 강조 효과 제거
+        if (markerDom) {
+          markerDom.classList.remove('marker-hovered');
+        }
       };
 
       // 호버 이벤트 - MapLibreMap과 동일하게 처리
@@ -493,7 +569,7 @@ export default function LeafletMap({
         showPopup();
       });
 
-      customMarker.on('mouseleave', () => {
+      customMarker.on('mouseout', () => {
         if (onHospitalHover) {
           onHospitalHover(null);
         }
@@ -511,9 +587,17 @@ export default function LeafletMap({
     });
   }, [leafletLoaded, hospitals, bedDataMap, onHospitalClick, onHospitalHover, isDark, createPopupContent]);
 
-  // hoveredHospitalCode 변경 시 팝업 표시/숨김
+  // hoveredHospitalCode 변경 시 팝업 표시/숨김 및 마커 강조
   useEffect(() => {
     if (!mapInstance.current || !leafletLoaded) return;
+
+    // 모든 마커에서 hover 클래스 제거
+    markersRef.current.forEach((marker) => {
+      const markerDom = marker.getElement?.();
+      if (markerDom) {
+        markerDom.classList.remove('marker-hovered');
+      }
+    });
 
     // 이전 팝업 닫기
     if (popupRef.current) {
@@ -524,12 +608,22 @@ export default function LeafletMap({
     // 새로운 병원 팝업 표시
     if (hoveredHospitalCode) {
       const hospital = hospitals.find(h => h.code === hoveredHospitalCode);
+      const marker = markersRef.current.get(hoveredHospitalCode);
+
+      // 마커 강조 효과 추가
+      if (marker) {
+        const markerDom = marker.getElement?.();
+        if (markerDom) {
+          markerDom.classList.add('marker-hovered');
+        }
+      }
+
       if (hospital && hospital.lat && hospital.lng) {
         const popupElement = window.L.popup({
           closeButton: false,
           closeOnClick: false,
-          offset: [15, 0],
-          className: 'leaflet-popup-custom',
+          offset: [0, -40],  // 마커 위쪽으로 충분히 이동
+          className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
         })
           .setLatLng([hospital.lat, hospital.lng])
           .setContent(createPopupContent(hospital, isDark))

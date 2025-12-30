@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const category = searchParams.get('category') || undefined;
 
-    const { posts, total } = await getFeedbackList(category, page, limit);
+    const { posts, total, status, errorMessage } = await getFeedbackList(category, page, limit);
 
     return NextResponse.json(
       {
@@ -52,6 +52,11 @@ export async function GET(request: NextRequest) {
           total,
           totalPages: Math.ceil(total / limit),
         },
+        warning: status === 'error'
+          ? (process.env.NODE_ENV === 'production'
+              ? 'Google Sheets 조회 실패'
+              : `Google Sheets 조회 실패: ${errorMessage || 'Unknown error'}`)
+          : undefined,
       },
       { headers: corsHeaders }
     );

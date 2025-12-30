@@ -878,8 +878,8 @@ export default function FeedbackPage() {
                           </div>
                         )}
 
-                        {/* 답변 표시 - replyPublic이 true인 경우만 표시 */}
-                        {showContent && displayPost.replyContent && displayPost.replyPublic && (
+                        {/* 답변 표시 - replyPublic이 true인 경우 (비밀글이어도 K열이 Y면 답변만 공개) */}
+                        {displayPost.replyContent && displayPost.replyPublic && (
                           <div className={`mt-4 p-4 rounded-xl ${
                             isDark
                               ? 'bg-green-500/10 border border-green-500/20'

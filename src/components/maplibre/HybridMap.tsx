@@ -106,6 +106,41 @@ export default function HybridMap({
     });
   }, [hospitals]);
 
+  // 42개 자원조사 가용상태 맵 계산 (병원코드 → 24시간/주간/야간/불가)
+  const diseaseStatusMap = useMemo(() => {
+    const statusMap = new Map<string, AvailabilityStatus>();
+    if (selectedDiseases.size === 0) return statusMap;
+
+    hospitals.forEach(hospital => {
+      let bestStatus: AvailabilityStatus | null = null;
+
+      // 24시간 우선순위로 확인
+      for (const diseaseName of selectedDiseases) {
+        const data = diseaseData.find(
+          d => d.소속기관코드 === hospital.code && d.질환명 === diseaseName
+        );
+        if (data) {
+          const status = data[selectedDay] as AvailabilityStatus;
+          if (status === '24시간') {
+            bestStatus = '24시간';
+            break;
+          } else if ((status === '주간' || status === '야간') && !bestStatus) {
+            bestStatus = status;
+          }
+        }
+      }
+
+      if (bestStatus) {
+        statusMap.set(hospital.code, bestStatus);
+      } else if (selectedDiseases.size > 0) {
+        // 질환이 선택되었지만 해당 병원에 데이터가 없는 경우
+        statusMap.set(hospital.code, '불가');
+      }
+    });
+
+    return statusMap;
+  }, [hospitals, diseaseData, selectedDiseases, selectedDay]);
+
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
       {/* MapLibre 레이어 */}
@@ -119,6 +154,7 @@ export default function HybridMap({
           selectedSevereType={selectedSevereType}
           selectedDiseaseCategory={selectedDiseaseCategory}
           selectedDiseases={selectedDiseases}
+          diseaseStatusMap={diseaseStatusMap}
           selectedClassifications={selectedClassifications}
           hoveredHospitalCode={hoveredHospitalCode}
           onHospitalHover={onHospitalHover}
@@ -139,6 +175,7 @@ export default function HybridMap({
           selectedSevereType={selectedSevereType}
           selectedDiseaseCategory={selectedDiseaseCategory}
           selectedDiseases={selectedDiseases}
+          diseaseStatusMap={diseaseStatusMap}
           selectedClassifications={selectedClassifications}
           hoveredHospitalCode={hoveredHospitalCode}
           onHospitalHover={onHospitalHover}
