@@ -116,26 +116,42 @@ export default function HybridMap({
     });
   }, [hospitals]);
 
+  // 질환 데이터 인덱싱 (O(n*m) → O(1) 룩업 최적화)
+  // Map<병원코드, Map<질환명, 데이터>> 형태로 사전 인덱싱
+  const diseaseDataIndex = useMemo(() => {
+    const index = new Map<string, Map<string, typeof diseaseData[0]>>();
+    for (const data of diseaseData) {
+      const hospitalCode = data.소속기관코드;
+      if (!index.has(hospitalCode)) {
+        index.set(hospitalCode, new Map());
+      }
+      index.get(hospitalCode)!.set(data.질환명, data);
+    }
+    return index;
+  }, [diseaseData]);
+
   // 42개 자원조사 가용상태 맵 계산 (병원코드 → 24시간/주간/야간/불가)
+  // 최적화: diseaseDataIndex 사용으로 O(n) 시간 복잡도
   const diseaseStatusMap = useMemo(() => {
     const statusMap = new Map<string, AvailabilityStatus>();
     if (selectedDiseases.size === 0) return statusMap;
 
     hospitals.forEach(hospital => {
       let bestStatus: AvailabilityStatus | null = null;
+      const hospitalDiseases = diseaseDataIndex.get(hospital.code);
 
-      // 24시간 우선순위로 확인
-      for (const diseaseName of selectedDiseases) {
-        const data = diseaseData.find(
-          d => d.소속기관코드 === hospital.code && d.질환명 === diseaseName
-        );
-        if (data) {
-          const status = data[selectedDay] as AvailabilityStatus;
-          if (status === '24시간') {
-            bestStatus = '24시간';
-            break;
-          } else if ((status === '주간' || status === '야간') && !bestStatus) {
-            bestStatus = status;
+      if (hospitalDiseases) {
+        // 24시간 우선순위로 확인
+        for (const diseaseName of selectedDiseases) {
+          const data = hospitalDiseases.get(diseaseName);  // O(1) 룩업
+          if (data) {
+            const status = data[selectedDay] as AvailabilityStatus;
+            if (status === '24시간') {
+              bestStatus = '24시간';
+              break;
+            } else if ((status === '주간' || status === '야간') && !bestStatus) {
+              bestStatus = status;
+            }
           }
         }
       }
@@ -149,7 +165,7 @@ export default function HybridMap({
     });
 
     return statusMap;
-  }, [hospitals, diseaseData, selectedDiseases, selectedDay]);
+  }, [hospitals, diseaseDataIndex, selectedDiseases, selectedDay]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>

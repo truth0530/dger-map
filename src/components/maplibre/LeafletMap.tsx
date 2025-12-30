@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
 import '@/styles/popup.css';
+import '@/styles/marker.css';
 import type { Hospital, AvailabilityStatus } from '@/types';
 import type { HospitalBedData } from '@/lib/hooks/useBedData';
 import type { HospitalSevereData } from '@/lib/hooks/useSevereData';
@@ -105,6 +106,7 @@ export default function LeafletMap({
   const createPopupContentRef = useRef<((hospital: Hospital, isDarkMode?: boolean) => string) | null>(null);
   // 이전 호버 마커 추적 - 외부(리스트) 호버 처리용
   const prevHoveredCodeRef = useRef<string | null>(null);
+  const batchRenderIdRef = useRef<number>(0);  // 배치 렌더링 취소용 ID
   const [leafletLoaded, setLeafletLoaded] = useState(false);
 
   // 콜백 ref 업데이트
@@ -519,8 +521,13 @@ export default function LeafletMap({
   }, [tileLayer]);
 
   // 마커 업데이트
+  // 최적화: requestAnimationFrame으로 배치 렌더링하여 TBT 감소
   useEffect(() => {
     if (!leafletLoaded || !mapInstance.current) return;
+
+    // 기존 배치 작업 취소
+    batchRenderIdRef.current += 1;
+    const currentBatchId = batchRenderIdRef.current;
 
     // 기존 마커 제거
     markersRef.current.forEach(marker => {
@@ -528,14 +535,14 @@ export default function LeafletMap({
     });
     markersRef.current.clear();
 
-    // 새 마커 추가
-    hospitals.forEach(hospital => {
-      if (!hospital.lat || !hospital.lng) return;
+    // 단일 마커 생성 함수
+    const createSingleMarker = (hospital: Hospital) => {
+      if (!hospital.lat || !hospital.lng || !mapInstance.current) return;
 
       const markerElement = createMarkerElement(
         hospital,
         bedDataMap,
-        hoveredHospitalCode === hospital.code,
+        false,  // 초기 생성 시 호버 상태 없음
         diseaseStatusMap?.get(hospital.code),
         false
       );
@@ -554,11 +561,9 @@ export default function LeafletMap({
       const markerDom = customMarker.getElement();
 
       // 네이티브 DOM 이벤트 사용 (mouseenter/mouseleave)
-      // MapLibre와 동일한 방식 - mouseover/mouseout은 자식 요소에서 버블링되어 깜빡임 발생
       if (markerDom) {
         markerDom.addEventListener('mouseenter', () => {
           markerDom.classList.add('marker-hovered');
-          // 팝업 표시
           if (popupRef.current) {
             popupRef.current.remove();
           }
@@ -574,24 +579,19 @@ export default function LeafletMap({
             .setContent(createPopupContentRef.current?.(hospital, isDark) || '')
             .addTo(mapInstance.current);
 
-          // 부모에게 호버 상태 알림 (리스트 하이라이트용)
           onHospitalHoverRef.current?.(hospital.code);
         });
 
         markerDom.addEventListener('mouseleave', () => {
           markerDom.classList.remove('marker-hovered');
-          // 팝업 제거
           if (popupRef.current) {
             popupRef.current.remove();
             popupRef.current = null;
           }
-
-          // 부모에게 호버 해제 알림
           onHospitalHoverRef.current?.(null);
         });
       }
 
-      // 클릭 이벤트
       customMarker.on('click', () => {
         if (onHospitalClickRef.current) {
           onHospitalClickRef.current(hospital);
@@ -599,7 +599,32 @@ export default function LeafletMap({
       });
 
       markersRef.current.set(hospital.code, customMarker);
-    });
+    };
+
+    // 배치 렌더링 (청크 단위로 분할)
+    const BATCH_SIZE = 25;  // 프레임당 처리할 마커 수
+    let currentIndex = 0;
+
+    const renderBatch = () => {
+      // 배치 ID가 변경되었으면 중단 (새 배치 작업이 시작됨)
+      if (batchRenderIdRef.current !== currentBatchId) return;
+
+      const endIndex = Math.min(currentIndex + BATCH_SIZE, hospitals.length);
+
+      for (let i = currentIndex; i < endIndex; i++) {
+        createSingleMarker(hospitals[i]);
+      }
+
+      currentIndex = endIndex;
+
+      // 아직 처리할 마커가 남아있으면 다음 프레임에 계속
+      if (currentIndex < hospitals.length) {
+        requestAnimationFrame(renderBatch);
+      }
+    };
+
+    // 첫 배치 시작 (다음 프레임에)
+    requestAnimationFrame(renderBatch);
   }, [leafletLoaded, hospitals, bedDataMap, diseaseStatusMap, isDark]);
 
   // 10km 반경 원 표시/숨김

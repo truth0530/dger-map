@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '@/styles/popup.css';
+import '@/styles/marker.css';
 import { getStyleUrl, getRegionView, MAPTILER_CONFIG } from '@/lib/maplibre/config';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { parseMessage, getStatusColorClasses, renderHighlightedMessage, replaceUnavailableWithX } from '@/lib/utils/messageClassifier';
@@ -73,6 +74,8 @@ export default function MapLibreMap({
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const prevHoveredCodeRef = useRef<string | null>(null);  // 이전 호버된 마커 코드 (최적화용)
+  const batchRenderIdRef = useRef<number>(0);  // 배치 렌더링 취소용 ID
   const [isLoaded, setIsLoaded] = useState(false);
   const [mapStyleMode, setMapStyleMode] = useState<'dataviz' | 'voyager'>('dataviz'); // 'dataviz' 또는 'voyager'
 
@@ -485,25 +488,29 @@ export default function MapLibreMap({
   }, [selectedRegion, isLoaded]);
 
   // 마커 업데이트 (병원 목록 변경 시에만)
+  // 최적화: requestAnimationFrame으로 배치 렌더링하여 TBT 감소
   useEffect(() => {
     if (!map.current || !isLoaded) return;
+
+    // 기존 배치 작업 취소
+    batchRenderIdRef.current += 1;
+    const currentBatchId = batchRenderIdRef.current;
 
     // 기존 마커 제거
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current.clear();
 
-    // 새 마커 추가
-    filteredHospitals.forEach(hospital => {
-      if (!hospital.lat || !hospital.lng) return;
+    // 마커 생성 함수 (단일 마커)
+    const createSingleMarker = (hospital: Hospital) => {
+      if (!hospital.lat || !hospital.lng || !map.current) return;
 
-      const el = createMarkerElementCallback(hospital, false); // 초기 생성 시 호버 상태 없음
+      const el = createMarkerElementCallback(hospital, false);
 
       // 호버 이벤트
       el.addEventListener('mouseenter', () => {
         el.classList.add('marker-hovered');
         onHospitalHover?.(hospital.code);
 
-        // 팝업 표시
         if (popupRef.current) {
           popupRef.current.remove();
         }
@@ -525,7 +532,6 @@ export default function MapLibreMap({
         popupRef.current?.remove();
       });
 
-      // 클릭 이벤트
       el.addEventListener('click', () => {
         onHospitalClick?.(hospital);
       });
@@ -535,8 +541,33 @@ export default function MapLibreMap({
         .addTo(map.current!);
 
       markersRef.current.set(hospital.code, marker);
-    });
-  }, [filteredHospitals, isLoaded, createMarkerElementCallback, createPopupContent, onHospitalHover, onHospitalClick]);
+    };
+
+    // 배치 렌더링 (청크 단위로 분할)
+    const BATCH_SIZE = 25;  // 프레임당 처리할 마커 수
+    let currentIndex = 0;
+
+    const renderBatch = () => {
+      // 배치 ID가 변경되었으면 중단 (새 배치 작업이 시작됨)
+      if (batchRenderIdRef.current !== currentBatchId) return;
+
+      const endIndex = Math.min(currentIndex + BATCH_SIZE, filteredHospitals.length);
+
+      for (let i = currentIndex; i < endIndex; i++) {
+        createSingleMarker(filteredHospitals[i]);
+      }
+
+      currentIndex = endIndex;
+
+      // 아직 처리할 마커가 남아있으면 다음 프레임에 계속
+      if (currentIndex < filteredHospitals.length) {
+        requestAnimationFrame(renderBatch);
+      }
+    };
+
+    // 첫 배치 시작 (다음 프레임에)
+    requestAnimationFrame(renderBatch);
+  }, [filteredHospitals, isLoaded, createMarkerElementCallback, createPopupContent, onHospitalHover, onHospitalClick, isDark]);
 
   // 10km 반경 원 표시/숨김
   useEffect(() => {
@@ -645,34 +676,37 @@ export default function MapLibreMap({
   }, [onHospitalHover, onHospitalClick, createPopupContent, isDark]);
 
   // 외부 호버 상태 변경 시 마커 스타일 + 팝업 표시
+  // 최적화: DOM 재생성 대신 CSS 클래스 토글만 수행
   useEffect(() => {
     if (!isLoaded || !map.current) return;
 
-    // 기존 팝업 제거
-    popupRef.current?.remove();
+    const prevCode = prevHoveredCodeRef.current;
+    const newCode = hoveredHospitalCode;
 
-    markersRef.current.forEach((marker, code) => {
-      const hospital = filteredHospitals.find(h => h.code === code);
-      if (!hospital) return;
+    // 동일한 마커면 아무것도 하지 않음
+    if (prevCode === newCode) return;
 
-      const isHovered = code === hoveredHospitalCode;
+    // 이전 호버 마커에서 클래스 제거
+    if (prevCode) {
+      const prevMarker = markersRef.current.get(prevCode);
+      if (prevMarker) {
+        const el = prevMarker.getElement();
+        el.classList.remove('marker-hovered');
+      }
+      // 이전 팝업 제거
+      popupRef.current?.remove();
+    }
 
-      // 호버 상태에 따라 마커 재생성
-      if (isHovered) {
-        // 새 마커로 교체
-        marker.remove();
-        const newEl = createMarkerElementCallback(hospital, true);
+    // 새 호버 마커에 클래스 추가 + 팝업 표시
+    if (newCode) {
+      const newMarker = markersRef.current.get(newCode);
+      const hospital = filteredHospitals.find(h => h.code === newCode);
 
-        // 이벤트 리스너 재연결
-        attachMarkerEventListeners(newEl, hospital);
+      if (newMarker && hospital) {
+        const el = newMarker.getElement();
+        el.classList.add('marker-hovered');
 
-        const newMarker = new maplibregl.Marker({ element: newEl })
-          .setLngLat([hospital.lng!, hospital.lat!])
-          .addTo(map.current!);
-
-        markersRef.current.set(code, newMarker);
-
-        // 팝업 표시 (사이드바에서 호버한 경우)
+        // 팝업 표시
         if (hospital.lng && hospital.lat) {
           popupRef.current = new maplibregl.Popup({
             closeButton: false,
@@ -684,27 +718,12 @@ export default function MapLibreMap({
             .setHTML(createPopupContent(hospital, isDark))
             .addTo(map.current!);
         }
-      } else {
-        // 호버 해제 시 원래 마커로 교체
-        marker.remove();
-        const newEl = createMarkerElementCallback(hospital, false);
-
-        // 이벤트 리스너 재연결
-        attachMarkerEventListeners(newEl, hospital);
-
-        const newMarker = new maplibregl.Marker({ element: newEl })
-          .setLngLat([hospital.lng!, hospital.lat!])
-          .addTo(map.current!);
-
-        markersRef.current.set(code, newMarker);
       }
-    });
-
-    // 호버 해제 시 팝업 제거
-    if (!hoveredHospitalCode) {
-      popupRef.current?.remove();
     }
-  }, [hoveredHospitalCode, filteredHospitals, createMarkerElementCallback, isLoaded, createPopupContent, attachMarkerEventListeners]);
+
+    // 현재 호버 코드 저장
+    prevHoveredCodeRef.current = newCode;
+  }, [hoveredHospitalCode, filteredHospitals, isLoaded, createPopupContent, isDark]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
