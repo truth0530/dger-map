@@ -317,20 +317,36 @@ export default function HomePage() {
                 ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
                 : 'bg-white border-gray-300 text-gray-900'
             }`}
-            style={{ width: '60px' }}
+            style={{ width: '80px' }}
           />
 
           {/* 27개 중증질환 드롭다운 */}
           <select
             value={selectedDisease}
             onChange={(e) => setSelectedDisease(e.target.value)}
-            className={`px-1 py-1.5 border rounded text-sm h-9 min-w-20 max-w-36 flex-shrink ${
+            className={`sm:hidden px-1 py-1.5 border rounded text-sm h-9 w-20 flex-shrink-0 ${
               isDark
                 ? 'bg-gray-800 border-gray-600 text-white'
                 : 'bg-white border-gray-300 text-gray-900'
             }`}
           >
-            <option value="">질환</option>
+            <option value="">질환선택</option>
+            {SEVERE_TYPES.map(disease => (
+              <option key={disease.qn} value={disease.qn}>
+                {disease.qn}. {disease.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={selectedDisease}
+            onChange={(e) => setSelectedDisease(e.target.value)}
+            className={`hidden sm:inline-flex px-2 py-1.5 border rounded text-sm h-9 min-w-[180px] max-w-[210px] flex-shrink-0 ${
+              isDark
+                ? 'bg-gray-800 border-gray-600 text-white'
+                : 'bg-white border-gray-300 text-gray-900'
+            }`}
+          >
+            <option value="">27개중증질환 선택</option>
             {SEVERE_TYPES.map(disease => (
               <option key={disease.qn} value={disease.qn}>
                 {disease.qn}. {disease.label}
@@ -581,14 +597,8 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
             </button>
             <OrgTypeBadge
               type={orgType}
-              label={shortOrgLabel}
               isDark={isDark}
-              className="sm:hidden leading-none"
-            />
-            <OrgTypeBadge
-              type={orgType}
-              isDark={isDark}
-              className="hidden sm:inline-flex leading-none"
+              className="leading-none"
             />
             {/* lg 이하에서 약어 표시, lg 이상에서 전체 이름 */}
             <span className="font-medium whitespace-nowrap lg:hidden" title={hospital.dutyName}>{shortenHospitalName(hospital.dutyName)}</span>
@@ -766,14 +776,8 @@ function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, 
             </button>
             <OrgTypeBadge
               type={orgType}
-              label={shortOrgLabel}
               isDark={isDark}
-              className="sm:hidden leading-none"
-            />
-            <OrgTypeBadge
-              type={orgType}
-              isDark={isDark}
-              className="hidden sm:inline-flex leading-none"
+              className="leading-none"
             />
             <h3 className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
               <span className="sm:hidden">{shortenHospitalName(hospital.dutyName)}</span>
