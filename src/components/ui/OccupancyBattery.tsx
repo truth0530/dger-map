@@ -31,14 +31,17 @@ export function OccupancyBattery({ rate, isDark, size = 'medium' }: OccupancyBat
   const getTextColor = () => {
     if (rate >= 95) return 'text-white'; // 빨간 배경
     if (rate >= 60) return isDark ? 'text-white' : 'text-amber-900'; // 노란/주황 배경
-    if (rate >= 50) return 'text-white'; // 초록 배경
+    if (rate >= 50) return isDark ? 'text-white' : 'text-gray-900'; // 초록 배경
     return isDark ? 'text-gray-200' : 'text-gray-700'; // 채워지지 않은 부분
   };
   const textColor = getTextColor();
 
   return (
     <div className="inline-flex items-center justify-center">
-      <div className={`relative ${config.wrapper} rounded flex items-center justify-center border-gray-500`} style={{ background: 'transparent' }}>
+      <div
+        className={`relative ${config.wrapper} rounded flex items-center justify-center border-gray-300 text-gray-300`}
+        style={{ background: 'transparent' }}
+      >
         <div
           className={`absolute top-0.5 left-0.5 bottom-0.5 transition-all ${fillClass}`}
           style={{ width: `calc(${fillWidth}% - 4px)`, borderRadius: '2px' }}
@@ -52,7 +55,7 @@ export function OccupancyBattery({ rate, isDark, size = 'medium' }: OccupancyBat
             right: config.knobPos,
             width: config.knobW,
             height: config.knobH,
-            backgroundColor: '#6b7280',
+            backgroundColor: 'currentColor',
             borderRadius: '1px'
           }}
         />
@@ -67,9 +70,11 @@ export function OccupancyBattery({ rate, isDark, size = 'medium' }: OccupancyBat
 interface OrgTypeBadgeProps {
   type: '권역' | '센터' | '기관' | string;
   isDark?: boolean;
+  label?: string;
+  className?: string;
 }
 
-export function OrgTypeBadge({ type, isDark = false }: OrgTypeBadgeProps) {
+export function OrgTypeBadge({ type, isDark = false, label, className }: OrgTypeBadgeProps) {
   const badgeConfig: Record<string, { bg: string; text: string }> = {
     '권역': {
       bg: isDark ? 'bg-amber-600/30' : 'bg-amber-100',
@@ -88,8 +93,8 @@ export function OrgTypeBadge({ type, isDark = false }: OrgTypeBadgeProps) {
   const config = badgeConfig[type] || badgeConfig['기관'];
 
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${config.bg} ${config.text}`}>
-      {type}
+    <span className={`inline-flex items-center px-1 py-1 rounded text-[10px] font-medium ${config.bg} ${config.text} ${className || ''}`}>
+      {label ?? type}
     </span>
   );
 }

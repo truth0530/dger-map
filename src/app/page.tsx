@@ -18,7 +18,7 @@ import { formatDateWithDay } from '@/lib/utils/dateUtils';
 import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
 import { ClassifiedMessages, parseMessageWithHighlights, getHighlightClass, HighlightedSegment } from '@/lib/utils/messageClassifier';
 import { calculateOccupancyRate, calculateTotalOccupancy, getBedValues } from '@/lib/utils/bedOccupancy';
-import { OccupancyBattery } from '@/components/ui/OccupancyBattery';
+import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
 
 // 하이라이트된 메시지 렌더링 컴포넌트
 function HighlightedMessage({ message }: { message: string }) {
@@ -187,19 +187,26 @@ export default function HomePage() {
       return orgTypes[orgType];
     });
 
-    // 정렬: 센터급 우선, 재실인원 내림차순
+    // 정렬: 센터급 우선 → 재실인원 내림차순 → 포화도 내림차순
     return [...filtered].sort((a, b) => {
-      const centerTypes = ['권역응급의료센터', '지역응급의료센터', '전문응급의료센터'];
-      const aIsCenter = centerTypes.includes(a.dutyEmclsName);
-      const bIsCenter = centerTypes.includes(b.dutyEmclsName);
+      const aIsCenter = isCenterHospital({ hpbd: a.hpbd, dutyEmclsName: a.dutyEmclsName });
+      const bIsCenter = isCenterHospital({ hpbd: b.hpbd, dutyEmclsName: b.dutyEmclsName });
 
       if (aIsCenter && !bIsCenter) return -1;
       if (!aIsCenter && bIsCenter) return 1;
 
-      // 같은 급수 내에서는 재실인원 내림차순
-      return calculateTotalOccupancy(b) - calculateTotalOccupancy(a);
+      const occupancyDiff = calculateTotalOccupancy(b) - calculateTotalOccupancy(a);
+      if (occupancyDiff !== 0) return occupancyDiff;
+
+      return calculateOccupancyRate(b) - calculateOccupancyRate(a);
     });
   }, [data, searchTerm, orgTypes]);
+
+  const firstNonCenterIndex = useMemo(
+    () => filteredData.findIndex(h => !isCenterHospital({ hpbd: h.hpbd, dutyEmclsName: h.dutyEmclsName })),
+    [filteredData]
+  );
+
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}>
@@ -366,17 +373,17 @@ export default function HomePage() {
               <table className="w-full border-collapse">
                 {/* 칼럼 너비 정의: 병원명 넓게, 코호트 좁게, 업데이트 유지 */}
                 <colgroup>
-                  <col className="w-[100px] sm:w-[180px] lg:w-[220px] min-w-[100px]" /> {/* 병원명 - 넓게 유지 */}
-                  <col className="w-[60px] sm:w-[80px]" /> {/* 병상포화도 */}
-                  <col className="w-[50px] sm:w-[70px]" /> {/* 재실인원 */}
-                  <col className="w-[50px] sm:w-[70px]" /> {/* 일반병상 */}
-                  <col className="hidden sm:table-column w-[50px] lg:w-[60px]" /> {/* 코호트 - 좁게 */}
-                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" /> {/* 음압격리 */}
-                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" /> {/* 일반격리 */}
-                  <col className="hidden sm:table-column w-[45px] lg:w-[55px]" /> {/* 소아 */}
-                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" /> {/* 소아음압 */}
-                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" /> {/* 소아일반 */}
-                  <col className="w-[85px] sm:w-[100px] lg:w-[115px]" /> {/* 업데이트 - 유지 */}
+                  <col className="w-[100px] sm:w-[180px] lg:w-[220px] min-w-[100px]" />
+                  <col className="w-[60px] sm:w-[80px]" />
+                  <col className="w-[50px] sm:w-[70px]" />
+                  <col className="w-[50px] sm:w-[70px]" />
+                  <col className="hidden sm:table-column w-[50px] lg:w-[60px]" />
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
+                  <col className="hidden sm:table-column w-[45px] lg:w-[55px]" />
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
+                  <col className="w-[85px] sm:w-[100px] lg:w-[115px]" />
                 </colgroup>
                 <thead className={`sticky top-0 z-20 ${isDark ? 'bg-[#111827]' : 'bg-[#4A5D5D]'}`}>
                   <tr>
@@ -441,11 +448,12 @@ export default function HomePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map(hospital => (
+                  {filteredData.map((hospital, index) => (
                     <HospitalRow
                       key={hospital.hpid}
                       hospital={hospital}
                       isDark={isDark}
+                      showGroupDivider={firstNonCenterIndex !== -1 && index === firstNonCenterIndex}
                       isExpanded={expandedMessages.has(hospital.hpid)}
                       onToggle={() => toggleMessage(hospital.hpid)}
                       messages={emergencyMessages.get(hospital.hpid)}
@@ -463,11 +471,12 @@ export default function HomePage() {
         {/* 카드 뷰 */}
         {viewMode === 'cards' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredData.map(hospital => (
+            {filteredData.map((hospital, index) => (
               <HospitalCard
                 key={hospital.hpid}
                 hospital={hospital}
                 isDark={isDark}
+                showGroupDivider={firstNonCenterIndex !== -1 && index === firstNonCenterIndex}
                 isExpanded={expandedMessages.has(hospital.hpid)}
                 onToggle={() => toggleMessage(hospital.hpid)}
                 messages={emergencyMessages.get(hospital.hpid)}
@@ -507,6 +516,7 @@ type ColumnWidths = {
 interface HospitalRowProps {
   hospital: HospitalBedData;
   isDark: boolean;
+  showGroupDivider?: boolean;
   isExpanded: boolean;
   onToggle: () => void;
   messages?: ClassifiedMessages | null;
@@ -515,9 +525,11 @@ interface HospitalRowProps {
   columnWidths?: ColumnWidths;
 }
 
-function HospitalRow({ hospital, isDark, isExpanded, onToggle, messages, messageLoading, onFetchMessages, columnWidths }: HospitalRowProps) {
-  const isCenter = isCenterHospital({ dutyEmclsName: hospital.dutyEmclsName });
+function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, onToggle, messages, messageLoading, onFetchMessages, columnWidths }: HospitalRowProps) {
+  const isCenter = isCenterHospital({ hpbd: hospital.hpbd, dutyEmclsName: hospital.dutyEmclsName });
   const beds = getBedValues(hospital);
+  const orgType = getHospitalOrgType(hospital);
+  const shortOrgLabel = orgType === '권역' ? '권' : orgType === '센터' ? '센' : '기';
 
   // 확장될 때 메시지 조회
   useEffect(() => {
@@ -545,11 +557,18 @@ function HospitalRow({ hospital, isDark, isExpanded, onToggle, messages, message
 
   return (
     <>
-      <tr className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} ${
-        isCenter
-          ? isDark ? 'bg-amber-900/30 hover:bg-amber-900/50' : 'bg-amber-50 hover:bg-amber-100'
-          : isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-      }`}>
+      <tr
+        className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} ${
+          isCenter
+            ? isDark ? 'bg-amber-900/30 hover:bg-amber-900/50' : 'bg-amber-50 hover:bg-amber-100'
+            : isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+        }`}
+        style={showGroupDivider ? {
+          boxShadow: isDark
+            ? 'inset 0 1px 0 rgba(148,163,184,0.35)'
+            : 'inset 0 1px 0 rgba(107,114,128,0.35)'
+        } : undefined}
+      >
         {/* 병원명 + 펼치기/접기 버튼 - 좌측 정렬 */}
         <td className={`px-1 sm:px-2 py-1.5 text-sm text-left ${isDark ? 'text-white' : 'text-gray-900'}`}>
           <div className="flex items-center gap-1">
@@ -560,6 +579,17 @@ function HospitalRow({ hospital, isDark, isExpanded, onToggle, messages, message
             >
               {isExpanded ? '⌄' : '›'}
             </button>
+            <OrgTypeBadge
+              type={orgType}
+              label={shortOrgLabel}
+              isDark={isDark}
+              className="sm:hidden leading-none"
+            />
+            <OrgTypeBadge
+              type={orgType}
+              isDark={isDark}
+              className="hidden sm:inline-flex leading-none"
+            />
             {/* lg 이하에서 약어 표시, lg 이상에서 전체 이름 */}
             <span className="font-medium whitespace-nowrap lg:hidden" title={hospital.dutyName}>{shortenHospitalName(hospital.dutyName)}</span>
             <span className="font-medium whitespace-nowrap hidden lg:inline" title={hospital.dutyName}>{hospital.dutyName}</span>
@@ -675,6 +705,7 @@ function HospitalRow({ hospital, isDark, isExpanded, onToggle, messages, message
 interface HospitalCardProps {
   hospital: HospitalBedData;
   isDark: boolean;
+  showGroupDivider?: boolean;
   isExpanded: boolean;
   onToggle: () => void;
   messages?: ClassifiedMessages | null;
@@ -682,11 +713,13 @@ interface HospitalCardProps {
   onFetchMessages?: (hpid: string) => void;
 }
 
-function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messageLoading, onFetchMessages }: HospitalCardProps) {
-  const isCenter = isCenterHospital({ dutyEmclsName: hospital.dutyEmclsName });
+function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, onToggle, messages, messageLoading, onFetchMessages }: HospitalCardProps) {
+  const isCenter = isCenterHospital({ hpbd: hospital.hpbd, dutyEmclsName: hospital.dutyEmclsName });
   const beds = getBedValues(hospital);
   const totalOccupancy = calculateTotalOccupancy(hospital);
   const occupancyRate = calculateOccupancyRate(hospital);
+  const orgType = getHospitalOrgType(hospital);
+  const shortOrgLabel = orgType === '권역' ? '권' : orgType === '센터' ? '센' : '기';
 
   // 확장될 때 메시지 조회
   useEffect(() => {
@@ -709,11 +742,18 @@ function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messag
   };
 
   return (
-    <div className={`border rounded-lg overflow-hidden shadow-sm ${
-      isCenter
-        ? isDark ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200 border-l-4 border-l-[#4A5D5D]'
-        : isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-    }`}>
+    <div
+      className={`border rounded-lg overflow-hidden shadow-sm ${
+        isCenter
+          ? isDark ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200 border-l-4 border-l-[#4A5D5D]'
+          : isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}
+      style={showGroupDivider ? {
+        boxShadow: isDark
+          ? 'inset 0 1px 0 rgba(148,163,184,0.35)'
+          : 'inset 0 1px 0 rgba(107,114,128,0.35)'
+      } : undefined}
+    >
       {/* 헤더 */}
       <div className={`px-4 py-3 ${isDark ? 'border-gray-700' : 'border-gray-200'} border-b`}>
         <div className="flex items-center justify-between">
@@ -724,6 +764,17 @@ function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messag
             >
               {isExpanded ? '⌄' : '›'}
             </button>
+            <OrgTypeBadge
+              type={orgType}
+              label={shortOrgLabel}
+              isDark={isDark}
+              className="sm:hidden leading-none"
+            />
+            <OrgTypeBadge
+              type={orgType}
+              isDark={isDark}
+              className="hidden sm:inline-flex leading-none"
+            />
             <h3 className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
               <span className="sm:hidden">{shortenHospitalName(hospital.dutyName)}</span>
               <span className="hidden sm:inline">{hospital.dutyName}</span>
