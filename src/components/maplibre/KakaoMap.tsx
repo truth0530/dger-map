@@ -90,6 +90,7 @@ export default function KakaoMap({
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const overlayRef = useRef<any>(null);
+  const pinnedOverlayCodeRef = useRef<string | null>(null);
   const [kakaoLoaded, setKakaoLoaded] = useState(false);
   const [mapType, setMapType] = useState<KakaoMapType>('roadmap');
 
@@ -199,6 +200,20 @@ export default function KakaoMap({
     html += `</div>`;
     return html;
   }, [bedDataMap, severeDataMap, selectedSevereType, isDark]);
+
+  const showOverlay = useCallback((hospital: Hospital, position: kakao.maps.LatLng) => {
+    if (!mapInstance.current) return;
+    if (overlayRef.current) {
+      overlayRef.current.setMap(null);
+    }
+    const content = createPopupContent(hospital);
+    overlayRef.current = new kakao.maps.CustomOverlay({
+      content: `<div style="transform: translateY(-100%); margin-bottom: 10px;">${content}</div>`,
+      position,
+      yAnchor: 1,
+    });
+    overlayRef.current.setMap(mapInstance.current);
+  }, [createPopupContent]);
 
   // 마커 이미지 생성
   const getMarkerImage = useCallback((hospital: Hospital) => {
@@ -315,39 +330,57 @@ export default function KakaoMap({
 
       // 클릭 이벤트
       kakao.maps.event.addListener(marker, 'click', () => {
+        if (pinnedOverlayCodeRef.current === hospital.code) {
+          pinnedOverlayCodeRef.current = null;
+          if (overlayRef.current) {
+            overlayRef.current.setMap(null);
+            overlayRef.current = null;
+          }
+          return;
+        }
+        pinnedOverlayCodeRef.current = hospital.code;
+        showOverlay(hospital, position);
         onHospitalClick?.(hospital);
       });
 
       // 마우스오버 이벤트
       kakao.maps.event.addListener(marker, 'mouseover', () => {
         onHospitalHover?.(hospital.code);
-
-        // 인포윈도우 표시
-        if (overlayRef.current) {
-          overlayRef.current.setMap(null);
+        if (!pinnedOverlayCodeRef.current) {
+          showOverlay(hospital, position);
         }
-
-        const content = createPopupContent(hospital);
-        overlayRef.current = new kakao.maps.CustomOverlay({
-          content: `<div style="transform: translateY(-100%); margin-bottom: 10px;">${content}</div>`,
-          position,
-          yAnchor: 1,
-        });
-        overlayRef.current.setMap(mapInstance.current);
       });
 
       // 마우스아웃 이벤트
       kakao.maps.event.addListener(marker, 'mouseout', () => {
         onHospitalHover?.(null);
-        if (overlayRef.current) {
-          overlayRef.current.setMap(null);
-          overlayRef.current = null;
+        if (!pinnedOverlayCodeRef.current) {
+          if (overlayRef.current) {
+            overlayRef.current.setMap(null);
+            overlayRef.current = null;
+          }
         }
       });
 
       markersRef.current.set(hospital.code, marker);
     });
-  }, [hospitals, kakaoLoaded, getMarkerImage, createPopupContent, onHospitalClick, onHospitalHover]);
+  }, [hospitals, kakaoLoaded, getMarkerImage, showOverlay, onHospitalClick, onHospitalHover]);
+
+  useEffect(() => {
+    if (!kakaoLoaded || !mapInstance.current) return;
+    const handler = () => {
+      pinnedOverlayCodeRef.current = null;
+      if (overlayRef.current) {
+        overlayRef.current.setMap(null);
+        overlayRef.current = null;
+      }
+      onHospitalHover?.(null);
+    };
+    kakao.maps.event.addListener(mapInstance.current, 'click', handler);
+    return () => {
+      kakao.maps.event.removeListener(mapInstance.current, 'click', handler);
+    };
+  }, [kakaoLoaded, onHospitalHover]);
 
   // 호버 상태 변경 시 마커 업데이트
   useEffect(() => {

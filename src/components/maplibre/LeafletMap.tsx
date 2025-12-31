@@ -98,6 +98,7 @@ export default function LeafletMap({
   const tileLayerRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const popupRef = useRef<any>(null);
+  const pinnedPopupCodeRef = useRef<string | null>(null);
   const radiusCircleRef = useRef<any>(null);
   // 콜백 ref - 의존성 배열에서 제거하여 불필요한 마커 재생성 방지
   const onHospitalHoverRef = useRef(onHospitalHover);
@@ -108,6 +109,27 @@ export default function LeafletMap({
   const prevHoveredCodeRef = useRef<string | null>(null);
   const batchRenderIdRef = useRef<number>(0);  // 배치 렌더링 취소용 ID
   const [leafletLoaded, setLeafletLoaded] = useState(false);
+
+  const filteredHospitals = useMemo(() => {
+    return hospitals.filter(h => {
+      if (!h.lat || !h.lng) return false;
+      return true;
+    });
+  }, [hospitals]);
+
+  const maxOccupancy = useMemo(() => {
+    if (!bedDataMap) return 0;
+    let max = 0;
+    filteredHospitals.forEach((hospital) => {
+      const bedData = bedDataMap.get(hospital.code);
+      if (!bedData) return;
+      const occupancy = typeof bedData.occupancy === 'number'
+        ? bedData.occupancy
+        : Math.max(0, (bedData.hvs01 ?? 0) - (bedData.hvec ?? 0));
+      if (occupancy > max) max = occupancy;
+    });
+    return max;
+  }, [filteredHospitals, bedDataMap]);
 
   // 콜백 ref 업데이트
   useEffect(() => {
@@ -436,6 +458,23 @@ export default function LeafletMap({
     createPopupContentRef.current = createPopupContent;
   }, [createPopupContent]);
 
+  const showPopup = useCallback((hospital: Hospital) => {
+    if (!mapInstance.current || !hospital.lat || !hospital.lng) return;
+    if (popupRef.current) {
+      popupRef.current.remove();
+    }
+    popupRef.current = window.L.popup({
+      closeButton: false,
+      closeOnClick: false,
+      autoPan: false,
+      offset: [0, -40],
+      className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
+    })
+      .setLatLng([hospital.lat, hospital.lng])
+      .setContent(createPopupContentRef.current?.(hospital, isDark) || '')
+      .addTo(mapInstance.current);
+  }, [isDark]);
+
   // 타일 레이어 URL 및 설정
   // NOTE: minimal, pure_dark 테마는 지저분하여 제거됨 (2024-12-28)
   const getTileLayerConfig = (style: 'clean' | 'classic', darkMode: boolean) => {
@@ -532,7 +571,8 @@ export default function LeafletMap({
         bedDataMap,
         false,  // 초기 생성 시 호버 상태 없음
         diseaseStatusMap?.get(hospital.code),
-        false
+        false,
+        maxOccupancy
       );
 
       const customMarker = window.L.marker([hospital.lat, hospital.lng], {
@@ -552,35 +592,37 @@ export default function LeafletMap({
       if (markerDom) {
         markerDom.addEventListener('mouseenter', () => {
           markerDom.classList.add('marker-hovered');
-          if (popupRef.current) {
-            popupRef.current.remove();
+          if (!pinnedPopupCodeRef.current) {
+            showPopup(hospital);
           }
-
-          popupRef.current = window.L.popup({
-            closeButton: false,
-            closeOnClick: false,
-            autoPan: false,
-            offset: [0, -40],
-            className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
-          })
-            .setLatLng([hospital.lat!, hospital.lng!])
-            .setContent(createPopupContentRef.current?.(hospital, isDark) || '')
-            .addTo(mapInstance.current);
 
           onHospitalHoverRef.current?.(hospital.code);
         });
 
         markerDom.addEventListener('mouseleave', () => {
           markerDom.classList.remove('marker-hovered');
-          if (popupRef.current) {
-            popupRef.current.remove();
-            popupRef.current = null;
+          if (!pinnedPopupCodeRef.current) {
+            if (popupRef.current) {
+              popupRef.current.remove();
+              popupRef.current = null;
+            }
           }
           onHospitalHoverRef.current?.(null);
         });
       }
 
-      customMarker.on('click', () => {
+      customMarker.on('click', (event: any) => {
+        window.L.DomEvent.stopPropagation(event);
+        if (pinnedPopupCodeRef.current === hospital.code) {
+          pinnedPopupCodeRef.current = null;
+          if (popupRef.current) {
+            popupRef.current.remove();
+            popupRef.current = null;
+          }
+          return;
+        }
+        pinnedPopupCodeRef.current = hospital.code;
+        showPopup(hospital);
         if (onHospitalClickRef.current) {
           onHospitalClickRef.current(hospital);
         }
@@ -597,23 +639,23 @@ export default function LeafletMap({
       // 배치 ID가 변경되었으면 중단 (새 배치 작업이 시작됨)
       if (batchRenderIdRef.current !== currentBatchId) return;
 
-      const endIndex = Math.min(currentIndex + BATCH_SIZE, hospitals.length);
+      const endIndex = Math.min(currentIndex + BATCH_SIZE, filteredHospitals.length);
 
       for (let i = currentIndex; i < endIndex; i++) {
-        createSingleMarker(hospitals[i]);
+        createSingleMarker(filteredHospitals[i]);
       }
 
       currentIndex = endIndex;
 
       // 아직 처리할 마커가 남아있으면 다음 프레임에 계속
-      if (currentIndex < hospitals.length) {
+      if (currentIndex < filteredHospitals.length) {
         requestAnimationFrame(renderBatch);
       }
     };
 
     // 첫 배치 시작 (다음 프레임에)
     requestAnimationFrame(renderBatch);
-  }, [leafletLoaded, hospitals, bedDataMap, diseaseStatusMap, isDark]);
+  }, [leafletLoaded, filteredHospitals, bedDataMap, diseaseStatusMap, isDark, maxOccupancy, showPopup]);
 
   // 10km 반경 원 표시/숨김
   useEffect(() => {
@@ -638,9 +680,29 @@ export default function LeafletMap({
     }
   }, [leafletLoaded, showLocationRadius, userLocation, isDark]);
 
+  useEffect(() => {
+    if (!mapInstance.current || !leafletLoaded) return;
+    const handleMapClick = () => {
+      pinnedPopupCodeRef.current = null;
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
+      onHospitalHoverRef.current?.(null);
+    };
+    mapInstance.current.on('click', handleMapClick);
+    return () => {
+      mapInstance.current?.off('click', handleMapClick);
+    };
+  }, [leafletLoaded]);
+
   // hoveredHospitalCode 변경 시 팝업 표시/숨김 및 마커 강조
   useEffect(() => {
     if (!mapInstance.current || !leafletLoaded) return;
+
+    if (pinnedPopupCodeRef.current) {
+      return;
+    }
 
     // 같은 마커인 경우 무시 (중복 실행 방지)
     if (prevHoveredCodeRef.current === hoveredHospitalCode) {
@@ -678,24 +740,13 @@ export default function LeafletMap({
       }
 
       if (hospital && hospital.lat && hospital.lng) {
-        const popupElement = window.L.popup({
-          closeButton: false,
-          closeOnClick: false,
-          autoPan: false,  // 지도 자동 이동 방지 - 깜빡임 방지
-          offset: [0, -40],  // 마커 위쪽으로 충분히 이동
-          className: `leaflet-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
-        })
-          .setLatLng([hospital.lat, hospital.lng])
-          .setContent(createPopupContentRef.current?.(hospital, isDark) || '')
-          .addTo(mapInstance.current);
-
-        popupRef.current = popupElement;
+        showPopup(hospital);
       }
     }
 
     // 현재 호버 코드 저장
     prevHoveredCodeRef.current = hoveredHospitalCode;
-  }, [hoveredHospitalCode, hospitals, isDark, leafletLoaded]);
+  }, [hoveredHospitalCode, hospitals, isDark, leafletLoaded, showPopup]);
 
   if (!leafletLoaded) {
     return (
@@ -720,8 +771,8 @@ export default function LeafletMap({
         }}
       />
 
-      {/* 지도 컨트롤 그룹 (맵 전환 + 타일 스타일) */}
-      <div className={`absolute top-4 right-4 z-50 flex items-center gap-2 rounded-lg shadow-lg border p-1.5 pointer-events-auto ${isDark ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-gray-300/50'}`}>
+      {/* 지도 컨트롤 그룹 (맵 전환 + 타일 스타일 + 줌 + 전체화면) */}
+      <div className={`absolute top-4 right-4 z-20 flex items-center gap-2 rounded-lg shadow-lg border p-1.5 pointer-events-auto ${isDark ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-gray-300/50'}`}>
         {/* MapTiler/Leaflet/Kakao 전환 */}
         <div className="flex items-center">
           {onSwitchToMaptiler && (
@@ -734,7 +785,7 @@ export default function LeafletMap({
             </button>
           )}
           <button
-            className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${isDark ? 'bg-green-600 text-white' : 'bg-green-500 text-white'}`}
+            className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${isDark ? 'bg-cyan-600 text-white' : 'bg-cyan-500 text-white'}`}
             title="현재: Leaflet"
           >
             Leaflet
@@ -767,9 +818,65 @@ export default function LeafletMap({
           </div>
         </div>
 
-        <div className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 bg-gray-800/70' : 'text-gray-600 bg-gray-100'}`}>
-          Theme: {isDark ? 'Dark' : 'Light'}
-        </div>
+        {/* 구분선 */}
+        <div className={`w-px h-5 ${isDark ? 'bg-gray-700/50' : 'bg-gray-400/50'}`} />
+
+        {/* 줌 인 버튼 */}
+        <button
+          onClick={() => mapInstance.current?.zoomIn()}
+          className={`w-9 h-9 rounded-md transition-all flex items-center justify-center font-bold ${isDark ? 'hover:bg-gray-700/80 text-white' : 'hover:bg-gray-200/80 text-gray-900'}`}
+          title="확대"
+        >
+          +
+        </button>
+
+        {/* 줌 아웃 버튼 */}
+        <button
+          onClick={() => mapInstance.current?.zoomOut()}
+          className={`w-9 h-9 rounded-md transition-all flex items-center justify-center font-bold ${isDark ? 'hover:bg-gray-700/80 text-white' : 'hover:bg-gray-200/80 text-gray-900'}`}
+          title="축소"
+        >
+          −
+        </button>
+
+        {/* 구분선 */}
+        <div className={`w-px h-5 ${isDark ? 'bg-gray-700/50' : 'bg-gray-400/50'}`} />
+
+        {/* 전체화면 버튼 */}
+        <button
+          onClick={() => {
+            if (!mapContainer.current) return;
+
+            const elem = mapContainer.current;
+            const isFullscreen = document.fullscreenElement || (document as any).webkitFullscreenElement;
+
+            try {
+              if (isFullscreen) {
+                if (document.exitFullscreen) {
+                  document.exitFullscreen();
+                } else if ((document as any).webkitExitFullscreen) {
+                  (document as any).webkitExitFullscreen();
+                }
+              } else {
+                if (elem.requestFullscreen) {
+                  elem.requestFullscreen();
+                } else if ((elem as any).webkitRequestFullscreen) {
+                  (elem as any).webkitRequestFullscreen();
+                } else if ((elem as any).mozRequestFullScreen) {
+                  (elem as any).mozRequestFullScreen();
+                } else if ((elem as any).msRequestFullscreen) {
+                  (elem as any).msRequestFullscreen();
+                }
+              }
+            } catch (e) {
+              console.warn('전체화면 요청 실패:', e);
+            }
+          }}
+          className={`w-9 h-9 rounded-md transition-all flex items-center justify-center text-lg font-bold ${isDark ? 'hover:bg-gray-700/80 text-white' : 'hover:bg-gray-200/80 text-gray-900'}`}
+          title="전체화면"
+        >
+          ⛶
+        </button>
       </div>
 
     </div>

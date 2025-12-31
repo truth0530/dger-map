@@ -688,10 +688,10 @@ export function MapDashboard() {
         </div>
       </header>
 
-      <div className="flex-1 flex relative">
+      <div className="flex-1 flex relative min-h-0">
         {/* 좌측 필터 사이드바 */}
-        <aside className={`hidden md:flex w-48 flex-col border-r ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-[#d4cdc4]'}`}>
-          <div className={`flex-1 overflow-y-auto ${isDark ? '' : 'bg-[#E8E2D8]'}`}>
+        <aside className={`hidden md:flex w-48 flex-col border-r min-h-0 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-[#d4cdc4]'}`}>
+          <div className={`flex-1 overflow-y-auto min-h-0 ${isDark ? '' : 'bg-[#E8E2D8]'}`}>
           {/* 지역 + 기관분류 */}
           <div className={`px-2 py-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#E8E2D8]'}`}>
             <div className="flex items-end gap-1.5">
@@ -919,7 +919,7 @@ export function MapDashboard() {
         </aside>
 
         {/* 병원 목록 사이드바 */}
-        <aside className={`hidden md:flex w-64 flex-col border-r ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-[#d4cdc4]'}`}>
+        <aside className={`hidden md:flex w-64 flex-col border-r min-h-0 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-[#d4cdc4]'}`}>
           <div className={`px-1.5 py-1.5 space-y-1.5 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#ddd6cc]'}`}>
             <div className="flex items-center justify-between">
               <label className={`text-[10px] font-medium ${isDark ? 'text-gray-400' : 'text-[#4A5D5D]'}`}>
@@ -988,7 +988,7 @@ export function MapDashboard() {
           </div>
           <div
             ref={hospitalListRef}
-            className={`flex-1 overflow-y-auto p-1.5 space-y-0.5 ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}
+            className={`flex-1 overflow-y-auto min-h-0 p-1.5 space-y-0.5 ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}
           >
             {sortMode === "travelTime" && (
               <div className={`text-[9px] pb-0.5 text-right ${isDark ? 'text-rose-300/70' : 'text-red-500'}`}>

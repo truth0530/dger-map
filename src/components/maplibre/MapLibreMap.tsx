@@ -74,6 +74,7 @@ export default function MapLibreMap({
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const pinnedPopupCodeRef = useRef<string | null>(null);
   const prevHoveredCodeRef = useRef<string | null>(null);  // 이전 호버된 마커 코드 (최적화용)
   const batchRenderIdRef = useRef<number>(0);  // 배치 렌더링 취소용 ID
   const [isLoaded, setIsLoaded] = useState(false);
@@ -111,10 +112,24 @@ export default function MapLibreMap({
     });
   }, [hospitals]);
 
+  const maxOccupancy = useMemo(() => {
+    if (!bedDataMap) return 0;
+    let max = 0;
+    filteredHospitals.forEach((hospital) => {
+      const bedData = bedDataMap.get(hospital.code);
+      if (!bedData) return;
+      const occupancy = typeof bedData.occupancy === 'number'
+        ? bedData.occupancy
+        : Math.max(0, (bedData.hvs01 ?? 0) - (bedData.hvec ?? 0));
+      if (occupancy > max) max = occupancy;
+    });
+    return max;
+  }, [filteredHospitals, bedDataMap]);
+
   // 마커 HTML 생성 (공통 유틸 사용)
   const createMarkerElementCallback = useCallback((hospital: Hospital, isHovered: boolean): HTMLElement => {
-    return createMarkerElement(hospital, bedDataMap, isHovered, diseaseStatusMap?.get(hospital.code), true);
-  }, [bedDataMap, diseaseStatusMap]);
+    return createMarkerElement(hospital, bedDataMap, isHovered, diseaseStatusMap?.get(hospital.code), true, maxOccupancy);
+  }, [bedDataMap, diseaseStatusMap, maxOccupancy]);
 
   // 병상 상태 색상 결정
   const getBedStatusColor = (available: number, total: number): string => {
@@ -403,6 +418,22 @@ export default function MapLibreMap({
     return content;
   }, [bedDataMap, severeDataMap, emergencyMessages, selectedSevereType, selectedDiseaseCategory, selectedDiseases, diseaseStatusMap, isDark]);
 
+  const showPopup = useCallback((hospital: Hospital) => {
+    if (!map.current || !hospital.lat || !hospital.lng) return;
+    if (popupRef.current) {
+      popupRef.current.remove();
+    }
+    popupRef.current = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 15,
+      className: `maplibre-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
+    })
+      .setLngLat([hospital.lng, hospital.lat])
+      .setHTML(createPopupContent(hospital, isDark))
+      .addTo(map.current);
+  }, [createPopupContent, isDark]);
+
   // 지도 초기화
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -510,29 +541,29 @@ export default function MapLibreMap({
       el.addEventListener('mouseenter', () => {
         el.classList.add('marker-hovered');
         onHospitalHover?.(hospital.code);
-
-        if (popupRef.current) {
-          popupRef.current.remove();
+        if (!pinnedPopupCodeRef.current) {
+          showPopup(hospital);
         }
-
-        popupRef.current = new maplibregl.Popup({
-          closeButton: false,
-          closeOnClick: false,
-          offset: 15,
-          className: `maplibre-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
-        })
-          .setLngLat([hospital.lng!, hospital.lat!])
-          .setHTML(createPopupContent(hospital, isDark))
-          .addTo(map.current!);
       });
 
       el.addEventListener('mouseleave', () => {
         el.classList.remove('marker-hovered');
         onHospitalHover?.(null);
-        popupRef.current?.remove();
+        if (!pinnedPopupCodeRef.current) {
+          popupRef.current?.remove();
+        }
       });
 
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (pinnedPopupCodeRef.current === hospital.code) {
+          pinnedPopupCodeRef.current = null;
+          popupRef.current?.remove();
+          popupRef.current = null;
+          return;
+        }
+        pinnedPopupCodeRef.current = hospital.code;
+        showPopup(hospital);
         onHospitalClick?.(hospital);
       });
 
@@ -567,7 +598,21 @@ export default function MapLibreMap({
 
     // 첫 배치 시작 (다음 프레임에)
     requestAnimationFrame(renderBatch);
-  }, [filteredHospitals, isLoaded, createMarkerElementCallback, createPopupContent, onHospitalHover, onHospitalClick, isDark]);
+  }, [filteredHospitals, isLoaded, createMarkerElementCallback, showPopup, onHospitalHover, onHospitalClick]);
+
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+    const handleMapClick = () => {
+      pinnedPopupCodeRef.current = null;
+      popupRef.current?.remove();
+      popupRef.current = null;
+      onHospitalHover?.(null);
+    };
+    map.current.on('click', handleMapClick);
+    return () => {
+      map.current?.off('click', handleMapClick);
+    };
+  }, [isLoaded, onHospitalHover]);
 
   // 10km 반경 원 표시/숨김
   useEffect(() => {
@@ -649,36 +694,41 @@ export default function MapLibreMap({
       onHospitalHover?.(hospital.code);
 
       // 팝업 표시
-      if (popupRef.current) {
-        popupRef.current.remove();
+      if (!pinnedPopupCodeRef.current) {
+        showPopup(hospital);
       }
-
-      popupRef.current = new maplibregl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        offset: 15,
-        className: `maplibre-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
-      })
-        .setLngLat([hospital.lng!, hospital.lat!])
-        .setHTML(createPopupContent(hospital, isDark))
-        .addTo(map.current!);
     });
 
     el.addEventListener('mouseleave', () => {
       el.classList.remove('marker-hovered');
       onHospitalHover?.(null);
-      popupRef.current?.remove();
+      if (!pinnedPopupCodeRef.current) {
+        popupRef.current?.remove();
+      }
     });
 
-    el.addEventListener('click', () => {
+    el.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (pinnedPopupCodeRef.current === hospital.code) {
+        pinnedPopupCodeRef.current = null;
+        popupRef.current?.remove();
+        popupRef.current = null;
+        return;
+      }
+      pinnedPopupCodeRef.current = hospital.code;
+      showPopup(hospital);
       onHospitalClick?.(hospital);
     });
-  }, [onHospitalHover, onHospitalClick, createPopupContent, isDark]);
+  }, [onHospitalHover, onHospitalClick, showPopup]);
 
   // 외부 호버 상태 변경 시 마커 스타일 + 팝업 표시
   // 최적화: DOM 재생성 대신 CSS 클래스 토글만 수행
   useEffect(() => {
     if (!isLoaded || !map.current) return;
+
+    if (pinnedPopupCodeRef.current) {
+      return;
+    }
 
     const prevCode = prevHoveredCodeRef.current;
     const newCode = hoveredHospitalCode;
@@ -707,23 +757,13 @@ export default function MapLibreMap({
         el.classList.add('marker-hovered');
 
         // 팝업 표시
-        if (hospital.lng && hospital.lat) {
-          popupRef.current = new maplibregl.Popup({
-            closeButton: false,
-            closeOnClick: false,
-            offset: 15,
-            className: `maplibre-popup-custom ${isDark ? 'popup-dark' : 'popup-light'}`,
-          })
-            .setLngLat([hospital.lng, hospital.lat])
-            .setHTML(createPopupContent(hospital, isDark))
-            .addTo(map.current!);
-        }
+        showPopup(hospital);
       }
     }
 
     // 현재 호버 코드 저장
     prevHoveredCodeRef.current = newCode;
-  }, [hoveredHospitalCode, filteredHospitals, isLoaded, createPopupContent, isDark]);
+  }, [hoveredHospitalCode, filteredHospitals, isLoaded, showPopup]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>

@@ -6,7 +6,7 @@
  * - 피드백 게시판 탭 (Google Sheets 연동)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 
 // 릴리즈 노트 타입
@@ -36,20 +36,28 @@ interface FeedbackPost {
 // 릴리즈 노트 데이터
 const RELEASE_NOTES: ReleaseNote[] = [
   // DGER 3.0 - React 프레임워크 기반
+  { date: '2025.12.31', content: '지도 마커 크기를 재실인원 기준으로 자동 조절하고, 포화도에 따라 색상/투명도 그라데이션을 적용', type: 'minor' },
   { date: '2025.12.30', content: 'DGER 3.0', type: 'version', version: '3.0', tech: 'Next.js 16 (React 프레임워크 기반)' },
   { date: '2025.12.30', content: 'Next.js 16 기반 DGER 이송지도 개발, 피드백 게시판 신설, 방문자 통계 페이지 신설', type: 'init' },
 
   // DGER 2.0 - Node.js 서버 기반
-  { date: '2025.09.08', content: 'DGER 2.0', type: 'version', version: '2.0', tech: 'Node.js Express (서버 기반)' },
+  { date: '2025.09.13', content: '병상 포화도 계산 로직 수정, 응급실 포화도 기능 추가', type: 'minor' },
+  { date: '2025.09.12', content: 'React2 버전 정식 서비스 전환, 품질 안정화', type: 'major' },
+  { date: '2025.09.11', content: '전체화면 모드 UX 전면 개선(우측 여백 제거, 컬럼 잘림 해결, 고해상도 최적화, ESC 지원)', type: 'major' },
+  { date: '2025.09.10', content: '메시지/질환 표기 정확도 개선, 질환 코드 매핑 오류 수정', type: 'fix' },
+  { date: '2025.09.09', content: '병원명 별칭/표기 로직 개선', type: 'minor' },
+  { date: '2025.09.08', content: 'React 기반 화면 리뉴얼(레이아웃/카드뷰/테이블), 메시지/질환 필터 안정화 작업 완료', type: 'major' },
   { date: '2025.11.01', content: '공공데이터 복구완료, 응급실메시지 진료과목 등 세부 라벨 표기 구현', type: 'major' },
   { date: '2025.10.08', content: 'DGER 자체서버 구축완료, 임시 가동 시작(병상만 구현완료)', type: 'major' },
   { date: '2025.09.26', content: '국가정보자원관리원 화재로 공공데이터 포털 사용중단, 내손안의 응급실 임시 연결', type: 'fix' },
   { date: '2025.09.13', content: '응급실 연락처 제거, 병상포화도 추가', type: 'minor' },
   { date: '2025.09.10', content: '중증질환 항목 오류 긴급 수정', type: 'fix' },
+  { date: '2025.09.08', content: 'DGER 2.0', type: 'version', version: '2.0', tech: 'Node.js Express (서버 기반)' },
   { date: '2025.09.08', content: '새로운 DGER로 이전완료', type: 'major' },
 
   // DGER 1.0 - 스프레드시트 기반
-  { date: '2021.11.26', content: 'DGER 1.0', type: 'version', version: '1.0', tech: 'Google Sheets (스프레드시트 기반)' },
+  { date: '2025. 08. 01~31', content: '중증질환(severe) 페이지 조회 안정화(Q0+QN 기본화/폴백), UI 1줄 정책 강화\n드롭다운 포탈/클리핑 이슈 근본 해결 및 전 페이지 적용\nsystommsg 안정화(병원 분류 hpbd 매핑 정비, 메시지 렌더 안정화)\n네비/헤더/검색/체크박스 스타일 통일 및 반응형 1줄 최적화\n카드뷰 타이포 개선(재실/병원명), 비대구 병원명 축소 및 줄바꿈 방지\n병원 유형 자동 매칭(hosp_list.json 연동) 및 색상 스타일 분화', type: 'major' },
+  { date: '2025. 06. 01~26', content: '27개 중증질환 대시보드 및 index4.html UI 구축/개선\n병원 리스트 정렬/재실환자 수 표기 기능 추가 및 계산 오류 수정\n질환 선택/필터링 로직 보정, 선택 질환명 헤더 표시\n중증질환 필드명 대소문자(MKioskTy) 수정 및 API 오류 개선', type: 'major' },
   { date: '2025.06.27', content: 'DGER 디자인과 속도 개편', type: 'major' },
   { date: '2025.06.27', content: '속도개선 (5분 간격 업데이트)', type: 'minor' },
   { date: '2025.06.27', content: '버튼사이즈 확대, 소아병상/격리병상 표출', type: 'minor' },
@@ -58,6 +66,7 @@ const RELEASE_NOTES: ReleaseNote[] = [
   { date: '2022.10.10', content: '종합상황판 리뉴얼에 따른 재배치 부분완료', type: 'minor' },
   { date: '2022.06.11', content: '대구동산병원 반영완료', type: 'minor' },
   { date: '2022.02.15', content: '포화신호등 반영: 95% 이상(위험) 60~94%(주의) 60% 미만(안전)', type: 'major' },
+  { date: '2021.11.26', content: 'DGER 1.0', type: 'version', version: '1.0', tech: 'Google Sheets (스프레드시트 기반)' },
   { date: '2021.11.26', content: 'DGER 최초 배포 - 대구지역 구급대원을 위한 응급실 병상 정보 시스템', type: 'init' }
 ];
 
@@ -151,6 +160,55 @@ export default function FeedbackPage() {
 
   // 탭 상태
   const [activeTab, setActiveTab] = useState<'release' | 'board' | 'stats'>('release');
+  const sortedReleaseNotes = useMemo(() => {
+    const typeOrder: Record<ReleaseNote['type'], number> = {
+      init: 0,
+      major: 1,
+      minor: 2,
+      fix: 3,
+      version: 9,
+    };
+    const versionOrder: Record<string, number> = {
+      '3.0': 0,
+      '2.0': 1,
+      '1.0': 2,
+    };
+
+    const getDateKey = (dateText: string) => {
+      const cleaned = dateText.replace(/\s+/g, '');
+      const match = cleaned.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+      if (match) {
+        return `${match[1]}${match[2]}${match[3]}`;
+      }
+      return cleaned.replace(/\D/g, '');
+    };
+
+    const getVersionGroup = (note: ReleaseNote) => {
+      if (note.version) return note.version;
+      const dateKey = getDateKey(note.date);
+      if (dateKey >= '20251230') return '3.0';
+      if (dateKey >= '20250601') return '2.0';
+      return '1.0';
+    };
+
+    return [...RELEASE_NOTES].sort((a, b) => {
+      const aGroup = getVersionGroup(a);
+      const bGroup = getVersionGroup(b);
+      const aRank = versionOrder[aGroup] ?? 99;
+      const bRank = versionOrder[bGroup] ?? 99;
+      if (aRank !== bRank) return aRank - bRank;
+      const aIsVersion = a.type === 'version';
+      const bIsVersion = b.type === 'version';
+      if (aIsVersion && !bIsVersion) return 1;
+      if (!aIsVersion && bIsVersion) return -1;
+      const aKey = getDateKey(a.date);
+      const bKey = getDateKey(b.date);
+      if (aKey !== bKey) {
+        return bKey.localeCompare(aKey);
+      }
+      return (typeOrder[a.type] ?? 99) - (typeOrder[b.type] ?? 99);
+    });
+  }, []);
 
   // 통계 데이터 상태
   interface AnalyticsData {
@@ -528,13 +586,11 @@ export default function FeedbackPage() {
               <div className="relative">
                 <div className={`text-sm leading-relaxed space-y-3 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                   <p>
-                    2021년 11월 26일부터 대구지역 구급대원을 위해 DGER을 제작하여 배포하였고,
-                    인천, 광주, 세종, 경남지역으로 확대하여 시범사업을 진행하였으며,
-                    2022년 3월 16일부터 내 손안의 응급실이 복지부를 통해 정식 출시되었습니다.
+                    2021년 11월 26일부터 대구지역 구급대원을 위해 구글스프레드 기반 HTML 웹페이지로 DGER을 제작·배포하였고,
+                    인천·광주·세종·경남으로 확대해 종합상황판 불가능 메시지 개선을 위한 시범사업을 진행하며 ICER, KJER, SJER, GNER을 제작하여 추가 배포했습니다. 이후 2022년 3월 16일부터 내 손안의 응급실이 복지부를 통해 정식 출시되었습니다.
                   </p>
                   <p>
-                    현재는 내손안의 응급실의 보조적 수단으로 서버를 유지중이며,
-                    향후 개선방향을 제시하기 위해 지속적인 피드백을 받도록 하겠습니다.
+                    현재는 내손안의 응급실의 보조적 수단으로 서버를 유지 중이며 대구지역 위주로 하루 100여명의 접속자가 이용하고 있습니다(2025년 12월 31일 기준 누적 페이지뷰 736,285건). 또한 Node.js Express 서버 기반의 2.0과 Next.js 기반의 3.0으로 지속 업데이트하고 있으며, 피드백 게시판을 통해 개선 의견을 주시면 최대한 반영하겠습니다.
                   </p>
                 </div>
               </div>
@@ -556,7 +612,7 @@ export default function FeedbackPage() {
                 <div className={`absolute left-[7px] top-3 bottom-3 w-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-400'}`} />
 
                 <div className="space-y-1">
-                  {RELEASE_NOTES.map((note, index) => (
+                  {sortedReleaseNotes.map((note, index) => (
                     note.type === 'version' ? (
                       // 버전 섹션 헤더
                       <div
@@ -613,7 +669,7 @@ export default function FeedbackPage() {
                             {getReleaseTypeLabel(note.type)}
                           </span>
                         </div>
-                        <p className={`mt-1 text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                        <p className={`mt-1 text-sm leading-relaxed whitespace-pre-line ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                           {note.content}
                         </p>
                       </div>
