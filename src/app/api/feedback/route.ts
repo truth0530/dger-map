@@ -22,6 +22,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+const FEEDBACK_CACHE_TTL_MS = 120 * 1000;
+const globalForFeedbackCache = globalThis as unknown as {
+  feedbackCache?: Map<string, { timestamp: number; payload: unknown }>;
+};
+const feedbackCache = globalForFeedbackCache.feedbackCache ?? new Map<string, { timestamp: number; payload: unknown }>();
+globalForFeedbackCache.feedbackCache = feedbackCache;
+
+const normalizeCategory = (value?: string) => (value || 'all').trim();
+const getCacheKey = (page: number, limit: number, category?: string) =>
+  `${page}:${limit}:${normalizeCategory(category)}`;
+
+const getCachedResponse = (key: string) => {
+  const cached = feedbackCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > FEEDBACK_CACHE_TTL_MS) {
+    feedbackCache.delete(key);
+    return null;
+  }
+  return cached.payload;
+};
+
+const setCachedResponse = (key: string, payload: unknown) => {
+  feedbackCache.set(key, { timestamp: Date.now(), payload });
+};
+
+const clearFeedbackCache = () => {
+  feedbackCache.clear();
+};
+
 /**
  * GET /api/feedback
  * 게시글 목록 조회
@@ -41,26 +70,33 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const category = searchParams.get('category') || undefined;
 
+    const cacheKey = getCacheKey(page, limit, category);
+    const cachedPayload = getCachedResponse(cacheKey);
+    if (cachedPayload) {
+      return NextResponse.json(cachedPayload, { headers: corsHeaders });
+    }
+
     const { posts, total, status, errorMessage } = await getFeedbackList(category, page, limit);
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: posts,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-        warning: status === 'error'
-          ? (process.env.NODE_ENV === 'production'
-              ? 'Google Sheets 조회 실패'
-              : `Google Sheets 조회 실패: ${errorMessage || 'Unknown error'}`)
-          : undefined,
+    const payload = {
+      success: true,
+      data: posts,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      { headers: corsHeaders }
-    );
+      warning: status === 'error'
+        ? (process.env.NODE_ENV === 'production'
+            ? 'Google Sheets 조회 실패'
+            : `Google Sheets 조회 실패: ${errorMessage || 'Unknown error'}`)
+        : undefined,
+    };
+
+    setCachedResponse(cacheKey, payload);
+
+    return NextResponse.json(payload, { headers: corsHeaders });
   } catch (error) {
     console.error('[feedback API] GET 오류:', error);
     return NextResponse.json(
@@ -134,6 +170,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    clearFeedbackCache();
+
     // 슬랙 알림 전송 (비동기, 실패해도 응답에 영향 없음)
     sendFeedbackNotification({
       id: post.id,
@@ -197,6 +235,8 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    clearFeedbackCache();
+
     return NextResponse.json(
       {
         success: true,
@@ -254,6 +294,8 @@ export async function DELETE(request: NextRequest) {
         { status: 500, headers: corsHeaders }
       );
     }
+
+    clearFeedbackCache();
 
     return NextResponse.json(
       {
