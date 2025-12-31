@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { SEVERE_CONSTRAINTS } from '@/lib/constants/severeDefinitions';
 import { shortenHospitalName } from '@/lib/utils/hospitalUtils';
+import { BedOccupancyInput, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
 
 // 중증질환 코드 목록 (dger-api와 동일)
 const SEVERE_CODES = [
@@ -92,37 +93,10 @@ interface DiseaseData {
   noInfoHospitals: HospitalInfo[];
 }
 
-interface BedInfo {
+interface BedInfo extends BedOccupancyInput {
+  hpid?: string;
   dutyName: string;
   dutyEmclsName: string;
-  hvec: number;
-  hvs01: number;
-  hv27: number;
-  HVS59: number;
-  hv29: number;
-  HVS03: number;
-  hv30: number;
-  HVS04: number;
-  hv28: number;
-  HVS02: number;
-  hv15: number;
-  HVS48: number;
-  hv16: number;
-  HVS49: number;
-}
-
-// 재실인원 계산 함수 (dger-api/js/utils.js와 동일)
-function calculateTotalOccupancy(bedInfo: BedInfo): number {
-  // 응급실 + 중환자실 재실인원
-  const hvs01 = bedInfo.hvs01 || 0; // 응급실 재실
-  const HVS59 = bedInfo.HVS59 || 0; // 응급전용 중환자실 재실
-  const HVS03 = bedInfo.HVS03 || 0; // 신경과 중환자실 재실
-  const HVS04 = bedInfo.HVS04 || 0; // 신생아 중환자실 재실
-  const HVS02 = bedInfo.HVS02 || 0; // 일반 중환자실 재실
-  const HVS48 = bedInfo.HVS48 || 0; // 외과 중환자실 재실
-  const HVS49 = bedInfo.HVS49 || 0; // 심장내과 중환자실 재실
-
-  return hvs01 + HVS59 + HVS03 + HVS04 + HVS02 + HVS48 + HVS49;
 }
 
 // 센터급 병원 판별
@@ -165,45 +139,23 @@ export default function SeverePage() {
 
       if (!severeResponse.ok) throw new Error('중증질환 데이터 로드 실패');
 
-      // 병상정보 파싱
-      const bedInfoMap = new Map<string, BedInfo>();
-      if (bedResponse.ok) {
-        const bedXml = await bedResponse.text();
-        const bedParser = new DOMParser();
-        const bedDoc = bedParser.parseFromString(bedXml, 'text/xml');
-        const bedItems = bedDoc.querySelectorAll('item');
-
-        Array.from(bedItems).forEach(item => {
-          const hpid = item.querySelector('hpid')?.textContent || '';
-          if (hpid) {
-            const info: BedInfo = {
-              dutyName: item.querySelector('dutyName')?.textContent || '',
-              dutyEmclsName: item.querySelector('dutyEmclsName')?.textContent || '',
-              hvec: parseInt(item.querySelector('hvec')?.textContent || '0'),
-              hvs01: parseInt(item.querySelector('hvs01')?.textContent || '0'),
-              hv27: parseInt(item.querySelector('hv27')?.textContent || '0'),
-              HVS59: parseInt(item.querySelector('HVS59')?.textContent || '0'),
-              hv29: parseInt(item.querySelector('hv29')?.textContent || '0'),
-              HVS03: parseInt(item.querySelector('HVS03')?.textContent || '0'),
-              hv30: parseInt(item.querySelector('hv30')?.textContent || '0'),
-              HVS04: parseInt(item.querySelector('HVS04')?.textContent || '0'),
-              hv28: parseInt(item.querySelector('hv28')?.textContent || '0'),
-              HVS02: parseInt(item.querySelector('HVS02')?.textContent || '0'),
-              hv15: parseInt(item.querySelector('hv15')?.textContent || '0'),
-              HVS48: parseInt(item.querySelector('HVS48')?.textContent || '0'),
-              hv16: parseInt(item.querySelector('hv16')?.textContent || '0'),
-              HVS49: parseInt(item.querySelector('HVS49')?.textContent || '0')
-            };
-            bedInfoMap.set(hpid, info);
-          }
-        });
+      const severeJson = await severeResponse.json();
+      if (!severeJson?.success || !severeJson.items) {
+        throw new Error('중증질환 데이터 파싱 실패');
       }
 
-      // 중증질환 데이터 파싱
-      const severeXml = await severeResponse.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(severeXml, 'text/xml');
-      const items = doc.querySelectorAll('item');
+      const bedInfoMap = new Map<string, BedInfo>();
+      if (bedResponse.ok) {
+        const bedJson = await bedResponse.json();
+        if (bedJson?.success && bedJson.items) {
+          bedJson.items.forEach((item: BedInfo) => {
+            const hpid = item.hpid || '';
+            if (hpid) {
+              bedInfoMap.set(hpid, item);
+            }
+          });
+        }
+      }
 
       const data: Record<number, DiseaseData> = {};
 
@@ -221,17 +173,17 @@ export default function SeverePage() {
       });
 
       // 데이터 수집
-      Array.from(items).forEach(item => {
-        const hpid = item.querySelector('hpid')?.textContent || '';
-        const dutyName = item.querySelector('dutyName')?.textContent || '';
-        const dutyEmclsName = item.querySelector('dutyEmclsName')?.textContent || '';
+      severeJson.items.forEach((item: { hpid: string; dutyName: string; dutyEmclsName: string; severeStatus: Record<string, string> }) => {
+        const hpid = item.hpid || '';
+        const dutyName = item.dutyName || '';
+        const dutyEmclsName = item.dutyEmclsName || '';
 
         // 병상정보에서 재실인원 가져오기
         const bedInfo = bedInfoMap.get(hpid);
         const occupancy = bedInfo ? calculateTotalOccupancy(bedInfo) : 0;
 
         SEVERE_CODES.forEach(disease => {
-          const fieldValue = item.querySelector(disease.field)?.textContent || '';
+          const fieldValue = item.severeStatus?.[disease.field] || '';
           const yn = fieldValue?.trim().toUpperCase();
 
           const hospitalInfo: HospitalInfo = {

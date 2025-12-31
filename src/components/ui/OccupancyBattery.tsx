@@ -52,7 +52,7 @@ export function OccupancyBattery({ rate, isDark, size = 'medium' }: OccupancyBat
             right: config.knobPos,
             width: config.knobW,
             height: config.knobH,
-            backgroundColor: isDark ? '#6b7280' : '#ffffff',
+            backgroundColor: '#6b7280',
             borderRadius: '1px'
           }}
         />
@@ -93,16 +93,4 @@ export function OrgTypeBadge({ type, isDark = false }: OrgTypeBadgeProps) {
     </span>
   );
 }
-
-/**
- * 포화도 계산 함수 (응급실 병상 기준)
- * @param total - 응급실 총 병상 수 (hvs01)
- * @param available - 응급실 가용 병상 수 (hvec)
- */
-export function calculateOccupancyRate(total: number, available: number): { rate: number; occupied: number } {
-  const occupied = Math.max(0, total - available);
-  const rate = total > 0 ? Math.round((occupied / total) * 100) : 0;
-  return { rate, occupied };
-}
-
 export default OccupancyBattery;

@@ -10,7 +10,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { parseMessageWithHighlights, getHighlightClass, HighlightType, replaceUnavailableWithX } from '@/lib/utils/messageClassifier';
-import { OccupancyBattery, OrgTypeBadge, calculateOccupancyRate } from '@/components/ui/OccupancyBattery';
+import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
+import { calculateOccupancyRate, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
 
 // 질환 패턴 정의 (dger-api/public/js/diseasePatterns.js와 동일)
 const SYMPTOM_CODE_TO_DISEASE_MAP: Record<string, number> = {
@@ -112,24 +113,23 @@ interface Hospital {
   // 포화도 계산용 필드
   hvec?: number;  // 응급실 가용 병상
   hvs01?: number; // 일반입원실 가용
-  hvs59?: number; // 코호트 가용
+  hv27?: number;  // 코호트 가용
   hv29?: number;  // 음압격리(성인)
   hv13?: number;  // 음압격리(소아)
   hv30?: number;  // 일반격리(성인)
   hv14?: number;  // 일반격리(소아)
-  hv15?: number;  // 소아
-  hv16?: number;  // 소아음압
-  hvs17?: number; // 소아일반
+  hv28?: number;  // 소아
+  hv15?: number;  // 소아음압
+  hv16?: number;  // 소아일반
   // 총병상
   hvs02?: number; // 일반입원실 총
-  hvs60?: number; // 코호트 총
+  hvs59?: number; // 코호트 총
   hvs03?: number; // 음압격리(성인) 총
   hvs46?: number; // 음압격리(소아) 총
   hvs04?: number; // 일반격리(성인) 총
   hvs47?: number; // 일반격리(소아) 총
-  hvs06?: number; // 소아 총
-  hvs07?: number; // 소아음압 총
-  hvs18?: number; // 소아일반 총
+  hvs48?: number; // 소아음압 총
+  hvs49?: number; // 소아일반 총
 }
 
 interface HospitalWithMessages extends Hospital {
@@ -358,24 +358,23 @@ export default function MessagesPage() {
             // 가용 병상
             hvec: item.hvec || 0,
             hvs01: item.hvs01 || 0,
-            hvs59: item.hvs59 || 0,
+            hv27: item.hv27 || 0,
             hv29: item.hv29 || 0,
             hv13: item.hv13 || 0,
             hv30: item.hv30 || 0,
             hv14: item.hv14 || 0,
+            hv28: item.hv28 || 0,
             hv15: item.hv15 || 0,
             hv16: item.hv16 || 0,
-            hvs17: item.hvs17 || 0,
             // 총 병상
             hvs02: item.hvs02 || 0,
-            hvs60: item.hvs60 || 0,
+            hvs59: item.hvs59 || 0,
             hvs03: item.hvs03 || 0,
             hvs46: item.hvs46 || 0,
             hvs04: item.hvs04 || 0,
             hvs47: item.hvs47 || 0,
-            hvs06: item.hvs06 || 0,
-            hvs07: item.hvs07 || 0,
-            hvs18: item.hvs18 || 0,
+            hvs48: item.hvs48 || 0,
+            hvs49: item.hvs49 || 0,
           });
         }
       }
@@ -752,7 +751,8 @@ export default function MessagesPage() {
                   .map(hospital => {
                     const isCollapsed = collapsedGroups.has(hospital.name);
                     const level = getHospitalLevel(hospital);
-                    const { rate, occupied } = calculateOccupancyRate(hospital.hvs01 || 0, hospital.hvec || 0);
+                    const rate = calculateOccupancyRate(hospital);
+                    const occupied = calculateTotalOccupancy(hospital);
                     const emergencyMsgs = hospital.messages.filter(m => !m.isDisease);
                     const diseaseMsgs = hospital.messages.filter(m => m.isDisease);
 
@@ -894,7 +894,8 @@ export default function MessagesPage() {
                 .map(hospital => {
                   const isCollapsed = collapsedGroups.has(hospital.name);
                   const level = getHospitalLevel(hospital);
-                  const { rate, occupied } = calculateOccupancyRate(hospital.hvs01 || 0, hospital.hvec || 0);
+                  const rate = calculateOccupancyRate(hospital);
+                  const occupied = calculateTotalOccupancy(hospital);
                   const emergencyMsgs = hospital.messages.filter(m => !m.isDisease);
                   const diseaseMsgs = hospital.messages.filter(m => m.isDisease);
 

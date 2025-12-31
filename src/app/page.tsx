@@ -17,6 +17,7 @@ import { isCenterHospital, shortenHospitalName } from '@/lib/utils/hospitalUtils
 import { formatDateWithDay } from '@/lib/utils/dateUtils';
 import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
 import { ClassifiedMessages, parseMessageWithHighlights, getHighlightClass, HighlightedSegment } from '@/lib/utils/messageClassifier';
+import { calculateOccupancyRate, calculateTotalOccupancy, getBedValues } from '@/lib/utils/bedOccupancy';
 import { OccupancyBattery } from '@/components/ui/OccupancyBattery';
 
 // 하이라이트된 메시지 렌더링 컴포넌트
@@ -41,77 +42,6 @@ interface OrgTypes {
   권역: boolean;
   센터: boolean;
   기관: boolean;
-}
-
-// 병상 값 계산 헬퍼
-function getBedValues(hospital: HospitalBedData) {
-  return {
-    // 일반병상
-    general: {
-      available: hospital.hvec || 0,
-      total: hospital.hvs01 || 0
-    },
-    // 코호트
-    cohort: {
-      available: hospital.hv27 || 0,
-      total: hospital.HVS59 || 0
-    },
-    // 음압격리 (통합: hv29 + hv13 / HVS03 + HVS46)
-    erNegative: {
-      available: (hospital.hv29 || 0) + (hospital.hv13 || 0),
-      total: (hospital.HVS03 || 0) + (hospital.HVS46 || 0)
-    },
-    // 일반격리 (통합: hv30 + hv14 / HVS04 + HVS47)
-    erGeneral: {
-      available: (hospital.hv30 || 0) + (hospital.hv14 || 0),
-      total: (hospital.HVS04 || 0) + (hospital.HVS47 || 0)
-    },
-    // 소아
-    pediatric: {
-      available: hospital.hv28 || 0,
-      total: hospital.HVS02 || 0
-    },
-    // 소아음압
-    pediatricNegative: {
-      available: hospital.hv15 || 0,
-      total: hospital.HVS48 || 0
-    },
-    // 소아일반
-    pediatricGeneral: {
-      available: hospital.hv16 || 0,
-      total: hospital.HVS49 || 0
-    }
-  };
-}
-
-// 재실인원 계산 (dger-api와 동일)
-function calculateTotalOccupancy(hospital: HospitalBedData): number {
-  const beds = getBedValues(hospital);
-
-  const generalOccupied = Math.max(0, beds.general.total - beds.general.available);
-  const cohortOccupied = Math.max(0, beds.cohort.total - beds.cohort.available);
-  const erNegativeOccupied = Math.max(0, beds.erNegative.total - beds.erNegative.available);
-  const erGeneralOccupied = Math.max(0, beds.erGeneral.total - beds.erGeneral.available);
-  const pediatricOccupied = Math.max(0, beds.pediatric.total - beds.pediatric.available);
-  const pediatricNegativeOccupied = Math.max(0, beds.pediatricNegative.total - beds.pediatricNegative.available);
-  const pediatricGeneralOccupied = Math.max(0, beds.pediatricGeneral.total - beds.pediatricGeneral.available);
-
-  return generalOccupied + cohortOccupied + erNegativeOccupied + erGeneralOccupied +
-         pediatricOccupied + pediatricNegativeOccupied + pediatricGeneralOccupied;
-}
-
-// 병상포화도 계산 (dger-api와 동일)
-function calculateOccupancyRate(hospital: HospitalBedData): number {
-  const beds = getBedValues(hospital);
-
-  const totalBeds = beds.general.total + beds.cohort.total + beds.erNegative.total +
-                    beds.erGeneral.total + beds.pediatric.total +
-                    beds.pediatricNegative.total + beds.pediatricGeneral.total;
-
-  if (totalBeds === 0) return 0;
-
-  const totalOccupied = calculateTotalOccupancy(hospital);
-  return Math.round((totalOccupied / totalBeds) * 100);
 }
 
 // 병원 유형 판별 (hpbd 우선, 없으면 dutyEmclsName 사용)
@@ -902,4 +832,3 @@ function HospitalCard({ hospital, isDark, isExpanded, onToggle, messages, messag
     </div>
   );
 }
-

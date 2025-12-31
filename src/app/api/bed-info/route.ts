@@ -18,6 +18,7 @@ import { checkRateLimit, getClientIP, getRateLimitHeaders } from '@/lib/middlewa
 import { parseXmlToJson, getItemText, getItemNumber } from '@/lib/utils/serverXmlParser';
 import { getHospitalOrgType, HospitalOrgType } from '@/lib/data/hospitalTypeMap';
 import { getBedStatus, BedStatus } from '@/lib/constants/dger';
+import { calculateOccupancyRate, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
 
 const logger = createLogger('api:bed-info');
 const API_NAME = 'bed-info';
@@ -84,10 +85,64 @@ function parseXmlToBedInfo(xml: string, usedSample: boolean): BedInfoResponse {
     const hpid = getItemText(item, 'hpid');
     const hvec = getItemNumber(item, 'hvec');
     const hvs01 = getItemNumber(item, 'hvs01');
+    const hv27 = getItemNumber(item, 'hv27');
+    const hvs59 = getItemNumber(item, 'hvs59');
+    const hv29 = getItemNumber(item, 'hv29');
+    const hvs03 = getItemNumber(item, 'hvs03');
+    const hv13 = getItemNumber(item, 'hv13');
+    const hvs46 = getItemNumber(item, 'hvs46');
+    const hv30 = getItemNumber(item, 'hv30');
+    const hvs04 = getItemNumber(item, 'hvs04');
+    const hv14 = getItemNumber(item, 'hv14');
+    const hvs47 = getItemNumber(item, 'hvs47');
+    const hv28 = getItemNumber(item, 'hv28');
+    const hvs02 = getItemNumber(item, 'hvs02');
+    const hv15 = getItemNumber(item, 'hv15');
+    const hvs48 = getItemNumber(item, 'hvs48');
+    const hv16 = getItemNumber(item, 'hv16');
+    const hvs49 = getItemNumber(item, 'hvs49');
 
     // 재실인원 및 점유율 계산
-    const occupancy = Math.max(0, hvs01 - hvec);
-    const occupancyRate = hvs01 > 0 ? Math.round((occupancy / hvs01) * 100) : 0;
+    const occupancy = calculateTotalOccupancy({
+      hvec,
+      hvs01,
+      hv27,
+      hvs59,
+      hv29,
+      hvs03,
+      hv13,
+      hvs46,
+      hv30,
+      hvs04,
+      hv14,
+      hvs47,
+      hv28,
+      hvs02,
+      hv15,
+      hvs48,
+      hv16,
+      hvs49
+    });
+    const occupancyRate = calculateOccupancyRate({
+      hvec,
+      hvs01,
+      hv27,
+      hvs59,
+      hv29,
+      hvs03,
+      hv13,
+      hvs46,
+      hv30,
+      hvs04,
+      hv14,
+      hvs47,
+      hv28,
+      hvs02,
+      hv15,
+      hvs48,
+      hv16,
+      hvs49
+    });
 
     return {
       hpid,
@@ -98,22 +153,22 @@ function parseXmlToBedInfo(xml: string, usedSample: boolean): BedInfoResponse {
       dutyTel3: getItemText(item, 'dutyTel3'),
       hvec,
       hvs01,
-      hv27: getItemNumber(item, 'hv27'),
-      hvs59: getItemNumber(item, 'hvs59'),
-      hv29: getItemNumber(item, 'hv29'),
-      hvs03: getItemNumber(item, 'hvs03'),
-      hv13: getItemNumber(item, 'hv13'),
-      hvs46: getItemNumber(item, 'hvs46'),
-      hv30: getItemNumber(item, 'hv30'),
-      hvs04: getItemNumber(item, 'hvs04'),
-      hv14: getItemNumber(item, 'hv14'),
-      hvs47: getItemNumber(item, 'hvs47'),
-      hv28: getItemNumber(item, 'hv28'),
-      hvs02: getItemNumber(item, 'hvs02'),
-      hv15: getItemNumber(item, 'hv15'),
-      hvs48: getItemNumber(item, 'hvs48'),
-      hv16: getItemNumber(item, 'hv16'),
-      hvs49: getItemNumber(item, 'hvs49'),
+      hv27,
+      hvs59,
+      hv29,
+      hvs03,
+      hv13,
+      hvs46,
+      hv30,
+      hvs04,
+      hv14,
+      hvs47,
+      hv28,
+      hvs02,
+      hv15,
+      hvs48,
+      hv16,
+      hvs49,
       hvidate: getItemText(item, 'hvidate'),
       occupancy,
       occupancyRate,
