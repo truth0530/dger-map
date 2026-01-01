@@ -31,22 +31,15 @@ export default function Footer() {
               className="text-sm font-semibold transition-colors hover:opacity-80"
               style={{ color: isDark ? '#e2e8f0' : '#ffffff' }}
             >
-              국립중앙의료원 대구응급의료지원센터
+              국립중앙의료원
             </a>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <span className="inline-flex items-center gap-1">
-                <span className="opacity-70">사업자등록번호</span>
-                <span>104-82-11329</span>
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="opacity-70">주소</span>
-                <span>대구광역시 중구 동덕로 167</span>
-              </span>
+              <span>104-82-11329 서울 중구 을지로 245</span>
             </div>
           </div>
 
           <div className="text-xs md:text-sm md:text-right">
-            <p>&copy; 2021 DGER. All rights reserved.</p>
+            <p>&copy; 2021 DGER. All rights reserved. 대구응급의료지원센터</p>
           </div>
         </div>
       </div>
