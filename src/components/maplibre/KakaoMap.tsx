@@ -25,6 +25,8 @@ declare global {
   }
 }
 
+declare const kakao: any;
+
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
 
 interface KakaoMapProps {
@@ -201,7 +203,7 @@ export default function KakaoMap({
     return html;
   }, [bedDataMap, severeDataMap, selectedSevereType, isDark]);
 
-  const showOverlay = useCallback((hospital: Hospital, position: kakao.maps.LatLng) => {
+  const showOverlay = useCallback((hospital: Hospital, position: any) => {
     if (!mapInstance.current) return;
     if (overlayRef.current) {
       overlayRef.current.setMap(null);
