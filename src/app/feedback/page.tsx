@@ -18,6 +18,8 @@ interface ReleaseNote {
   tech?: string;
 }
 
+type ReleaseNoteType = NonNullable<ReleaseNote['type']>;
+
 // 피드백 게시글 타입
 interface FeedbackPost {
   id: string;
@@ -161,7 +163,7 @@ export default function FeedbackPage() {
   // 탭 상태
   const [activeTab, setActiveTab] = useState<'release' | 'board' | 'stats'>('release');
   const sortedReleaseNotes = useMemo(() => {
-    const typeOrder: Record<ReleaseNote['type'], number> = {
+    const typeOrder: Record<ReleaseNoteType, number> = {
       init: 0,
       major: 1,
       minor: 2,
@@ -206,7 +208,9 @@ export default function FeedbackPage() {
       if (aKey !== bKey) {
         return bKey.localeCompare(aKey);
       }
-      return (typeOrder[a.type] ?? 99) - (typeOrder[b.type] ?? 99);
+      const aType = a.type ?? 'minor';
+      const bType = b.type ?? 'minor';
+      return (typeOrder[aType] ?? 99) - (typeOrder[bType] ?? 99);
     });
   }, []);
 
