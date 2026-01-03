@@ -198,10 +198,10 @@ const globalForCache = global as unknown as {
   severeDiseasesCache: SimpleCache<string>;
 };
 
-export const bedInfoCache = globalForCache.bedInfoCache ?? new SimpleCache<string>(100, 300000, 'bedInfo'); // 5분
-export const hospitalListCache = globalForCache.hospitalListCache ?? new SimpleCache<string>(100, 600000, 'hospitalList'); // 10분
-export const emergencyMessageCache = globalForCache.emergencyMessageCache ?? new SimpleCache<string>(500, 180000, 'emergencyMessage'); // 3분
-export const severeDiseasesCache = globalForCache.severeDiseasesCache ?? new SimpleCache<string>(100, 300000, 'severeDiseases'); // 5분
+export const bedInfoCache = globalForCache.bedInfoCache ?? new SimpleCache<string>(100, 120000, 'bedInfo'); // 2분
+export const hospitalListCache = globalForCache.hospitalListCache ?? new SimpleCache<string>(100, 300000, 'hospitalList'); // 5분
+export const emergencyMessageCache = globalForCache.emergencyMessageCache ?? new SimpleCache<string>(500, 60000, 'emergencyMessage'); // 1분
+export const severeDiseasesCache = globalForCache.severeDiseasesCache ?? new SimpleCache<string>(100, 120000, 'severeDiseases'); // 2분
 
 if (process.env.NODE_ENV !== 'production') {
   globalForCache.bedInfoCache = bedInfoCache;

@@ -412,6 +412,11 @@ export const UNAVAILABLE_PHRASES = [
   '불가',
 ];
 
+const UNAVAILABLE_PATTERN_SOURCE = UNAVAILABLE_PHRASES
+  .map(phrase => phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  .join('|');
+const UNAVAILABLE_REGEX = new RegExp(`(${UNAVAILABLE_PATTERN_SOURCE})`, 'gi');
+
 const UNAVAILABLE_REPLACE_PATTERNS: RegExp[] = [
   /수용\s*및\s*입원\s*불가능/gi,
   /환자\s*수용\s*불가능/gi,
@@ -452,6 +457,23 @@ const UNAVAILABLE_EXCEPTION_PATTERNS: RegExp[] = [
   /불가능메세지등록/gi,
   /불가능메시지/gi,
   /불가능메세지/gi
+];
+
+const HIGHLIGHT_PATTERNS: Array<{ regex: RegExp; type: HighlightType }> = [
+  { regex: /\[([^\]]+)\]/g, type: 'department' },  // [진료과목] 대괄호 형태
+  // 대괄호 없는 진료과목 (문장 시작 또는 콤마/공백 뒤)
+  { regex: /(감염내과|혈액\s*종양내과|영상의학과|비뇨의학과|비뇨기과|신경과|치과|산부인과|산과|부인과|신경외과|피부과|소아청소년과|소아신경과|내분비내과|정형외과|흉부외과|심장내과|호흡기내과|소화기내과|신장내과|류마티스내과|재활의학과|마취통증의학과|응급의학과|이비인후과|안과|정신건강의학과|가정의학과|외과|내과|구강악면외과|대장항문외과|성형외과|비뇨의학과)/g, type: 'department' },
+  { regex: /(의료진|교수님?|교수진|인력|전문의)/g, type: 'staff' },           // 의료진/인력
+  { regex: /(장비|기기|기계|CT|MRI|X-ray|초음파|내시경|인공호흡기|호흡기|ECMO|투석|혈액투석|산소|모니터|sono)/gi, type: 'equipment' }, // 장비 관련
+  { regex: /(뇌출혈|뇌경색|심근경색|대동맥|중환자실|골절|출혈|경색|수술|acute\s*stroke|acute\s*storke|stroke|storke|급성|중증|패혈증|쇼크|외상|화상|간질환|담낭|담도|폐색|장중첩|장충첩증|정복술|복부손상|사지접합|저체중출생아|중증외상|epilepsy|seizure|spine|두경부|심경부감염|급성후두개염|상기도\s*폐쇄|목통증|후두개염|식도\s*응급질환|식도|척추|경련|소아응급|산모|객혈|BAE|의식저하|약물중독|자해|DI\s*환자|Appendicitis|열상환자|단순봉합|안면\s*열상|안면\s*골절|안와\s*골절|자살\s*사고|자살\s*중독|자살환자|담관\s*질환|안구\s*적출|간이식수술|간\s*이식|간이식|간\\(Liver\\)|가스중독|조영술|발열|뇌척수|토혈|객혈|궤사성|췌장염|심부전|신부전|관상동맥|소아경련|이물질흡인|이물\s*흡인|소아내시경|소아위장관|요로감염|신우신염|폐렴|봉와직염|intubation|심부열상|개방성\s*골절|BOF)/gi, type: 'disease' }, // 질환명 관련
+  { regex: UNAVAILABLE_REGEX, type: 'unavailable' },  // 불가능 관련
+  { regex: /(이송\s*전\s*확인|참고바람|참고)/gi, type: 'guidance' },  // 안내/확인 통일 문구
+];
+
+const TOOLTIP_PATTERNS: Array<{ regex: RegExp; type: HighlightType }> = [
+  { regex: CONTACT_TOOLTIP_REGEX, type: 'guidance' },
+  { regex: NOTICE_TOOLTIP_REGEX, type: 'guidance' },
+  { regex: UNAVAILABLE_REGEX, type: 'unavailable' }
 ];
 
 function protectUnavailableExceptions(message: string): { text: string; restore: (input: string) => string } {
@@ -500,7 +522,8 @@ function buildSegments(message: string, patterns: Array<{ regex: RegExp; type: H
   const allMatches: Match[] = [];
 
   for (const pattern of patterns) {
-    const regex = new RegExp(pattern.regex.source, 'gi');
+    const regex = pattern.regex;
+    regex.lastIndex = 0;
     let match;
     while ((match = regex.exec(message)) !== null) {
       allMatches.push({
@@ -558,24 +581,7 @@ export function parseMessageWithHighlights(message: string): HighlightedSegment[
   const decodedMessage = decodeHtmlEntities(message);
   const { text: protectedMessage, restore } = protectUnavailableExceptions(decodedMessage);
 
-  // 불가능 패턴을 동적으로 생성 (긴 것부터 매칭하도록 정렬됨)
-  const unavailablePattern = UNAVAILABLE_PHRASES
-    .map(phrase => phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))  // 특수문자 이스케이프
-    .join('|');
-
-  // 패턴 정의: 진료과목, 의료진, 장비, 질환명, 불가능
-  const patterns = [
-    { regex: /\[([^\]]+)\]/g, type: 'department' as HighlightType },  // [진료과목] 대괄호 형태
-    // 대괄호 없는 진료과목 (문장 시작 또는 콤마/공백 뒤)
-    { regex: /(감염내과|혈액\s*종양내과|영상의학과|비뇨의학과|비뇨기과|신경과|치과|산부인과|산과|부인과|신경외과|피부과|소아청소년과|소아신경과|내분비내과|정형외과|흉부외과|심장내과|호흡기내과|소화기내과|신장내과|류마티스내과|재활의학과|마취통증의학과|응급의학과|이비인후과|안과|정신건강의학과|가정의학과|외과|내과|구강악면외과|대장항문외과|성형외과|비뇨의학과)/g, type: 'department' as HighlightType },
-    { regex: /(의료진|교수님?|교수진|인력|전문의)/g, type: 'staff' as HighlightType },           // 의료진/인력
-    { regex: /(장비|기기|기계|CT|MRI|X-ray|초음파|내시경|인공호흡기|호흡기|ECMO|투석|혈액투석|산소|모니터|sono)/gi, type: 'equipment' as HighlightType }, // 장비 관련
-    { regex: /(뇌출혈|뇌경색|심근경색|대동맥|중환자실|골절|출혈|경색|수술|acute\s*stroke|acute\s*storke|stroke|storke|급성|중증|패혈증|쇼크|외상|화상|간질환|담낭|담도|폐색|장중첩|장충첩증|정복술|복부손상|사지접합|저체중출생아|중증외상|epilepsy|seizure|spine|두경부|심경부감염|급성후두개염|상기도\s*폐쇄|목통증|후두개염|식도\s*응급질환|식도|척추|경련|소아응급|산모|객혈|BAE|의식저하|약물중독|자해|DI\s*환자|Appendicitis|열상환자|단순봉합|안면\s*열상|안면\s*골절|안와\s*골절|자살\s*사고|자살\s*중독|자살환자|담관\s*질환|안구\s*적출|간이식수술|간\s*이식|간이식|간\\(Liver\\)|가스중독|조영술|발열|뇌척수|토혈|객혈|궤사성|췌장염|심부전|신부전|관상동맥|소아경련|이물질흡인|이물\s*흡인|소아내시경|소아위장관|요로감염|신우신염|폐렴|봉와직염|intubation|심부열상|개방성\s*골절|BOF)/gi, type: 'disease' as HighlightType }, // 질환명 관련
-    { regex: new RegExp(`(${unavailablePattern})`, 'gi'), type: 'unavailable' as HighlightType },  // 불가능 관련
-    { regex: /(이송\s*전\s*확인|참고바람|참고)/gi, type: 'guidance' as HighlightType },  // 안내/확인 통일 문구
-  ];
-
-  const built = buildSegments(protectedMessage, patterns);
+  const built = buildSegments(protectedMessage, HIGHLIGHT_PATTERNS);
   return built.map((segment) => ({
     ...segment,
     text: restore(segment.text)
@@ -591,17 +597,7 @@ export function parseMessageWithTooltipHighlights(message: string): HighlightedS
   const decodedMessage = decodeHtmlEntities(message);
   const { text: protectedMessage, restore } = protectUnavailableExceptions(decodedMessage);
 
-  const unavailablePattern = UNAVAILABLE_PHRASES
-    .map(phrase => phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('|');
-
-  const patterns = [
-    { regex: CONTACT_TOOLTIP_REGEX, type: 'guidance' as HighlightType },
-    { regex: NOTICE_TOOLTIP_REGEX, type: 'guidance' as HighlightType },
-    { regex: new RegExp(`(${unavailablePattern})`, 'gi'), type: 'unavailable' as HighlightType }
-  ];
-
-  const built = buildSegments(protectedMessage, patterns);
+  const built = buildSegments(protectedMessage, TOOLTIP_PATTERNS);
   return built.map((segment) => ({
     ...segment,
     text: restore(segment.text)
