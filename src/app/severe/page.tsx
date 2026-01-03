@@ -528,39 +528,55 @@ export default function SeverePage() {
                     })()}
                   </div>
 
-                  {/* 통계 - 최대한 컴팩트 */}
-                  <div className="flex flex-shrink-0">
-                    <div
-                      className={`flex items-center text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors ${
-                        isDark ? 'hover:bg-gray-700 text-green-400' : 'hover:bg-gray-100 text-green-700'
-                      }`}
-                      onClick={() => toggleSection(disease.qn, 'available')}
-                      title="수용가능 병원 목록 보기"
-                    >
-                      <span className="font-medium">가능</span>
-                      <span className="font-bold ml-0.5">{data.available}</span>
-                    </div>
-                    <div
-                      className={`flex items-center text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors ${
-                        isDark ? 'hover:bg-gray-700 text-red-400' : 'hover:bg-gray-100 text-red-700'
-                      }`}
-                      onClick={() => toggleSection(disease.qn, 'unavailable')}
-                      title="수용불가 병원 목록 보기"
-                    >
-                      <span className="font-medium">불가</span>
-                      <span className="font-bold ml-0.5">{data.unavailable}</span>
-                    </div>
-                    <div
-                      className={`flex items-center text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors ${
-                        isDark ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
-                      }`}
-                      onClick={() => toggleSection(disease.qn, 'noInfo')}
-                      title="미참여 병원 목록 보기"
-                    >
-                      <span className="font-medium">미참여</span>
-                      <span className="font-bold ml-0.5">{data.noInfo}</span>
-                    </div>
-                  </div>
+                  {/* 통계 - 스택 바 차트 (내부 텍스트) */}
+                  {(() => {
+                    const total = data.available + data.unavailable + data.noInfo;
+                    const availPct = total > 0 ? (data.available / total) * 100 : 0;
+                    const unavailPct = total > 0 ? (data.unavailable / total) * 100 : 0;
+                    const noInfoPct = total > 0 ? (data.noInfo / total) * 100 : 0;
+                    // 텍스트 표시: 넓으면 라벨+숫자, 좁으면 숫자만, 더 좁으면 생략
+                    const getLabel = (pct: number, label: string, count: number) => {
+                      if (pct >= 35) return `${label}${count}`;
+                      if (pct >= 12) return `${count}`;
+                      return '';
+                    };
+                    return (
+                      <div className="flex items-center flex-shrink-0">
+                        <div className={`flex h-5 w-28 rounded-sm overflow-hidden text-[9px] font-medium shadow-sm ${isDark ? 'bg-gray-700/50' : 'bg-stone-200'}`}>
+                          {availPct > 0 && (
+                            <div
+                              className={`h-full cursor-pointer transition-all hover:brightness-110 flex items-center justify-center overflow-hidden whitespace-nowrap ${isDark ? 'bg-teal-600 text-teal-50' : 'bg-[#4A5D5D] text-white'}`}
+                              style={{ width: `${availPct}%` }}
+                              onClick={() => toggleSection(disease.qn, 'available')}
+                              title={`수용가능 ${data.available}개`}
+                            >
+                              {getLabel(availPct, '가능', data.available)}
+                            </div>
+                          )}
+                          {unavailPct > 0 && (
+                            <div
+                              className={`h-full cursor-pointer transition-all hover:brightness-110 flex items-center justify-center overflow-hidden whitespace-nowrap ${isDark ? 'bg-rose-700 text-rose-50' : 'bg-rose-600 text-white'}`}
+                              style={{ width: `${unavailPct}%` }}
+                              onClick={() => toggleSection(disease.qn, 'unavailable')}
+                              title={`수용불가 ${data.unavailable}개`}
+                            >
+                              {getLabel(unavailPct, '불가', data.unavailable)}
+                            </div>
+                          )}
+                          {noInfoPct > 0 && (
+                            <div
+                              className={`h-full cursor-pointer transition-all hover:brightness-110 flex items-center justify-center overflow-hidden whitespace-nowrap ${isDark ? 'bg-gray-600 text-gray-300' : 'bg-stone-400 text-stone-50'}`}
+                              style={{ width: `${noInfoPct}%` }}
+                              onClick={() => toggleSection(disease.qn, 'noInfo')}
+                              title={`미참여 ${data.noInfo}개`}
+                            >
+                              {getLabel(noInfoPct, '미참여', data.noInfo)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 병원 리스트 */}

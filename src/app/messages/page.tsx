@@ -840,7 +840,7 @@ export default function MessagesPage() {
                                   <thead>
                                     <tr style={{ backgroundColor: isDark ? '#1a3535' : '#4A5D5D' }}>
                                       <th className="px-3 py-1.5 text-left text-white font-bold text-xs">[{hospital.name}] 응급실 메시지 {emergencyMsgs.length}건</th>
-                                      <th className="px-2 py-1.5 pr-4 text-center text-white font-bold text-xs w-28">기간</th>
+                                      <th className="px-2 py-1.5 pr-4 text-right text-white font-bold text-xs w-36 shrink-0">기간</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -858,7 +858,7 @@ export default function MessagesPage() {
                                         >
                                           <HighlightedMessage message={msg.msg} isDark={isDark} />
                                         </td>
-                                        <td className={`px-2 py-1.5 pr-4 text-center text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        <td className={`px-2 py-1.5 pr-4 text-right text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                           {formatPeriod(msg.symBlkSttDtm, msg.symBlkEndDtm)}
                                         </td>
                                       </tr>
@@ -876,7 +876,7 @@ export default function MessagesPage() {
                                     <tr style={{ backgroundColor: isDark ? '#2d2525' : '#5D4A4A' }}>
                                       <th className="px-2 py-1.5 text-left text-white font-bold text-xs w-48"></th>
                                       <th className="px-3 py-1.5 text-left text-white font-bold text-xs">[{hospital.name}] 중증응급질환 불가능 메시지 {diseaseMsgs.length}건</th>
-                                      <th className="px-2 py-1.5 pr-4 text-center text-white font-bold text-xs w-28">기간</th>
+                                      <th className="px-2 py-1.5 pr-4 text-right text-white font-bold text-xs w-36 shrink-0">기간</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -900,7 +900,7 @@ export default function MessagesPage() {
                                         >
                                           <HighlightedMessage message={msg.msg} isDark={isDark} />
                                         </td>
-                                        <td className={`px-2 py-1.5 pr-4 text-center text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        <td className={`px-2 py-1.5 pr-4 text-right text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                           {formatPeriod(msg.symBlkSttDtm, msg.symBlkEndDtm)}
                                         </td>
                                       </tr>
