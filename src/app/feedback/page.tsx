@@ -38,7 +38,7 @@ interface FeedbackPost {
 // 릴리즈 노트 데이터
 const RELEASE_NOTES: ReleaseNote[] = [
   // DGER 3.0 - React 프레임워크 기반
-  { date: '2025.01.03', content: '응급메시지 가독성 정책 고도화(이송 전 확인/참고바람/불가 통일) 및 하이라이트 색상 규칙 정비, 원문 툴팁 표시 강화, 특수문자 표기/고유명사 보호 개선', type: 'minor' },
+  { date: '2026.01.03', content: '응급메시지 가독성 정책 고도화(이송 전 확인/참고바람/불가 통일) 및 하이라이트 색상 규칙 정비, 원문 툴팁 표시 강화', type: 'minor' },
   { date: '2025.12.31', content: '지도 마커 크기를 재실인원 기준으로 자동 조절하고, 포화도에 따라 색상/투명도 그라데이션을 적용', type: 'minor' },
   { date: '2025.12.30', content: 'DGER 3.0', type: 'version', version: '3.0', tech: 'Next.js 16 (React 프레임워크 기반)' },
   { date: '2025.12.30', content: 'Next.js 16 기반 DGER 이송지도 개발, 피드백 게시판 신설, 방문자 통계 페이지 신설', type: 'init' },
