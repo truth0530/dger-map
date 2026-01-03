@@ -29,7 +29,8 @@ export default function GaPageView() {
       const gaPath = getGaPagePath(pathname);
       window.gtag('event', 'page_view', {
         page_path: gaPath,
-        page_location: window.location.href,
+        // GA가 계산하는 페이지 경로는 page_location 기준이므로 매핑된 경로로 전송
+        page_location: `${window.location.origin}${gaPath}`,
         page_title: document.title,
       });
       sentRef.current = pathname;
