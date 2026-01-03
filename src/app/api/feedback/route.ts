@@ -14,13 +14,7 @@ import {
   isGoogleSheetsConfigured,
 } from '@/lib/googleSheets';
 import { sendFeedbackNotification } from '@/lib/slack/feedback-notification';
-
-// CORS 헤더
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
 
 const FEEDBACK_CACHE_TTL_MS = 120 * 1000;
 const globalForFeedbackCache = globalThis as unknown as {
@@ -57,6 +51,14 @@ const clearFeedbackCache = () => {
  * Query: ?page=1&limit=20&category=버그
  */
 export async function GET(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  if (!isAllowedOrigin(origin)) {
+    return NextResponse.json(
+      { error: '허용되지 않은 Origin입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
   try {
     if (!isGoogleSheetsConfigured()) {
       return NextResponse.json(
@@ -112,6 +114,14 @@ export async function GET(request: NextRequest) {
  * Body: { author?, content, category, isPublic?, password? }
  */
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  if (!isAllowedOrigin(origin)) {
+    return NextResponse.json(
+      { error: '허용되지 않은 Origin입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
   try {
     if (!isGoogleSheetsConfigured()) {
       return NextResponse.json(
@@ -208,6 +218,14 @@ export async function POST(request: NextRequest) {
  * Body: { postId, password }
  */
 export async function PUT(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  if (!isAllowedOrigin(origin)) {
+    return NextResponse.json(
+      { error: '허용되지 않은 Origin입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
   try {
     if (!isGoogleSheetsConfigured()) {
       return NextResponse.json(
@@ -258,6 +276,14 @@ export async function PUT(request: NextRequest) {
  * 게시글 삭제 (관리자 전용)
  */
 export async function DELETE(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  if (!isAllowedOrigin(origin)) {
+    return NextResponse.json(
+      { error: '허용되지 않은 Origin입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
   try {
     if (!isGoogleSheetsConfigured()) {
       return NextResponse.json(
@@ -313,9 +339,9 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
-    headers: corsHeaders,
+    headers: getCorsHeaders(request.headers.get('origin')),
   });
 }

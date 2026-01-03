@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requestErmctXml, mapSidoName } from '@/lib/ermctClient';
 import { SimpleCache } from '@/lib/cache/SimpleCache';
+import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
 
 // 캐시 인스턴스 (3분 TTL)
 const severeAcceptanceCache = new SimpleCache<string>(3 * 60 * 1000);
@@ -33,6 +34,14 @@ const EMPTY_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
 </response>`;
 
 export async function GET(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  if (!isAllowedOrigin(origin)) {
+    return NextResponse.json(
+      { error: '허용되지 않은 Origin입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
   const searchParams = request.nextUrl.searchParams;
   const hpid = searchParams.get('hpid') || '';
   const qn = searchParams.get('qn') || '';
@@ -44,14 +53,14 @@ export async function GET(request: NextRequest) {
   if (!qn) {
     return NextResponse.json(
       { error: '필수 파라미터 누락 (qn 필요)' },
-      { status: 400 }
+      { status: 400, headers: corsHeaders }
     );
   }
 
   if (!hpid && !q0) {
     return NextResponse.json(
       { error: '필수 파라미터 누락 (hpid 또는 q0 필요)' },
-      { status: 400 }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -66,7 +75,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'X-Cache': 'HIT'
       }
     });
@@ -171,7 +180,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'X-Cache': 'MISS'
       }
     });
@@ -183,7 +192,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'X-Cache': 'ERROR',
         'X-Error': error instanceof Error ? error.message : 'Unknown error'
       }
@@ -191,13 +200,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    }
+    headers: getCorsHeaders(request.headers.get('origin'))
   });
 }
