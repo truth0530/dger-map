@@ -779,8 +779,9 @@ export default function MessagesPage() {
                           </span>
                           <span className="mr-2 inline-flex items-center"><OrgTypeBadge type={level} isDark={isDark} /></span>
                           <span>{hospital.name}</span>
-                          <span className="font-normal text-sm text-gray-200 ml-3">재실환자 {occupied}명</span>
-                          <span className="font-normal text-sm text-gray-200 ml-2">병상 포화도</span>
+                          <span className="font-normal text-sm text-gray-200 ml-3 hidden min-[900px]:inline">재실환자 {occupied}명</span>
+                          <span className="font-normal text-sm text-gray-200 ml-3 inline min-[900px]:hidden">재실 {occupied}</span>
+                          <span className="font-normal text-sm text-gray-200 ml-2 hidden min-[900px]:inline">병상 포화도</span>
                           <span className="ml-1 inline-flex items-center"><OccupancyBattery rate={rate} isDark={isDark} size="small" /></span>
                         </div>
 
@@ -920,8 +921,7 @@ export default function MessagesPage() {
                       >
                         <span className="mr-2 inline-flex items-center"><OrgTypeBadge type={level} isDark={isDark} /></span>
                         <span>{hospital.name}</span>
-                        <span className="font-normal text-xs text-gray-200 ml-2">재실환자 {occupied}명</span>
-                        <span className="font-normal text-xs text-gray-200 ml-1">병상 포화도</span>
+                        <span className="font-normal text-xs text-gray-200 ml-2">재실 {occupied}</span>
                         <span className="ml-1 inline-flex items-center"><OccupancyBattery rate={rate} isDark={isDark} size="small" /></span>
                       </div>
 
