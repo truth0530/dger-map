@@ -545,7 +545,7 @@ export default function SeverePage() {
                         <div className={`flex h-5 w-28 rounded-sm overflow-hidden text-[9px] font-medium shadow-sm ${isDark ? 'bg-gray-700/50' : 'bg-stone-200'}`}>
                           {availPct > 0 && (
                             <div
-                              className={`h-full cursor-pointer transition-all hover:brightness-110 flex items-center justify-center overflow-hidden whitespace-nowrap ${isDark ? 'bg-teal-600 text-teal-50' : 'bg-[#4A5D5D] text-white'}`}
+                              className={`h-full cursor-pointer transition-all hover:brightness-110 flex items-center justify-center overflow-hidden whitespace-nowrap ${isDark ? 'bg-teal-600 text-teal-50' : 'bg-teal-600 text-white'}`}
                               style={{ width: `${availPct}%` }}
                               onClick={() => toggleSection(disease.qn, 'available')}
                               title={`수용가능 ${data.available}개`}
