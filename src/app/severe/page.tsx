@@ -6,11 +6,12 @@
  * 완전히 동일하게 구현
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { SEVERE_CONSTRAINTS } from '@/lib/constants/severeDefinitions';
 import { shortenHospitalName } from '@/lib/utils/hospitalUtils';
 import { BedOccupancyInput, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
+import { detectRegionFromLocation } from '@/lib/utils/locationRegion';
 
 // 중증질환 코드 목록 (dger-api와 동일)
 const SEVERE_CODES = [
@@ -108,6 +109,8 @@ function isCenterHospital(dutyEmclsName?: string): boolean {
 export default function SeverePage() {
   const { isDark } = useTheme();
   const [selectedRegion, setSelectedRegion] = useState('대구');
+  const hasUserSelectedRegion = useRef(false);
+  const [showLocationNotice, setShowLocationNotice] = useState(false);
   const [diseaseData, setDiseaseData] = useState<Record<number, DiseaseData>>({});
   const [loading, setLoading] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Record<number, string | null>>({});
@@ -122,6 +125,24 @@ export default function SeverePage() {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    (async () => {
+      const region = await detectRegionFromLocation();
+      if (!isActive || !region || hasUserSelectedRegion.current) return;
+      const nextRegion = region === '대구광역시' ? '대구' : region;
+      if (REGION_OPTIONS.some((opt) => opt.value === nextRegion)) {
+        setSelectedRegion(nextRegion);
+        setShowLocationNotice(true);
+        window.setTimeout(() => setShowLocationNotice(false), 2000);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   // 질환 데이터 로드
@@ -386,6 +407,11 @@ export default function SeverePage() {
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}>
+      {showLocationNotice && (
+        <div className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-full border px-3 py-1 text-xs shadow-sm bg-white/90 text-gray-700 border-gray-300">
+          현재 위치를 바탕으로 위치 정보가 설정되었습니다.
+        </div>
+      )}
       <main className="p-2 sm:p-4 max-w-[1800px] mx-auto">
         {/* 컨트롤 섹션 - 좌측 정렬 */}
         <div className="flex items-center justify-start gap-2 mb-2 px-2 overflow-x-auto">
@@ -397,7 +423,10 @@ export default function SeverePage() {
             } focus:outline-none`}
             style={{ height: '36px', width: '80px' }}
             value={selectedRegion}
-            onChange={(e) => setSelectedRegion(e.target.value)}
+            onChange={(e) => {
+              hasUserSelectedRegion.current = true;
+              setSelectedRegion(e.target.value);
+            }}
           >
             {REGION_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>

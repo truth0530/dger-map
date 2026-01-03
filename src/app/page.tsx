@@ -12,7 +12,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useBedData, HospitalBedData } from '@/lib/hooks/useBedData';
 import { REGIONS, SEVERE_TYPES } from '@/lib/constants/dger';
-import { mapSidoName } from '@/lib/utils/regionMapping';
+import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
+import { detectRegionFromLocation } from '@/lib/utils/locationRegion';
 import { isCenterHospital, shortenHospitalName } from '@/lib/utils/hospitalUtils';
 import { formatDateWithDay } from '@/lib/utils/dateUtils';
 import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
@@ -70,6 +71,7 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [selectedDisease, setSelectedDisease] = useState('');
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+  const [showLocationNotice, setShowLocationNotice] = useState(false);
 
   // 테이블 칼럼 너비 상태
   const [columnWidths, setColumnWidths] = useState({
@@ -143,10 +145,30 @@ export default function HomePage() {
   }, [expandedMessages.size, data]);
 
   useEffect(() => {
+    let isActive = true;
     const savedRegion = localStorage.getItem('bed_region');
     if (savedRegion) {
       setSelectedRegion(savedRegion);
+      return () => {
+        isActive = false;
+      };
     }
+
+    (async () => {
+      const region = await detectRegionFromLocation();
+      if (!isActive || !region) return;
+      const shortRegion = mapSidoShort(region);
+      if (REGIONS.some((r) => r.value === shortRegion)) {
+        setSelectedRegion(shortRegion);
+        localStorage.setItem('bed_region', shortRegion);
+        setShowLocationNotice(true);
+        window.setTimeout(() => setShowLocationNotice(false), 2000);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -214,6 +236,11 @@ export default function HomePage() {
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-[#F5F0E8]'}`}>
+      {showLocationNotice && (
+        <div className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-full border px-3 py-1 text-xs shadow-sm bg-white/90 text-gray-700 border-gray-300">
+          현재 위치를 바탕으로 위치 정보가 설정되었습니다.
+        </div>
+      )}
       <div className="max-w-full mx-auto px-2 py-2">
         {/* 컨트롤 섹션 - dger-api와 동일 */}
         <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-1 flex-nowrap">

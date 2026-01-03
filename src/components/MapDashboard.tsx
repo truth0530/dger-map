@@ -31,6 +31,7 @@ import { useSevereData, HospitalSevereData } from "@/lib/hooks/useSevereData";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { useTravelTime, HospitalTravelTime, HospitalCoordinate } from "@/lib/hooks/useTravelTime";
 import { mapSidoName } from "@/lib/utils/regionMapping";
+import { detectRegionFromLocation } from "@/lib/utils/locationRegion";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { DISEASE_CATEGORIES, getCategoryByKey, getDiseaseNamesByCategory, getMatchedSevereKeys } from "@/lib/constants/diseaseCategories";
@@ -86,6 +87,8 @@ export function MapDashboard() {
     "권역응급의료센터", "지역응급의료센터", "지역응급의료기관"
   ]);
   const [selectedRegion, setSelectedRegion] = useState<string>("대구광역시");
+  const hasUserSelectedRegion = useRef(false);
+  const [showLocationNotice, setShowLocationNotice] = useState(false);
   const [hoveredHospitalCode, setHoveredHospitalCode] = useState<string | null>(null);
   const [selectedBedTypes, setSelectedBedTypes] = useState<Set<BedType>>(new Set());
   const [selectedBedStatus, setSelectedBedStatus] = useState<BedStatus[]>(["여유", "적정", "부족"]);  // 병상 상태 필터
@@ -94,6 +97,24 @@ export function MapDashboard() {
   const [mobilePanel, setMobilePanel] = useState<MobilePanelType>(null);  // 모바일 패널 상태
   const [expandedHospitalCode, setExpandedHospitalCode] = useState<string | null>(null);  // 확장된 병원 코드
   const [sortMode, setSortMode] = useState<SortMode>("default");  // 정렬 모드
+
+  useEffect(() => {
+    let isActive = true;
+    (async () => {
+      const region = await detectRegionFromLocation();
+      if (!isActive || !region || hasUserSelectedRegion.current) return;
+      const nextRegion = mapSidoName(region);
+      if (REGIONS.some((r) => r.value === nextRegion)) {
+        setSelectedRegion(nextRegion);
+        setShowLocationNotice(true);
+        window.setTimeout(() => setShowLocationNotice(false), 2000);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   // 아코디언 상태 관리
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["region", "disease", "bed"]));
@@ -544,6 +565,7 @@ export function MapDashboard() {
 
   // 사이드바 지역 Select 변경 핸들러
   const handleSidebarRegionChange = (region: string) => {
+    hasUserSelectedRegion.current = true;
     setSelectedRegion(region);
   };
 
@@ -688,6 +710,12 @@ export function MapDashboard() {
           </div>
         </div>
       </header>
+
+      {showLocationNotice && (
+        <div className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-full border px-3 py-1 text-xs shadow-sm bg-white/90 text-gray-700 border-gray-300">
+          현재 위치를 바탕으로 위치 정보가 설정되었습니다.
+        </div>
+      )}
 
       <div className="flex-1 flex relative min-h-0">
         {/* 좌측 필터 사이드바 */}

@@ -13,6 +13,8 @@ import { parseMessageWithHighlights, getHighlightClass, HighlightType, normalize
 import MessageTooltip from '@/components/ui/MessageTooltip';
 import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
 import { calculateOccupancyRate, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
+import { detectRegionFromLocation } from '@/lib/utils/locationRegion';
+import { mapSidoShort } from '@/lib/utils/regionMapping';
 
 // 질환 패턴 정의 (dger-api/public/js/diseasePatterns.js와 동일)
 const SYMPTOM_CODE_TO_DISEASE_MAP: Record<string, number> = {
@@ -57,7 +59,7 @@ const DISEASE_DISPLAY_PATTERNS: Record<number, { original: string; displayFormat
 
 // 질환 필터 옵션
 const SEVERE_TYPE_OPTIONS = [
-  { value: '', label: '전체' },
+  { value: '', label: '27개중증질환 선택' },
   { value: '[재관류중재술] 심근경색', label: '[재관류중재술] 심근경색' },
   { value: '[재관류중재술] 뇌경색', label: '[재관류중재술] 뇌경색' },
   { value: '[뇌출혈수술] 거미막하출혈', label: '[뇌출혈수술] 거미막하출혈' },
@@ -85,6 +87,11 @@ const SEVERE_TYPE_OPTIONS = [
   { value: '[정신과적응급] 폐쇄병동입원', label: '[정신과적응급] 폐쇄병동입원' },
   { value: '[중증화상] 전문치료', label: '[중증화상] 전문치료' },
   { value: '[안과적수술] 응급', label: '[안과적수술] 응급' }
+];
+
+const REGION_OPTIONS = [
+  '대구', '서울', '부산', '광주', '대전', '울산', '세종', '경기',
+  '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'
 ];
 
 // 기관분류 필터 옵션 (축약형)
@@ -253,6 +260,8 @@ export default function MessagesPage() {
   const [allExpanded, setAllExpanded] = useState(true); // 기본: 전체 펼침
   const [isMobile, setIsMobile] = useState(false);
   const [hospitalTypeMap, setHospitalTypeMap] = useState<Record<string, string>>({});
+  const [showLocationNotice, setShowLocationNotice] = useState(false);
+  const hasUserSelectedRegion = useRef(false);
 
   // 화면 크기 감지
   useEffect(() => {
@@ -262,6 +271,24 @@ export default function MessagesPage() {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    (async () => {
+      const region = await detectRegionFromLocation();
+      if (!isActive || !region || hasUserSelectedRegion.current) return;
+      const shortRegion = mapSidoShort(region);
+      if (REGION_OPTIONS.includes(shortRegion)) {
+        setSelectedRegion(shortRegion);
+        setShowLocationNotice(true);
+        window.setTimeout(() => setShowLocationNotice(false), 2000);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   // 병원 타입 매핑 로드
@@ -592,6 +619,11 @@ export default function MessagesPage() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: isDark ? '#1E3A3A' : '#F5F0E8' }}>
+      {showLocationNotice && (
+        <div className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-full border px-3 py-1 text-xs shadow-sm bg-white/90 text-gray-700 border-gray-300">
+          현재 위치를 바탕으로 위치 정보가 설정되었습니다.
+        </div>
+      )}
       <main className="flex-1 p-4 max-w-[1800px] mx-auto w-full">
         {/* 컨트롤 섹션 - dger-api와 동일한 스타일 */}
         <div
@@ -607,24 +639,14 @@ export default function MessagesPage() {
             }`}
             style={{ height: '32px', lineHeight: '30px', paddingTop: '0', paddingBottom: '0' }}
             value={selectedRegion}
-            onChange={(e) => setSelectedRegion(e.target.value)}
+            onChange={(e) => {
+              hasUserSelectedRegion.current = true;
+              setSelectedRegion(e.target.value);
+            }}
           >
-            <option value="대구">대구</option>
-            <option value="서울">서울</option>
-            <option value="부산">부산</option>
-            <option value="광주">광주</option>
-            <option value="대전">대전</option>
-            <option value="울산">울산</option>
-            <option value="세종">세종</option>
-            <option value="경기">경기</option>
-            <option value="강원">강원</option>
-            <option value="충북">충북</option>
-            <option value="충남">충남</option>
-            <option value="전북">전북</option>
-            <option value="전남">전남</option>
-            <option value="경북">경북</option>
-            <option value="경남">경남</option>
-            <option value="제주">제주</option>
+            {REGION_OPTIONS.map((region) => (
+              <option key={region} value={region}>{region}</option>
+            ))}
           </select>
 
           {/* 기관분류 체크박스 */}
