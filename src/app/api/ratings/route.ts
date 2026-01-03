@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
+import { isAuthorizedRequest } from '@/lib/utils/apiAuth';
 
 // ===== 저장소 인터페이스 =====
 interface RatingsData {
@@ -246,6 +247,12 @@ export async function POST(request: NextRequest) {
   if (!isAllowedOrigin(origin)) {
     return NextResponse.json(
       { error: '허용되지 않은 Origin입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
+  if (!isAuthorizedRequest(request.headers.get('x-dger-key'))) {
+    return NextResponse.json(
+      { error: '인증되지 않은 요청입니다.' },
       { status: 403, headers: corsHeaders }
     );
   }

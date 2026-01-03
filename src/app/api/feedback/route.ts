@@ -15,6 +15,7 @@ import {
 } from '@/lib/googleSheets';
 import { sendFeedbackNotification } from '@/lib/slack/feedback-notification';
 import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
+import { isAuthorizedRequest } from '@/lib/utils/apiAuth';
 
 const FEEDBACK_CACHE_TTL_MS = 120 * 1000;
 const globalForFeedbackCache = globalThis as unknown as {
@@ -122,6 +123,12 @@ export async function POST(request: NextRequest) {
       { status: 403, headers: corsHeaders }
     );
   }
+  if (!isAuthorizedRequest(request.headers.get('x-dger-key'))) {
+    return NextResponse.json(
+      { error: '인증되지 않은 요청입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
   try {
     if (!isGoogleSheetsConfigured()) {
       return NextResponse.json(
@@ -226,6 +233,12 @@ export async function PUT(request: NextRequest) {
       { status: 403, headers: corsHeaders }
     );
   }
+  if (!isAuthorizedRequest(request.headers.get('x-dger-key'))) {
+    return NextResponse.json(
+      { error: '인증되지 않은 요청입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
   try {
     if (!isGoogleSheetsConfigured()) {
       return NextResponse.json(
@@ -281,6 +294,12 @@ export async function DELETE(request: NextRequest) {
   if (!isAllowedOrigin(origin)) {
     return NextResponse.json(
       { error: '허용되지 않은 Origin입니다.' },
+      { status: 403, headers: corsHeaders }
+    );
+  }
+  if (!isAuthorizedRequest(request.headers.get('x-dger-key'))) {
+    return NextResponse.json(
+      { error: '인증되지 않은 요청입니다.' },
       { status: 403, headers: corsHeaders }
     );
   }

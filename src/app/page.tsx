@@ -494,7 +494,7 @@ export default function HomePage() {
                       <span className="hidden lg:inline">소아일반</span>
                       <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('pedIsolation', e)} />
                     </th>
-                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap">
+                    <th className="px-1 sm:px-2 pr-4 sm:pr-5 py-1 text-center text-white font-semibold text-xs whitespace-nowrap">
                       <span className="lg:hidden">갱신</span>
                       <span className="hidden lg:inline">업데이트</span>
                     </th>
@@ -689,7 +689,7 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
         </td>
 
         {/* 업데이트 시간 - 너비 유지 */}
-        <td className={`px-1 sm:px-2 py-1.5 text-center text-[10px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+        <td className={`px-1 sm:px-2 pr-4 sm:pr-5 py-1.5 text-center text-[10px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
           {hospital.hvidate ? formatDateWithDay(hospital.hvidate) : '-'}
         </td>
       </tr>

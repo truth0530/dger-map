@@ -47,7 +47,9 @@ export async function GET(request: NextRequest) {
   const qn = searchParams.get('qn') || '';
   const q0 = searchParams.get('q0') || '';
 
-  console.log('[severe-acceptance] 요청 파라미터 - hpid:', hpid, 'qn:', qn, 'q0:', q0);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[severe-acceptance] 요청 파라미터 - hpid:', hpid, 'qn:', qn, 'q0:', q0);
+  }
 
   // 파라미터 검증
   if (!qn) {
@@ -70,7 +72,9 @@ export async function GET(request: NextRequest) {
   // 캐시 확인
   const cachedData = severeAcceptanceCache.get(cacheKey);
   if (cachedData) {
-    console.log(`[severe-acceptance] 캐시 히트: ${cacheKey}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[severe-acceptance] 캐시 히트: ${cacheKey}`);
+    }
     return new NextResponse(cachedData, {
       status: 200,
       headers: {
@@ -104,7 +108,9 @@ export async function GET(request: NextRequest) {
       });
 
       resultXml = result.xml;
-      console.log('[severe-acceptance] Q0+QN 응답 길이:', resultXml.length);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[severe-acceptance] Q0+QN 응답 길이:', resultXml.length);
+      }
 
     } else if (hpid && qn) {
       // HPID + QN 방식 (개별 병원 + 질환번호)
@@ -119,11 +125,15 @@ export async function GET(request: NextRequest) {
         });
 
         resultXml = result.xml;
-        console.log('[severe-acceptance] HPID+QN 응답 길이:', resultXml.length);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[severe-acceptance] HPID+QN 응답 길이:', resultXml.length);
+        }
 
         // SOAP Fault 감지시 Q0+QN으로 재시도
         if (resultXml.includes('<soapenv:Fault') && q0) {
-          console.warn('[severe-acceptance] HPID+QN 응답에서 Fault 감지 → Q0+QN 재시도');
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[severe-acceptance] HPID+QN 응답에서 Fault 감지 → Q0+QN 재시도');
+          }
           const mappedQ0 = mapSidoName(q0);
           const retryParams = { ...baseParams, Q0: mappedQ0, QN: qn };
 
@@ -141,7 +151,9 @@ export async function GET(request: NextRequest) {
 
         // Q0이 있으면 대체 조회
         if (q0) {
-          console.log('[severe-acceptance] HPID 실패 → Q0+QN 대체 조회 실행');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[severe-acceptance] HPID 실패 → Q0+QN 대체 조회 실행');
+          }
           const mappedQ0 = mapSidoName(q0);
           const retryParams = { ...baseParams, Q0: mappedQ0, QN: qn };
 
@@ -170,7 +182,9 @@ export async function GET(request: NextRequest) {
       });
 
       resultXml = result.xml;
-      console.log('[severe-acceptance] Q0+QN 응답 길이:', resultXml.length);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[severe-acceptance] Q0+QN 응답 길이:', resultXml.length);
+      }
     }
 
     // 캐시에 저장

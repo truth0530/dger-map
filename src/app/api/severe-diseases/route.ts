@@ -111,7 +111,9 @@ export async function GET(request: NextRequest) {
   // 캐시 확인
   const cachedData = severeDiseasesCache.get(cacheKey);
   if (cachedData) {
-    console.log(`[severe-diseases] 캐시 히트: ${cacheKey}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[severe-diseases] 캐시 히트: ${cacheKey}`);
+    }
     return new NextResponse(cachedData, {
       status: 200,
       headers: {
@@ -126,7 +128,9 @@ export async function GET(request: NextRequest) {
   try {
     const mappedStage1 = mapSidoName(STAGE1);
 
-    console.log('[severe-diseases] 요청 파라미터 - STAGE1:', mappedStage1, 'STAGE2:', STAGE2);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[severe-diseases] 요청 파라미터 - STAGE1:', mappedStage1, 'STAGE2:', STAGE2);
+    }
 
     const params: Record<string, string> = {
       numOfRows,
@@ -148,7 +152,9 @@ export async function GET(request: NextRequest) {
     const jsonResponse = parseXmlToSevereData(result.xml, result.usedSample);
     const jsonString = JSON.stringify(jsonResponse);
 
-    console.log('[severe-diseases] 응답 항목 수:', jsonResponse.items.length);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[severe-diseases] 응답 항목 수:', jsonResponse.items.length);
+    }
 
     // 캐시에 저장 (샘플 데이터가 아닌 경우만)
     if (!result.usedSample) {
