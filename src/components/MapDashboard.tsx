@@ -34,7 +34,8 @@ import { mapSidoName } from "@/lib/utils/regionMapping";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { DISEASE_CATEGORIES, getCategoryByKey, getDiseaseNamesByCategory, getMatchedSevereKeys } from "@/lib/constants/diseaseCategories";
-import { parseMessage, parseMessageWithHighlights, getHighlightClassWithTheme, replaceUnavailableWithX } from "@/lib/utils/messageClassifier";
+import { parseMessage, parseMessageWithHighlights, getHighlightClassWithTheme, normalizeMessageForDisplay } from "@/lib/utils/messageClassifier";
+import MessageTooltip from "@/components/ui/MessageTooltip";
 
 // 모바일 사이드바 상태
 type MobilePanelType = "filter" | "list" | null;
@@ -1332,18 +1333,20 @@ export function MapDashboard() {
                           </div>
                           {urgentItems.map((item, idx) => {
                             // 모바일 정책 적용: 수용불가능 문구를 X로 대체
-                            const processedContent = replaceUnavailableWithX(item.content);
-                            const segments = parseMessageWithHighlights(processedContent);
+                            const normalizedContent = normalizeMessageForDisplay(item.content);
+                            const segments = parseMessageWithHighlights(normalizedContent);
                             return (
                               <div key={idx} className="text-[10px] leading-tight">
                                 <span className={`font-medium ${isDark ? 'text-rose-300' : 'text-red-600'}`}>{item.label} </span>
-                                <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-                                  {segments.map((seg, segIdx) => (
-                                    <span key={segIdx} className={getHighlightClassWithTheme(seg.type, isDark)}>
-                                      {seg.text}
-                                    </span>
-                                  ))}
-                                </span>
+                                <MessageTooltip message={item.content} isDark={isDark}>
+                                  <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+                                    {segments.map((seg, segIdx) => (
+                                      <span key={segIdx} className={getHighlightClassWithTheme(seg.type, isDark)}>
+                                        {seg.text}
+                                      </span>
+                                    ))}
+                                  </span>
+                                </MessageTooltip>
                               </div>
                             );
                           })}

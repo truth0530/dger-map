@@ -9,7 +9,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
-import { parseMessageWithHighlights, getHighlightClass, HighlightType, replaceUnavailableWithX } from '@/lib/utils/messageClassifier';
+import { parseMessageWithHighlights, getHighlightClass, HighlightType, normalizeMessageForDisplay } from '@/lib/utils/messageClassifier';
+import MessageTooltip from '@/components/ui/MessageTooltip';
 import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
 import { calculateOccupancyRate, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
 
@@ -207,6 +208,8 @@ const getHighlightColorClass = (type: HighlightType, isDark: boolean): string =>
       return isDark ? 'text-purple-400 font-semibold' : 'text-purple-600 font-semibold';
     case 'unavailable': // 불가능 문구 - 회색 (연하게)
       return isDark ? 'text-gray-500 opacity-70' : 'text-gray-400 opacity-70';
+    case 'guidance':    // 안내 문구 - 회색
+      return isDark ? 'text-gray-500 opacity-80' : 'text-gray-400 opacity-80';
     default:
       return '';
   }
@@ -217,20 +220,23 @@ const getHighlightColorClass = (type: HighlightType, isDark: boolean): string =>
 // isMobile=false: 불가능 문구를 회색으로 표시
 const HighlightedMessage = ({ message, isDark, isMobile = false }: { message: string; isDark: boolean; isMobile?: boolean }) => {
   // 모바일에서는 불가능 문구를 "X"로 대체
-  const processedMessage = isMobile ? replaceUnavailableWithX(message) : message;
+  const normalizedMessage = normalizeMessageForDisplay(message);
+  const processedMessage = normalizedMessage;
   const segments = parseMessageWithHighlights(processedMessage);
 
   return (
-    <>
-      {segments.map((segment, idx) => (
-        <span
-          key={idx}
-          className={segment.type !== 'none' ? getHighlightColorClass(segment.type, isDark) : ''}
-        >
-          {segment.text}
-        </span>
-      ))}
-    </>
+    <MessageTooltip message={message} isDark={isDark}>
+      <span>
+        {segments.map((segment, idx) => (
+          <span
+            key={idx}
+            className={segment.type !== 'none' ? getHighlightColorClass(segment.type, isDark) : ''}
+          >
+            {segment.text}
+          </span>
+        ))}
+      </span>
+    </MessageTooltip>
   );
 };
 

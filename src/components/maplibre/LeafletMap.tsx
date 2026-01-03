@@ -20,8 +20,16 @@ import { SEVERE_TYPES } from '@/lib/constants/dger';
 import { getCategoryByKey, getMatchedSevereKeys } from '@/lib/constants/diseaseCategories';
 import { createMarkerElement } from '@/lib/utils/markerRenderer';
 import { shortenHospitalName } from '@/lib/utils/hospitalUtils';
-import { parseMessage, renderHighlightedMessage, replaceUnavailableWithX } from '@/lib/utils/messageClassifier';
+import { parseMessage, renderHighlightedMessage, normalizeMessageForDisplay, renderTooltipMessage } from '@/lib/utils/messageClassifier';
 import { useTheme } from '@/lib/contexts/ThemeContext';
+
+const escapeHtmlAttr = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
 type SevereTypeKey = typeof SEVERE_TYPES[number]['key'];
 
@@ -427,7 +435,7 @@ export default function LeafletMap({
         <div style="padding:8px 12px;background:${isDarkMode ? 'rgba(248,113,113,0.08)' : 'rgba(254,202,202,0.5)'};border-bottom:1px solid ${c.border};">
           ${urgentItems.slice(0, 3).map(item => `
             <div style="font-size:10px;line-height:1.5;">
-              <span style="font-weight:600;color:${urgentLabelColor};">${item.label} </span><span style="color:${c.muted};">${renderHighlightedMessage(replaceUnavailableWithX(item.content), isDarkMode)}</span>
+              <span style="font-weight:600;color:${urgentLabelColor};">${item.label} </span><span class="dger-tooltip" style="color:${c.muted};"><span>${renderHighlightedMessage(normalizeMessageForDisplay(item.content), isDarkMode)}</span><span class="dger-tooltip-content ${isDarkMode ? 'is-dark' : 'is-light'}">${renderTooltipMessage(item.content, isDarkMode)}</span></span>
             </div>
           `).join('')}
           ${urgentItems.length > 3 ? `<div style="font-size:9px;color:${c.muted};margin-top:2px;">+${urgentItems.length - 3}건 더</div>` : ''}

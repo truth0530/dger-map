@@ -16,21 +16,25 @@ import { mapSidoName } from '@/lib/utils/regionMapping';
 import { isCenterHospital, shortenHospitalName } from '@/lib/utils/hospitalUtils';
 import { formatDateWithDay } from '@/lib/utils/dateUtils';
 import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
-import { ClassifiedMessages, parseMessageWithHighlights, getHighlightClass, HighlightedSegment } from '@/lib/utils/messageClassifier';
+import { ClassifiedMessages, parseMessageWithHighlights, getHighlightClass, HighlightedSegment, normalizeMessageForDisplay } from '@/lib/utils/messageClassifier';
+import MessageTooltip from '@/components/ui/MessageTooltip';
 import { calculateOccupancyRate, calculateTotalOccupancy, getBedValues } from '@/lib/utils/bedOccupancy';
 import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
 
 // 하이라이트된 메시지 렌더링 컴포넌트
 function HighlightedMessage({ message }: { message: string }) {
-  const segments = parseMessageWithHighlights(message);
+  const normalizedMessage = normalizeMessageForDisplay(message);
+  const segments = parseMessageWithHighlights(normalizedMessage);
   return (
-    <>
-      {segments.map((segment, idx) => (
-        <span key={idx} className={getHighlightClass(segment.type)}>
-          {segment.text}
-        </span>
-      ))}
-    </>
+    <MessageTooltip message={message} isDark={true}>
+      <span>
+        {segments.map((segment, idx) => (
+          <span key={idx} className={getHighlightClass(segment.type)}>
+            {segment.text}
+          </span>
+        ))}
+      </span>
+    </MessageTooltip>
   );
 }
 
