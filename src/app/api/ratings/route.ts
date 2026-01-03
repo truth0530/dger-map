@@ -10,7 +10,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
 import { isAuthorizedRequest } from '@/lib/utils/apiAuth';
 
 // ===== 저장소 인터페이스 =====
@@ -190,14 +189,6 @@ async function saveRating(
 // ===== API 핸들러 =====
 
 export async function GET(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  if (!isAllowedOrigin(origin)) {
-    return NextResponse.json(
-      { error: '허용되지 않은 Origin입니다.' },
-      { status: 403, headers: corsHeaders }
-    );
-  }
   try {
     const { searchParams } = new URL(request.url);
     const page = searchParams.get('page');
@@ -213,7 +204,7 @@ export async function GET(request: NextRequest) {
         userVote: userVote,
         total: Object.values(pageRatings).reduce((a, b) => a + b, 0),
         storage: kvAvailable ? 'kv' : 'memory'
-      }, { headers: corsHeaders });
+      });
     } else {
       // 전체 평점 반환
       const allVotes = await getAllRatings();
@@ -230,30 +221,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         data: allRatings,
         storage: kvAvailable ? 'kv' : 'memory'
-      }, { headers: corsHeaders });
+      });
     }
   } catch (error) {
     console.error('[ratings] 조회 오류:', error);
-    return NextResponse.json(
-      { error: '서버 오류가 발생했습니다.' },
-      { status: 500, headers: corsHeaders }
-    );
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  if (!isAllowedOrigin(origin)) {
-    return NextResponse.json(
-      { error: '허용되지 않은 Origin입니다.' },
-      { status: 403, headers: corsHeaders }
-    );
-  }
   if (!isAuthorizedRequest(request.headers.get('x-dger-key'))) {
     return NextResponse.json(
       { error: '인증되지 않은 요청입니다.' },
-      { status: 403, headers: corsHeaders }
+      { status: 403 }
     );
   }
   try {
@@ -263,7 +243,7 @@ export async function POST(request: NextRequest) {
     if (!page || !rating || rating < 1 || rating > 5) {
       return NextResponse.json(
         { error: '유효하지 않은 요청입니다. page와 rating(1-5)이 필요합니다.' },
-        { status: 400, headers: corsHeaders }
+        { status: 400 }
       );
     }
 
@@ -279,19 +259,20 @@ export async function POST(request: NextRequest) {
       total: Object.values(pageRatings).reduce((a, b) => a + b, 0),
       message: previousVote ? '평점이 변경되었습니다.' : '평점이 등록되었습니다.',
       storage: kvAvailable ? 'kv' : 'memory'
-    }, { headers: corsHeaders });
+    });
   } catch (error) {
     console.error('[ratings] 등록 오류:', error);
-    return NextResponse.json(
-      { error: '서버 오류가 발생했습니다.' },
-      { status: 500, headers: corsHeaders }
-    );
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
-    headers: getCorsHeaders(request.headers.get('origin'))
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    }
   });
 }

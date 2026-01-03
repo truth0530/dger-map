@@ -10,17 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requestErmctXml, mapSidoName } from '@/lib/ermctClient';
 import { hospitalListCache } from '@/lib/cache/SimpleCache';
 import { SAMPLE_HOSPITAL_LIST } from '@/lib/sampleData';
-import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
 
 export async function GET(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  if (!isAllowedOrigin(origin)) {
-    return NextResponse.json(
-      { error: '허용되지 않은 Origin입니다.' },
-      { status: 403, headers: corsHeaders }
-    );
-  }
   const searchParams = request.nextUrl.searchParams;
   const region = searchParams.get('region') || '';
 
@@ -35,7 +26,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         'X-Cache': 'HIT'
       }
     });
@@ -70,7 +61,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         'X-Cache': 'MISS',
         'X-Sample-Data': result.usedSample ? 'true' : 'false'
       }
@@ -83,7 +74,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         'X-Cache': 'ERROR',
         'X-Sample-Data': 'true',
         'X-Error': error instanceof Error ? error.message : 'Unknown error'
@@ -92,9 +83,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
-    headers: getCorsHeaders(request.headers.get('origin'))
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    }
   });
 }

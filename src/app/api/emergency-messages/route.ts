@@ -10,7 +10,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requestErmctXml } from '@/lib/ermctClient';
 import { emergencyMessageCache } from '@/lib/cache/SimpleCache';
 import { SAMPLE_MESSAGE_DATA } from '@/lib/sampleData';
-import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
 
 // 빈 메시지 응답 (정상적으로 메시지가 없는 경우)
 const EMPTY_MESSAGE_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
@@ -28,21 +27,13 @@ const EMPTY_MESSAGE_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
 </response>`;
 
 export async function GET(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  if (!isAllowedOrigin(origin)) {
-    return NextResponse.json(
-      { error: '허용되지 않은 Origin입니다.' },
-      { status: 403, headers: corsHeaders }
-    );
-  }
   const searchParams = request.nextUrl.searchParams;
   const hpid = searchParams.get('hpid') || '';
 
   if (!hpid) {
     return NextResponse.json(
       { error: 'hpid 파라미터가 필요합니다.' },
-      { status: 400, headers: corsHeaders }
+      { status: 400 }
     );
   }
 
@@ -57,7 +48,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
         'X-Cache': 'HIT'
       }
@@ -87,7 +78,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
         'X-Cache': 'MISS',
         'X-Sample-Data': result.usedSample ? 'true' : 'false'
@@ -101,7 +92,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 's-maxage=30, stale-while-revalidate=120',
         'X-Cache': 'ERROR',
         'X-Sample-Data': 'true',
@@ -111,9 +102,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
-    headers: getCorsHeaders(request.headers.get('origin'))
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    }
   });
 }

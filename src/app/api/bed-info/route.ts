@@ -14,7 +14,6 @@ import { requestErmctXml, mapSidoName } from '@/lib/ermctClient';
 import { bedInfoCache } from '@/lib/cache/SimpleCache';
 import { SAMPLE_BED_DATA } from '@/lib/sampleData';
 import { createLogger } from '@/lib/utils/logger';
-import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
 import { checkRateLimit, getClientIP, getRateLimitHeaders } from '@/lib/middleware/rateLimit';
 import { parseXmlToJson, getItemText, getItemNumber } from '@/lib/utils/serverXmlParser';
 import { getHospitalOrgType, HospitalOrgType } from '@/lib/data/hospitalTypeMap';
@@ -199,14 +198,6 @@ function parseXmlToBedInfo(xml: string, usedSample: boolean): BedInfoResponse {
 }
 
 export async function GET(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  if (!isAllowedOrigin(origin)) {
-    return NextResponse.json(
-      { error: '허용되지 않은 Origin입니다.' },
-      { status: 403, headers: corsHeaders }
-    );
-  }
   const startTime = performance.now();
   const clientIP = getClientIP(request);
 
@@ -221,7 +212,7 @@ export async function GET(request: NextRequest) {
       {
         status: 429,
         headers: {
-          ...corsHeaders,
+          'Access-Control-Allow-Origin': '*',
           ...rateLimitHeaders,
         },
       }
@@ -248,7 +239,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 's-maxage=120, stale-while-revalidate=600',
         'X-Cache': 'HIT',
         'X-Response-Time': `${duration.toFixed(2)}ms`,
@@ -302,7 +293,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         'Cache-Control': cacheControl,
         'X-Cache': 'MISS',
         'X-Sample-Data': result.usedSample ? 'true' : 'false',
@@ -323,7 +314,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        ...corsHeaders,
+        'Access-Control-Allow-Origin': '*',
         // 에러/샘플 응답은 CDN 캐시하지 않음 - 장애 복구 후 즉시 정상 응답 제공
         'Cache-Control': 'no-store, must-revalidate',
         'X-Cache': 'ERROR',
@@ -336,9 +327,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
-    headers: getCorsHeaders(request.headers.get('origin'))
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    }
   });
 }

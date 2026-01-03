@@ -7,7 +7,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCorsHeaders, isAllowedOrigin } from '@/lib/utils/cors';
 
 // 카카오모빌리티 API 응답 타입
 interface KakaoRouteResult {
@@ -49,14 +48,6 @@ const MAX_DESTINATIONS = 30; // 카카오 API 최대 목적지 수
 const RADIUS = 10000; // 반경 10km (필수 파라미터)
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  if (!isAllowedOrigin(origin)) {
-    return NextResponse.json(
-      { error: '허용되지 않은 Origin입니다.' },
-      { status: 403, headers: corsHeaders }
-    );
-  }
   try {
     const body: TravelTimeRequest = await request.json();
     const { origin, destinations } = body;
@@ -65,14 +56,14 @@ export async function POST(request: NextRequest) {
     if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
       return NextResponse.json(
         { error: '유효한 출발지 좌표가 필요합니다.' },
-        { status: 400, headers: corsHeaders }
+        { status: 400 }
       );
     }
 
     if (!destinations || !Array.isArray(destinations) || destinations.length === 0) {
       return NextResponse.json(
         { error: '목적지 목록이 필요합니다.' },
-        { status: 400, headers: corsHeaders }
+        { status: 400 }
       );
     }
 
@@ -81,7 +72,7 @@ export async function POST(request: NextRequest) {
       console.error('[travel-time] KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다.');
       return NextResponse.json(
         { error: '서버 설정 오류' },
-        { status: 500, headers: corsHeaders }
+        { status: 500 }
       );
     }
 
@@ -96,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (validDestinations.length === 0) {
       return NextResponse.json(
         { error: '유효한 목적지가 없습니다.' },
-        { status: 400, headers: corsHeaders }
+        { status: 400 }
       );
     }
 
@@ -146,10 +137,8 @@ export async function POST(request: NextRequest) {
         }
 
         const data: KakaoApiResponse = await response.json();
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('[travel-time] 카카오 API 응답:', JSON.stringify(data, null, 2).slice(0, 2000));
-          console.log('[travel-time] 요청 origin:', origin, '목적지 수:', batch.length);
-        }
+        console.log('[travel-time] 카카오 API 응답:', JSON.stringify(data, null, 2).slice(0, 2000));
+        console.log('[travel-time] 요청 origin:', origin, '목적지 수:', batch.length);
 
         // 결과 매핑 - routes 배열의 각 요소가 개별 목적지 결과
         if (data.routes && data.routes.length > 0) {
@@ -191,21 +180,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        results,
-        origin,
-        timestamp: new Date().toISOString()
-      },
-      { headers: corsHeaders }
-    );
+    return NextResponse.json({
+      success: true,
+      results,
+      origin,
+      timestamp: new Date().toISOString()
+    });
 
   } catch (error) {
     console.error('[travel-time] 요청 처리 오류:', error);
     return NextResponse.json(
       { error: '요청 처리 중 오류가 발생했습니다.' },
-      { status: 500, headers: corsHeaders }
+      { status: 500 }
     );
   }
 }
@@ -219,9 +205,13 @@ function chunkArray<T>(array: T[], size: number): T[][] {
   return chunks;
 }
 
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
-    headers: getCorsHeaders(request.headers.get('origin'))
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    }
   });
 }
