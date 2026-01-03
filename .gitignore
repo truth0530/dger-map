@@ -52,3 +52,6 @@ nul
 
 # Playwright artifacts (local only)
 .playwright-mcp/dger-feedback-*.json
+
+# Ignore all JSON files (local only)
+*.json
