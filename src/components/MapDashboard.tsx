@@ -31,7 +31,7 @@ import { useSevereData, HospitalSevereData } from "@/lib/hooks/useSevereData";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { useTravelTime, HospitalTravelTime, HospitalCoordinate } from "@/lib/hooks/useTravelTime";
 import { mapSidoName } from "@/lib/utils/regionMapping";
-import { detectRegionFromLocation } from "@/lib/utils/locationRegion";
+import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from "@/lib/utils/locationRegion";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { DISEASE_CATEGORIES, getCategoryByKey, getDiseaseNamesByCategory, getMatchedSevereKeys } from "@/lib/constants/diseaseCategories";
@@ -100,6 +100,19 @@ export function MapDashboard() {
 
   useEffect(() => {
     let isActive = true;
+    const locked = isRegionLocked();
+    const storedRegion = getStoredRegion();
+    if (locked && storedRegion) {
+      if (REGIONS.some((r) => r.value === storedRegion)) {
+        setSelectedRegion(storedRegion);
+        return () => {
+          isActive = false;
+        };
+      }
+    } else if (locked && !storedRegion) {
+      setRegionLocked(false);
+    }
+
     (async () => {
       const region = await detectRegionFromLocation();
       if (!isActive || !region || hasUserSelectedRegion.current) return;
@@ -567,6 +580,12 @@ export function MapDashboard() {
   const handleSidebarRegionChange = (region: string) => {
     hasUserSelectedRegion.current = true;
     setSelectedRegion(region);
+    if (region === "all") {
+      setRegionLocked(false);
+    } else {
+      setStoredRegion(mapSidoName(region));
+      setRegionLocked(true);
+    }
   };
 
   // 내 위치 기반 소요시간 조회

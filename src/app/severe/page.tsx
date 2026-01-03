@@ -11,7 +11,8 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 import { SEVERE_CONSTRAINTS } from '@/lib/constants/severeDefinitions';
 import { shortenHospitalName } from '@/lib/utils/hospitalUtils';
 import { BedOccupancyInput, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
-import { detectRegionFromLocation } from '@/lib/utils/locationRegion';
+import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
+import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
 
 // 중증질환 코드 목록 (dger-api와 동일)
 const SEVERE_CODES = [
@@ -129,6 +130,26 @@ export default function SeverePage() {
 
   useEffect(() => {
     let isActive = true;
+    const locked = isRegionLocked();
+    const storedRegion = getStoredRegion();
+    if (locked && storedRegion) {
+      const shortRegion = mapSidoShort(storedRegion);
+      if (REGION_OPTIONS.some((opt) => opt.value === storedRegion)) {
+        setSelectedRegion(storedRegion);
+        return () => {
+          isActive = false;
+        };
+      }
+      if (REGION_OPTIONS.some((opt) => opt.value === shortRegion)) {
+        setSelectedRegion(shortRegion);
+        return () => {
+          isActive = false;
+        };
+      }
+    } else if (locked && !storedRegion) {
+      setRegionLocked(false);
+    }
+
     (async () => {
       const region = await detectRegionFromLocation();
       if (!isActive || !region || hasUserSelectedRegion.current) return;
@@ -425,7 +446,10 @@ export default function SeverePage() {
             value={selectedRegion}
             onChange={(e) => {
               hasUserSelectedRegion.current = true;
-              setSelectedRegion(e.target.value);
+              const nextRegion = e.target.value;
+              setSelectedRegion(nextRegion);
+              setStoredRegion(mapSidoName(nextRegion));
+              setRegionLocked(true);
             }}
           >
             {REGION_OPTIONS.map(opt => (

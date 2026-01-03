@@ -13,7 +13,7 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useBedData, HospitalBedData } from '@/lib/hooks/useBedData';
 import { REGIONS, SEVERE_TYPES } from '@/lib/constants/dger';
 import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
-import { detectRegionFromLocation } from '@/lib/utils/locationRegion';
+import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
 import { isCenterHospital, shortenHospitalName } from '@/lib/utils/hospitalUtils';
 import { formatDateWithDay } from '@/lib/utils/dateUtils';
 import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
@@ -146,12 +146,18 @@ export default function HomePage() {
 
   useEffect(() => {
     let isActive = true;
-    const savedRegion = localStorage.getItem('bed_region');
-    if (savedRegion) {
-      setSelectedRegion(savedRegion);
-      return () => {
-        isActive = false;
-      };
+    const locked = isRegionLocked();
+    const storedRegion = getStoredRegion();
+    if (locked && storedRegion) {
+      const shortRegion = mapSidoShort(storedRegion);
+      if (REGIONS.some((r) => r.value === shortRegion)) {
+        setSelectedRegion(shortRegion);
+        return () => {
+          isActive = false;
+        };
+      }
+    } else if (locked && !storedRegion) {
+      setRegionLocked(false);
     }
 
     (async () => {
@@ -160,7 +166,6 @@ export default function HomePage() {
       const shortRegion = mapSidoShort(region);
       if (REGIONS.some((r) => r.value === shortRegion)) {
         setSelectedRegion(shortRegion);
-        localStorage.setItem('bed_region', shortRegion);
         setShowLocationNotice(true);
         window.setTimeout(() => setShowLocationNotice(false), 2000);
       }
@@ -191,7 +196,8 @@ export default function HomePage() {
 
   const handleRegionChange = useCallback((region: string) => {
     setSelectedRegion(region);
-    localStorage.setItem('bed_region', region);
+    setStoredRegion(mapSidoName(region));
+    setRegionLocked(true);
   }, []);
 
   const filteredData = useMemo(() => {

@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Windows reserved device names
 nul
+
+# Playwright artifacts (local only)
+.playwright-mcp/dger-feedback-*.json

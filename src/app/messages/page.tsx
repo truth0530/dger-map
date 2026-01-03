@@ -13,8 +13,8 @@ import { parseMessageWithHighlights, getHighlightClass, HighlightType, normalize
 import MessageTooltip from '@/components/ui/MessageTooltip';
 import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
 import { calculateOccupancyRate, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
-import { detectRegionFromLocation } from '@/lib/utils/locationRegion';
-import { mapSidoShort } from '@/lib/utils/regionMapping';
+import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
+import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
 
 // 질환 패턴 정의 (dger-api/public/js/diseasePatterns.js와 동일)
 const SYMPTOM_CODE_TO_DISEASE_MAP: Record<string, number> = {
@@ -275,6 +275,20 @@ export default function MessagesPage() {
 
   useEffect(() => {
     let isActive = true;
+    const locked = isRegionLocked();
+    const storedRegion = getStoredRegion();
+    if (locked && storedRegion) {
+      const shortRegion = mapSidoShort(storedRegion);
+      if (REGION_OPTIONS.includes(shortRegion)) {
+        setSelectedRegion(shortRegion);
+        return () => {
+          isActive = false;
+        };
+      }
+    } else if (locked && !storedRegion) {
+      setRegionLocked(false);
+    }
+
     (async () => {
       const region = await detectRegionFromLocation();
       if (!isActive || !region || hasUserSelectedRegion.current) return;
@@ -641,7 +655,10 @@ export default function MessagesPage() {
             value={selectedRegion}
             onChange={(e) => {
               hasUserSelectedRegion.current = true;
-              setSelectedRegion(e.target.value);
+              const nextRegion = e.target.value;
+              setSelectedRegion(nextRegion);
+              setStoredRegion(mapSidoName(nextRegion));
+              setRegionLocked(true);
             }}
           >
             {REGION_OPTIONS.map((region) => (

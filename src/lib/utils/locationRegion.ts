@@ -1,5 +1,37 @@
 'use client';
 
+const REGION_STORAGE_KEY = 'dger_region_value';
+const REGION_LOCK_KEY = 'dger_region_locked';
+
+export function getStoredRegion(): string | null {
+  if (typeof window === 'undefined') return null;
+  const value = localStorage.getItem(REGION_STORAGE_KEY);
+  return value && value.length > 0 ? value : null;
+}
+
+export function setStoredRegion(region: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(REGION_STORAGE_KEY, region);
+}
+
+export function clearStoredRegion(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(REGION_STORAGE_KEY);
+}
+
+export function isRegionLocked(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(REGION_LOCK_KEY) === 'true';
+}
+
+export function setRegionLocked(locked: boolean): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(REGION_LOCK_KEY, locked ? 'true' : 'false');
+  if (!locked) {
+    clearStoredRegion();
+  }
+}
+
 export async function detectRegionFromLocation(): Promise<string | null> {
   if (typeof window === 'undefined' || !navigator.geolocation) {
     return null;
