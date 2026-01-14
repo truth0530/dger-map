@@ -95,9 +95,11 @@ function getScaledRingSize(markerSize: number, occupancy: number, maxOccupancy?:
   if (!maxOccupancy || maxOccupancy <= 0) return markerSize;
   const clamped = Math.max(0, occupancy);
   if (clamped === 0) return Math.max(12, markerSize - 4);
-  const ratio = Math.min(1, clamped / maxOccupancy);
-  const eased = Math.sqrt(ratio);
-  const maxExtra = 26;
+  // 상한 1.5: maxOccupancy의 150%까지 계속 커짐 (17명 기준 25명까지)
+  const ratio = Math.min(1.5, clamped / maxOccupancy);
+  // pow(1.5): 낮은 값에서 작게, 높은 값에서 크게 (sqrt 반대)
+  const eased = Math.pow(ratio, 1.5);
+  const maxExtra = 40;
   return Math.round(markerSize + eased * maxExtra);
 }
 

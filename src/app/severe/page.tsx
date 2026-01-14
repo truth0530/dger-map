@@ -10,7 +10,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { SEVERE_CONSTRAINTS } from '@/lib/constants/severeDefinitions';
 import { shortenHospitalName } from '@/lib/utils/hospitalUtils';
-import { BedOccupancyInput, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
+import { BedOccupancyInput, calculateTotalOccupancy, calculateOccupancyRate } from '@/lib/utils/bedOccupancy';
+import { OccupancyBattery } from '@/components/ui/OccupancyBattery';
 import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
 import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
 
@@ -83,6 +84,15 @@ interface HospitalInfo {
   status: string;
   dutyEmclsName?: string;
   occupancy: number;
+  occupancyRate: number;
+}
+
+// 메시지 인터페이스
+interface MessageItem {
+  msg: string;
+  symBpmgGubun: string;  // 질환 구분
+  symBlkSttDtm: string;
+  symBlkEndDtm: string;
 }
 
 interface DiseaseData {
@@ -117,6 +127,10 @@ export default function SeverePage() {
   const [expandedCards, setExpandedCards] = useState<Record<number, string | null>>({});
   const [allExpanded, setAllExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  // 불가 병원 메시지 관련 상태
+  const [expandedHospitalRows, setExpandedHospitalRows] = useState<Record<string, boolean>>({});
+  const [hospitalMessages, setHospitalMessages] = useState<Record<string, MessageItem[]>>({});
+  const [loadingMessages, setLoadingMessages] = useState<Record<string, boolean>>({});
 
   // 화면 크기 감지
   useEffect(() => {
@@ -220,9 +234,10 @@ export default function SeverePage() {
         const dutyName = item.dutyName || '';
         const dutyEmclsName = item.dutyEmclsName || '';
 
-        // 병상정보에서 재실인원 가져오기
+        // 병상정보에서 재실인원과 포화도 가져오기
         const bedInfo = bedInfoMap.get(hpid);
         const occupancy = bedInfo ? calculateTotalOccupancy(bedInfo) : 0;
+        const occupancyRate = bedInfo ? calculateOccupancyRate(bedInfo) : 0;
 
         SEVERE_CODES.forEach(disease => {
           const fieldValue = item.severeStatus?.[disease.field] || '';
@@ -233,7 +248,8 @@ export default function SeverePage() {
             hpid,
             status: yn,
             dutyEmclsName: bedInfo?.dutyEmclsName || dutyEmclsName,
-            occupancy
+            occupancy,
+            occupancyRate
           };
 
           if (yn === 'Y') {
@@ -279,6 +295,54 @@ export default function SeverePage() {
     loadData();
   }, [loadData]);
 
+  // 불가 병원 메시지 로드
+  const loadHospitalMessages = useCallback(async (hpid: string) => {
+    if (hospitalMessages[hpid] || loadingMessages[hpid]) return;
+
+    setLoadingMessages(prev => ({ ...prev, [hpid]: true }));
+    try {
+      const res = await fetch(`/api/emergency-messages?hpid=${encodeURIComponent(hpid)}`);
+      if (!res.ok) {
+        setHospitalMessages(prev => ({ ...prev, [hpid]: [] }));
+        return;
+      }
+
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const items = xml.querySelectorAll('item');
+
+      const messages: MessageItem[] = [];
+      items.forEach(item => {
+        const msg = item.querySelector('symBlkMsg')?.textContent || '';
+        const symBpmgGubun = item.querySelector('symBpmgGubun')?.textContent || '';
+        const symBlkSttDtm = item.querySelector('symBlkSttDtm')?.textContent || '';
+        const symBlkEndDtm = item.querySelector('symBlkEndDtm')?.textContent || '';
+        if (msg) {
+          messages.push({ msg, symBpmgGubun, symBlkSttDtm, symBlkEndDtm });
+        }
+      });
+
+      setHospitalMessages(prev => ({ ...prev, [hpid]: messages }));
+    } catch (error) {
+      console.error('메시지 로드 실패:', error);
+      setHospitalMessages(prev => ({ ...prev, [hpid]: [] }));
+    } finally {
+      setLoadingMessages(prev => ({ ...prev, [hpid]: false }));
+    }
+  }, [hospitalMessages, loadingMessages]);
+
+  // 불가 병원 행 펼치기 토글
+  const toggleHospitalRow = useCallback((hpid: string) => {
+    setExpandedHospitalRows(prev => {
+      const isExpanding = !prev[hpid];
+      if (isExpanding) {
+        loadHospitalMessages(hpid);
+      }
+      return { ...prev, [hpid]: isExpanding };
+    });
+  }, [loadHospitalMessages]);
+
   // 섹션 토글
   const toggleSection = (qn: number, section: string) => {
     setExpandedCards(prev => {
@@ -310,6 +374,71 @@ export default function SeverePage() {
     loadData();
   };
 
+  // qn과 symBpmgGubun 숫자를 직접 비교하여 메시지 필터링
+  const filterMessagesByDisease = (messages: MessageItem[], qn: number): MessageItem[] => {
+    return messages.filter(msg => {
+      const gubunNumber = parseInt(msg.symBpmgGubun, 10);
+      return gubunNumber === qn;
+    });
+  };
+
+  // 불가 병원 행 렌더링 (아코디언 기능 임시 비활성화 - TODO: 나중에 다시 활성화)
+  const renderUnavailableHospitalRow = (h: HospitalInfo, keyPrefix: string, qn: number) => {
+    // 아코디언 관련 변수 (나중에 다시 사용)
+    // const isExpanded = expandedHospitalRows[h.hpid];
+    // const allMessages = hospitalMessages[h.hpid] || [];
+    // const filteredMessages = filterMessagesByDisease(allMessages, qn);
+    // const isLoadingMsg = loadingMessages[h.hpid];
+
+    // 단순 행으로 렌더링 (아코디언 없이)
+    return (
+      <div key={`${keyPrefix}-${h.hpid}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+        <span className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+          {isMobile ? shortenHospitalName(h.name) : h.name}
+          <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+          <OccupancyBattery rate={h.occupancyRate} isDark={isDark} size="small" />
+        </span>
+        <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-700'}`}>불가</span>
+      </div>
+    );
+
+    /* 아코디언 버전 (나중에 다시 활성화할 때 사용)
+    return (
+      <div key={`${keyPrefix}-${h.hpid}`}>
+        <div
+          className={`flex justify-between items-center px-4 py-1.5 text-xs border-b cursor-pointer hover:${isDark ? 'bg-gray-800' : 'bg-gray-50'} ${isDark ? 'border-gray-700' : 'border-gray-100'}`}
+          onClick={() => toggleHospitalRow(h.hpid)}
+        >
+          <span className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+            <span className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+            {isMobile ? shortenHospitalName(h.name) : h.name}
+            <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+            <OccupancyBattery rate={h.occupancyRate} isDark={isDark} size="small" />
+          </span>
+          <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-700'}`}>불가</span>
+        </div>
+        {isExpanded && (
+          <div className={`px-6 py-2 text-xs ${isDark ? 'bg-gray-800/50' : 'bg-gray-50'}`}>
+            {isLoadingMsg ? (
+              <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>메시지 로딩중...</span>
+            ) : filteredMessages.length > 0 ? (
+              <div className="space-y-1">
+                {filteredMessages.map((msg, idx) => (
+                  <div key={idx} className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    • {msg.msg}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>해당 질환의 메시지가 없습니다.</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+    */
+  };
+
   // 병원 리스트 렌더링
   const renderHospitalList = (qn: number, section: string | null) => {
     if (!section) return null;
@@ -337,55 +466,48 @@ export default function SeverePage() {
       title = '미참여 병원';
       statusClass = isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600';
       statusText = '미참여';
+    } else if (section === 'both') {
+      // 가능+불가 함께 표시
+      return (
+        <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+          {data.availableHospitals.map((h, i) => (
+            <div key={`a-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+              <span className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                {isMobile ? shortenHospitalName(h.name) : h.name}
+                <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                <OccupancyBattery rate={h.occupancyRate} isDark={isDark} size="small" />
+              </span>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-700'}`}>수용가능</span>
+            </div>
+          ))}
+          {data.unavailableHospitals.map((h) => renderUnavailableHospitalRow(h, 'both-u', qn))}
+        </div>
+      );
     } else if (section === 'all') {
       // 전체 펼치기일 때 모든 병원 표시
       return (
-        <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} max-h-[250px] overflow-y-auto`}>
-          {data.availableHospitals.length > 0 && (
-            <>
-              <div className={`px-4 py-2 text-xs font-semibold sticky top-0 ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                수용가능 병원
-              </div>
-              {data.availableHospitals.map((h, i) => (
-                <div key={`a-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
-                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                    {isMobile ? shortenHospitalName(h.name) : h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
-                  </span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-700'}`}>수용가능</span>
-                </div>
-              ))}
-            </>
-          )}
-          {data.unavailableHospitals.length > 0 && (
-            <>
-              <div className={`px-4 py-2 text-xs font-semibold sticky top-0 ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                수용불가 병원
-              </div>
-              {data.unavailableHospitals.map((h, i) => (
-                <div key={`u-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
-                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                    {isMobile ? shortenHospitalName(h.name) : h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
-                  </span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-700'}`}>불가</span>
-                </div>
-              ))}
-            </>
-          )}
-          {data.noInfoHospitals.length > 0 && (
-            <>
-              <div className={`px-4 py-2 text-xs font-semibold sticky top-0 ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                미참여 병원
-              </div>
-              {data.noInfoHospitals.map((h, i) => (
-                <div key={`n-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
-                  <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                    {isMobile ? shortenHospitalName(h.name) : h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
-                  </span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'}`}>미참여</span>
-                </div>
-              ))}
-            </>
-          )}
+        <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+          {data.availableHospitals.map((h, i) => (
+            <div key={`a-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+              <span className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                {isMobile ? shortenHospitalName(h.name) : h.name}
+                <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                <OccupancyBattery rate={h.occupancyRate} isDark={isDark} size="small" />
+              </span>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-700'}`}>수용가능</span>
+            </div>
+          ))}
+          {data.unavailableHospitals.map((h) => renderUnavailableHospitalRow(h, 'all-u', qn))}
+          {data.noInfoHospitals.map((h, i) => (
+            <div key={`n-${i}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+              <span className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                {isMobile ? shortenHospitalName(h.name) : h.name}
+                <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+                <OccupancyBattery rate={h.occupancyRate} isDark={isDark} size="small" />
+              </span>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'}`}>미참여</span>
+            </div>
+          ))}
         </div>
       );
     }
@@ -398,15 +520,23 @@ export default function SeverePage() {
       );
     }
 
-    return (
-      <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} max-h-[250px] overflow-y-auto`}>
-        <div className={`px-4 py-2 text-xs font-semibold sticky top-0 z-10 ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-          {title}
+    // 불가 섹션인 경우 아코디언 적용
+    if (section === 'unavailable') {
+      return (
+        <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+          {hospitals.map((h) => renderUnavailableHospitalRow(h, 'single-u', qn))}
         </div>
+      );
+    }
+
+    return (
+      <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
         {hospitals.map((h, i) => (
           <div key={i} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
-            <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-              {isMobile ? shortenHospitalName(h.name) : h.name} <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+            <span className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              {isMobile ? shortenHospitalName(h.name) : h.name}
+              <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
+              <OccupancyBattery rate={h.occupancyRate} isDark={isDark} size="small" />
             </span>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusClass}`}>{statusText}</span>
           </div>
@@ -540,27 +670,42 @@ export default function SeverePage() {
                       if (pct >= 12) return `${count}`;
                       return '';
                     };
+                    // 불가능 세로 텍스트: 좁으면 세로로 "불/가", 넓으면 가로로 표시
+                    const getUnavailLabel = (pct: number, count: number) => {
+                      if (pct >= 35) return { text: `불가${count}`, vertical: false };
+                      if (count >= 1) return { text: '불가', vertical: true };
+                      return { text: '', vertical: false };
+                    };
+                    const unavailLabel = getUnavailLabel(unavailPct, data.unavailable);
                     return (
                       <div className="flex items-center flex-shrink-0">
-                        <div className={`flex h-5 w-28 rounded-sm overflow-hidden text-[9px] font-medium shadow-sm ${isDark ? 'bg-gray-700/50' : 'bg-stone-200'}`}>
+                        <div className={`flex h-7 w-28 rounded-sm overflow-hidden text-[9px] font-medium shadow-sm ${isDark ? 'bg-gray-700/50' : 'bg-stone-200'}`}>
                           {availPct > 0 && (
                             <div
                               className={`h-full cursor-pointer transition-all hover:brightness-110 flex items-center justify-center overflow-hidden whitespace-nowrap ${isDark ? 'bg-teal-600 text-teal-50' : 'bg-teal-600 text-white'}`}
                               style={{ width: `${availPct}%` }}
-                              onClick={() => toggleSection(disease.qn, 'available')}
+                              onClick={() => toggleSection(disease.qn, 'both')}
                               title={`수용가능 ${data.available}개`}
                             >
                               {getLabel(availPct, '가능', data.available)}
                             </div>
                           )}
-                          {unavailPct > 0 && (
+                          {data.unavailable > 0 && (
                             <div
-                              className={`h-full cursor-pointer transition-all hover:brightness-110 flex items-center justify-center overflow-hidden whitespace-nowrap ${isDark ? 'bg-rose-700 text-rose-50' : 'bg-rose-600 text-white'}`}
-                              style={{ width: `${unavailPct}%` }}
-                              onClick={() => toggleSection(disease.qn, 'unavailable')}
+                              className={`h-full cursor-pointer transition-all hover:brightness-110 flex items-center justify-center overflow-hidden ${isDark ? 'bg-rose-700 text-rose-50' : 'bg-rose-600 text-white'} ${unavailLabel.vertical ? 'flex-col leading-[1.1]' : 'whitespace-nowrap'}`}
+                              style={{
+                                width: `${unavailPct}%`,
+                                minWidth: data.unavailable >= 1 ? '18px' : undefined
+                              }}
+                              onClick={() => toggleSection(disease.qn, 'both')}
                               title={`수용불가 ${data.unavailable}개`}
                             >
-                              {getLabel(unavailPct, '불가', data.unavailable)}
+                              {unavailLabel.vertical ? (
+                                <>
+                                  <span>불</span>
+                                  <span>가</span>
+                                </>
+                              ) : unavailLabel.text}
                             </div>
                           )}
                           {noInfoPct > 0 && (
