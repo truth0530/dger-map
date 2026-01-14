@@ -59,7 +59,7 @@ const DISEASE_DISPLAY_PATTERNS: Record<number, { original: string; displayFormat
 
 // 질환 필터 옵션
 const SEVERE_TYPE_OPTIONS = [
-  { value: '', label: '27개중증질환 선택' },
+  { value: '', label: '가능한 27개중증질환 선택', shortLabel: '가능질환' },
   { value: '[재관류중재술] 심근경색', label: '[재관류중재술] 심근경색' },
   { value: '[재관류중재술] 뇌경색', label: '[재관류중재술] 뇌경색' },
   { value: '[뇌출혈수술] 거미막하출혈', label: '[뇌출혈수술] 거미막하출혈' },
@@ -558,11 +558,14 @@ export default function MessagesPage() {
 
         // 개별 메시지 필터링
         const filteredMsgs = hospital.messages.filter(msg => {
-          // 메시지 검색 - 메시지 내용 또는 증상명에서 검색
+          // 메시지 검색 - 공백으로 구분된 키워드 AND 조건 검색
           if (messageSearchLower) {
+            const keywords = messageSearchLower.split(/\s+/).filter(k => k.length > 0);
             const msgLower = msg.msg.toLowerCase();
             const symptomLower = (msg.standardizedSymptom || '').toLowerCase();
-            if (!msgLower.includes(messageSearchLower) && !symptomLower.includes(messageSearchLower)) {
+            const combined = msgLower + ' ' + symptomLower;
+            // 모든 키워드가 메시지 또는 증상명에 포함되어야 함
+            if (!keywords.every(keyword => combined.includes(keyword))) {
               return false;
             }
           }
@@ -641,7 +644,7 @@ export default function MessagesPage() {
       <main className="flex-1 p-4 max-w-[1800px] mx-auto w-full">
         {/* 컨트롤 섹션 - dger-api와 동일한 스타일 */}
         <div
-          className="flex flex-nowrap items-center gap-2 mb-4 p-2 overflow-x-auto whitespace-nowrap"
+          className="flex flex-nowrap items-center gap-2 mb-2 py-1 px-2 overflow-x-auto whitespace-nowrap"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {/* 지역 선택 */}
@@ -707,11 +710,24 @@ export default function MessagesPage() {
             })}
           </div>
 
-          {/* 검색 입력 */}
+          {/* 검색 입력 - 모바일 */}
+          <input
+            type="text"
+            placeholder="병원명"
+            className={`sm:hidden flex-shrink-0 px-3 border rounded-lg text-xs transition-colors ${
+              isDark
+                ? 'bg-[#1a2f2f] border-teal-700 text-teal-100 placeholder-teal-600'
+                : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
+            }`}
+            style={{ height: '32px', width: '60px' }}
+            value={hospitalSearch}
+            onChange={(e) => setHospitalSearch(e.target.value)}
+          />
+          {/* 검색 입력 - PC */}
           <input
             type="text"
             placeholder="병원명 검색"
-            className={`flex-shrink-0 px-3 border rounded-lg text-xs min-w-14 max-w-28 transition-colors ${
+            className={`hidden sm:inline-flex flex-shrink-0 px-3 border rounded-lg text-xs min-w-14 max-w-28 transition-colors ${
               isDark
                 ? 'bg-[#1a2f2f] border-teal-700 text-teal-100 placeholder-teal-600'
                 : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
@@ -721,22 +737,51 @@ export default function MessagesPage() {
             onChange={(e) => setHospitalSearch(e.target.value)}
           />
 
+          {/* 메시지 검색 - 모바일 */}
           <input
             type="text"
-            placeholder="메시지 검색"
-            className={`flex-shrink-0 px-3 border rounded-lg text-xs min-w-14 max-w-28 transition-colors ${
+            placeholder="메시지"
+            className={`sm:hidden flex-shrink-0 px-3 border rounded-lg text-xs transition-colors ${
               isDark
                 ? 'bg-[#1a2f2f] border-teal-700 text-teal-100 placeholder-teal-600'
                 : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
             }`}
-            style={{ height: '32px' }}
+            style={{ height: '32px', width: '60px' }}
+            value={messageSearch}
+            onChange={(e) => setMessageSearch(e.target.value)}
+          />
+          {/* 메시지 검색 - PC (공백으로 AND 조건) */}
+          <input
+            type="text"
+            placeholder="메시지 검색 (예: 소아 장중첩)"
+            className={`hidden sm:inline-flex flex-shrink-0 px-3 border rounded-lg text-xs transition-colors ${
+              isDark
+                ? 'bg-[#1a2f2f] border-teal-700 text-teal-100 placeholder-teal-600'
+                : 'bg-white border-gray-300 text-gray-800 placeholder-gray-400'
+            }`}
+            style={{ height: '32px', width: '200px' }}
             value={messageSearch}
             onChange={(e) => setMessageSearch(e.target.value)}
           />
 
-          {/* 질환 필터 */}
+          {/* 질환 필터 - 모바일 */}
           <select
-            className={`flex-shrink-0 px-2 border rounded-lg text-xs min-w-14 max-w-40 transition-colors ${
+            className={`sm:hidden flex-shrink-0 px-2 border rounded-lg text-xs transition-colors ${
+              isDark
+                ? 'bg-[#1a2f2f] border-teal-700 text-teal-100'
+                : 'bg-white border-gray-300 text-gray-800'
+            }`}
+            style={{ height: '32px', lineHeight: '30px', paddingTop: '0', paddingBottom: '0', minWidth: '70px', maxWidth: '100px' }}
+            value={selectedSevereType}
+            onChange={(e) => setSelectedSevereType(e.target.value)}
+          >
+            {SEVERE_TYPE_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.shortLabel || option.label}</option>
+            ))}
+          </select>
+          {/* 질환 필터 - PC */}
+          <select
+            className={`hidden sm:inline-flex flex-shrink-0 px-2 border rounded-lg text-xs min-w-14 max-w-40 transition-colors ${
               isDark
                 ? 'bg-[#1a2f2f] border-teal-700 text-teal-100'
                 : 'bg-white border-gray-300 text-gray-800'
@@ -767,7 +812,17 @@ export default function MessagesPage() {
               e.currentTarget.style.backgroundColor = isDark ? '#1a2f2f' : '#ffffff';
             }}
           >
-            {allExpanded ? '전체 접기' : '전체 펼치기'}
+            {allExpanded ? (
+              <>
+                <span className="sm:hidden">접기</span>
+                <span className="hidden sm:inline">전체 접기</span>
+              </>
+            ) : (
+              <>
+                <span className="sm:hidden">펼치기</span>
+                <span className="hidden sm:inline">전체 펼치기</span>
+              </>
+            )}
           </button>
         </div>
 

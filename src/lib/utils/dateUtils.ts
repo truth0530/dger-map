@@ -155,3 +155,17 @@ export function getCurrentTimeFormatted(): string {
   const now = new Date();
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
+
+/**
+ * 업데이트 시간이 지정된 분(기본 30분)보다 오래되었는지 확인
+ */
+export function isUpdateStale(dateString: string, thresholdMinutes: number = 30): boolean {
+  const d = parseDateString(dateString);
+  if (!d) return false;
+
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / (1000 * 60));
+
+  return diffMin > thresholdMinutes;
+}

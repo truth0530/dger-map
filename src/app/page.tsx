@@ -16,7 +16,7 @@ import { REGIONS, SEVERE_TYPES } from '@/lib/constants/dger';
 import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
 import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
 import { isCenterHospital, shortenHospitalName } from '@/lib/utils/hospitalUtils';
-import { formatDateWithDay } from '@/lib/utils/dateUtils';
+import { formatDateWithDay, isUpdateStale } from '@/lib/utils/dateUtils';
 import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
 import { ClassifiedMessages, parseMessageWithHighlights, getHighlightClass, HighlightedSegment, normalizeMessageForDisplay } from '@/lib/utils/messageClassifier';
 import MessageTooltip from '@/components/ui/MessageTooltip';
@@ -642,11 +642,17 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
             ? isDark ? 'bg-amber-900/30 hover:bg-amber-900/50' : 'bg-amber-50 hover:bg-amber-100'
             : isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
         }`}
-        style={showGroupDivider ? {
-          boxShadow: isDark
-            ? 'inset 0 1px 0 rgba(148,163,184,0.35)'
-            : 'inset 0 1px 0 rgba(107,114,128,0.35)'
-        } : undefined}
+        style={{
+          ...(showGroupDivider ? {
+            boxShadow: isDark
+              ? 'inset 0 1px 0 rgba(148,163,184,0.35)'
+              : 'inset 0 1px 0 rgba(107,114,128,0.35)'
+          } : {}),
+          ...(hospital.hvidate && isUpdateStale(hospital.hvidate) ? {
+            backgroundColor: isDark ? 'rgba(194, 65, 12, 0.4)' : 'rgb(255, 237, 213)',
+            borderLeft: '4px solid rgb(249, 115, 22)'
+          } : {})
+        }}
       >
         {/* 병원명 + 펼치기/접기 버튼 - 좌측 정렬 */}
         <td className={`px-1 sm:px-2 py-1.5 text-sm text-left ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -714,8 +720,12 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
           {renderBedValue(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}
         </td>
 
-        {/* 업데이트 시간 - 너비 유지 */}
-        <td className={`px-1 sm:px-2 pr-4 sm:pr-5 py-1.5 text-center text-[10px] whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+        {/* 업데이트 시간 - 너비 유지, 30분 초과시 강조 */}
+        <td className={`px-1 sm:px-2 pr-4 sm:pr-5 py-1.5 text-center text-[10px] whitespace-nowrap ${
+          hospital.hvidate && isUpdateStale(hospital.hvidate)
+            ? 'text-orange-500 font-medium'
+            : isDark ? 'text-gray-400' : 'text-gray-500'
+        }`}>
           {hospital.hvidate ? formatDateWithDay(hospital.hvidate) : '-'}
         </td>
       </tr>
@@ -808,11 +818,17 @@ function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, 
           ? isDark ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200 border-l-4 border-l-[#4A5D5D]'
           : isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
       }`}
-      style={showGroupDivider ? {
-        boxShadow: isDark
-          ? 'inset 0 1px 0 rgba(148,163,184,0.35)'
-          : 'inset 0 1px 0 rgba(107,114,128,0.35)'
-      } : undefined}
+      style={{
+        ...(showGroupDivider ? {
+          boxShadow: isDark
+            ? 'inset 0 1px 0 rgba(148,163,184,0.35)'
+            : 'inset 0 1px 0 rgba(107,114,128,0.35)'
+        } : {}),
+        ...(hospital.hvidate && isUpdateStale(hospital.hvidate) ? {
+          backgroundColor: isDark ? 'rgba(194, 65, 12, 0.4)' : 'rgb(255, 237, 213)',
+          borderLeft: '4px solid rgb(249, 115, 22)'
+        } : {})
+      }}
     >
       {/* 헤더 */}
       <div className={`px-4 py-3 ${isDark ? 'border-gray-700' : 'border-gray-200'} border-b`}>
@@ -882,8 +898,12 @@ function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, 
         </div>
       </div>
 
-      {/* 업데이트 시간 */}
-      <div className={`px-4 py-2 text-xs ${isDark ? 'bg-gray-900 text-gray-400' : 'bg-gray-50 text-gray-500'}`}>
+      {/* 업데이트 시간 - 30분 초과시 강조 */}
+      <div className={`px-4 py-2 text-xs ${
+        hospital.hvidate && isUpdateStale(hospital.hvidate)
+          ? (isDark ? 'bg-gray-900 text-orange-500 font-medium' : 'bg-gray-50 text-orange-600 font-medium')
+          : (isDark ? 'bg-gray-900 text-gray-400' : 'bg-gray-50 text-gray-500')
+      }`}>
         업데이트: {hospital.hvidate ? formatDateWithDay(hospital.hvidate) : '-'}
       </div>
 
