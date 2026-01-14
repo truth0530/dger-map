@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requestErmctXml, mapSidoName } from '@/lib/ermctClient';
 import { SimpleCache } from '@/lib/cache/SimpleCache';
+import { getCorsHeaders } from '@/lib/utils/cors';
 
 // 캐시 인스턴스 (3분 TTL)
 const severeAcceptanceCache = new SimpleCache<string>(3 * 60 * 1000);
@@ -33,6 +34,9 @@ const EMPTY_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
 </response>`;
 
 export async function GET(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   const searchParams = request.nextUrl.searchParams;
   const hpid = searchParams.get('hpid') || '';
   const qn = searchParams.get('qn') || '';
@@ -70,7 +74,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'X-Cache': 'HIT'
       }
     });
@@ -185,7 +189,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'X-Cache': 'MISS'
       }
     });
@@ -197,7 +201,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'X-Cache': 'ERROR',
         'X-Error': error instanceof Error ? error.message : 'Unknown error'
       }
@@ -205,13 +209,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+      ...corsHeaders,
     }
   });
 }

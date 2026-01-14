@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useBedData, HospitalBedData } from '@/lib/hooks/useBedData';
+import { useSevereData } from '@/lib/hooks/useSevereData';
 import { REGIONS, SEVERE_TYPES } from '@/lib/constants/dger';
 import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
 import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
@@ -20,6 +21,7 @@ import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
 import { ClassifiedMessages, parseMessageWithHighlights, getHighlightClass, HighlightedSegment, normalizeMessageForDisplay } from '@/lib/utils/messageClassifier';
 import MessageTooltip from '@/components/ui/MessageTooltip';
 import { calculateOccupancyRate, calculateTotalOccupancy, getBedValues } from '@/lib/utils/bedOccupancy';
+import { getBedStatusClass, renderBedValue } from '@/lib/utils/bedHelpers';
 import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
 
 // 하이라이트된 메시지 렌더링 컴포넌트
@@ -119,6 +121,7 @@ export default function HomePage() {
   }, [columnWidths]);
 
   const { loading, error, data, lastUpdate, fetchBedData, clearCache, hospitalTypeMapReady } = useBedData();
+  const { data: severeData, fetchSevereData } = useSevereData();
   const { messages: emergencyMessages, loading: messageLoading, fetchMessages } = useEmergencyMessages();
 
   // 메시지 토글
@@ -181,8 +184,9 @@ export default function HomePage() {
     if (hospitalTypeMapReady) {
       const mappedRegion = mapSidoName(selectedRegion);
       fetchBedData(mappedRegion);
+      fetchSevereData(mappedRegion);
     }
-  }, [selectedRegion, fetchBedData, hospitalTypeMapReady]);
+  }, [selectedRegion, fetchBedData, fetchSevereData, hospitalTypeMapReady]);
 
   // 자동 새로고침 (2분마다)
   useEffect(() => {
@@ -219,6 +223,20 @@ export default function HomePage() {
       return orgTypes[orgType];
     });
 
+    // 중증질환 필터 - 선택된 질환을 수용 가능한 병원만
+    if (selectedDisease && severeData.length > 0) {
+      const diseaseType = SEVERE_TYPES.find(d => d.qn === selectedDisease);
+      if (diseaseType) {
+        // severeData에서 해당 질환이 'Y'인 병원의 hpid 목록
+        const availableHpids = new Set(
+          severeData
+            .filter(h => (h.severeStatus[diseaseType.key] || '').trim().toUpperCase() === 'Y')
+            .map(h => h.hpid)
+        );
+        filtered = filtered.filter(h => availableHpids.has(h.hpid));
+      }
+    }
+
     // 정렬: 센터급 우선 → 재실인원 내림차순 → 포화도 내림차순
     return [...filtered].sort((a, b) => {
       const aIsCenter = isCenterHospital({ hpbd: a.hpbd, dutyEmclsName: a.dutyEmclsName });
@@ -232,7 +250,7 @@ export default function HomePage() {
 
       return calculateOccupancyRate(b) - calculateOccupancyRate(a);
     });
-  }, [data, searchTerm, orgTypes]);
+  }, [data, searchTerm, orgTypes, selectedDisease, severeData]);
 
   const firstNonCenterIndex = useMemo(
     () => filteredData.findIndex(h => !isCenterHospital({ hpbd: h.hpbd, dutyEmclsName: h.dutyEmclsName })),
@@ -343,18 +361,31 @@ export default function HomePage() {
             })}
           </div>
 
-          {/* 검색 */}
+          {/* 검색 - 모바일 */}
           <input
             type="text"
-            placeholder="검색"
+            placeholder="병원명"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={`px-2 py-1.5 border rounded text-sm h-9 flex-shrink-0 ${
+            className={`sm:hidden px-2 py-1.5 border rounded text-sm h-9 flex-shrink-0 ${
               isDark
                 ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
                 : 'bg-white border-gray-300 text-gray-900'
             }`}
-            style={{ width: '80px' }}
+            style={{ width: '70px' }}
+          />
+          {/* 검색 - PC */}
+          <input
+            type="text"
+            placeholder="병원명 검색"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={`hidden sm:inline-flex px-2 py-1.5 border rounded text-sm h-9 flex-shrink-0 ${
+              isDark
+                ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
+                : 'bg-white border-gray-300 text-gray-900'
+            }`}
+            style={{ width: '100px' }}
           />
 
           {/* 27개 중증질환 드롭다운 */}
@@ -367,7 +398,7 @@ export default function HomePage() {
                 : 'bg-white border-gray-300 text-gray-900'
             }`}
           >
-            <option value="">질환선택</option>
+            <option value="">가능질환</option>
             {SEVERE_TYPES.map(disease => (
               <option key={disease.qn} value={disease.qn}>
                 {disease.qn}. {disease.label}
@@ -383,7 +414,7 @@ export default function HomePage() {
                 : 'bg-white border-gray-300 text-gray-900'
             }`}
           >
-            <option value="">27개중증질환 선택</option>
+            <option value="">가능한 27개중증질환 선택</option>
             {SEVERE_TYPES.map(disease => (
               <option key={disease.qn} value={disease.qn}>
                 {disease.qn}. {disease.label}
@@ -400,7 +431,17 @@ export default function HomePage() {
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
             }`}
           >
-            {expandedMessages.size > 0 ? '접기' : '펼치기'}
+            {expandedMessages.size > 0 ? (
+              <>
+                <span className="sm:hidden">접기</span>
+                <span className="hidden sm:inline">메시지 접기</span>
+              </>
+            ) : (
+              <>
+                <span className="sm:hidden">펼치기</span>
+                <span className="hidden sm:inline">메시지 펼치기</span>
+              </>
+            )}
           </button>
 
         </div>
@@ -593,21 +634,6 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
   const totalOccupancy = calculateTotalOccupancy(hospital);
   const occupancyRate = calculateOccupancyRate(hospital);
 
-  // 병상 상태 색상 (dger-api와 동일)
-  const getBedStatusClass = (available: number, total: number) => {
-    if (total === 0) return isDark ? 'text-gray-500' : 'text-gray-400';
-    const percentage = (available / total) * 100;
-    if (percentage <= 5) return isDark ? 'text-red-400' : 'text-red-600';
-    if (percentage <= 40) return isDark ? 'text-yellow-400' : 'text-yellow-600';
-    return isDark ? 'text-green-400' : 'text-green-600';
-  };
-
-  // 병상 값 렌더링 (가용/총계, 총계가 0이면 -)
-  const renderBedValue = (available: number, total: number) => {
-    if (total === 0) return '-';
-    return `${available}/${total}`;
-  };
-
   return (
     <>
       <tr
@@ -654,37 +680,37 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
         </td>
 
         {/* 일반병상 */}
-        <td className={`px-1 sm:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.general.available, beds.general.total)}`}>
+        <td className={`px-1 sm:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.general.available, beds.general.total, isDark)}`}>
           {renderBedValue(beds.general.available, beds.general.total)}
         </td>
 
         {/* 코호트 - 모바일 숨김, 좁은 패딩 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.cohort.available, beds.cohort.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.cohort.available, beds.cohort.total, isDark)}`}>
           {renderBedValue(beds.cohort.available, beds.cohort.total)}
         </td>
 
         {/* 음압격리 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.erNegative.available, beds.erNegative.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.erNegative.available, beds.erNegative.total, isDark)}`}>
           {renderBedValue(beds.erNegative.available, beds.erNegative.total)}
         </td>
 
         {/* 일반격리 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.erGeneral.available, beds.erGeneral.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.erGeneral.available, beds.erGeneral.total, isDark)}`}>
           {renderBedValue(beds.erGeneral.available, beds.erGeneral.total)}
         </td>
 
         {/* 소아 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatric.available, beds.pediatric.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatric.available, beds.pediatric.total, isDark)}`}>
           {renderBedValue(beds.pediatric.available, beds.pediatric.total)}
         </td>
 
         {/* 소아음압 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricNegative.available, beds.pediatricNegative.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricNegative.available, beds.pediatricNegative.total, isDark)}`}>
           {renderBedValue(beds.pediatricNegative.available, beds.pediatricNegative.total)}
         </td>
 
         {/* 소아일반 - 모바일 숨김 */}
-        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}`}>
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.pediatricGeneral.available, beds.pediatricGeneral.total, isDark)}`}>
           {renderBedValue(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}
         </td>
 
@@ -775,19 +801,6 @@ function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, 
     }
   }, [isExpanded, messages, messageLoading, onFetchMessages, hospital.hpid]);
 
-  const getBedStatusClass = (available: number, total: number) => {
-    if (total === 0) return isDark ? 'text-gray-500' : 'text-gray-400';
-    const percentage = (available / total) * 100;
-    if (percentage <= 5) return isDark ? 'text-red-400' : 'text-red-600';
-    if (percentage <= 40) return isDark ? 'text-yellow-400' : 'text-yellow-600';
-    return isDark ? 'text-green-400' : 'text-green-600';
-  };
-
-  const renderBedValue = (available: number, total: number) => {
-    if (total === 0) return '-';
-    return `${available}/${total}`;
-  };
-
   return (
     <div
       className={`border rounded-lg overflow-hidden shadow-sm ${
@@ -838,31 +851,31 @@ function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, 
         <div className="grid grid-cols-5 gap-2 text-xs">
           <div className="text-center">
             <div className={isDark ? 'text-gray-400' : 'text-gray-500'}>일반</div>
-            <div className={`font-semibold ${getBedStatusClass(beds.general.available, beds.general.total)}`}>
+            <div className={`font-semibold ${getBedStatusClass(beds.general.available, beds.general.total, isDark)}`}>
               {renderBedValue(beds.general.available, beds.general.total)}
             </div>
           </div>
           <div className="text-center">
             <div className={isDark ? 'text-gray-400' : 'text-gray-500'}>코호트</div>
-            <div className={`font-semibold ${getBedStatusClass(beds.cohort.available, beds.cohort.total)}`}>
+            <div className={`font-semibold ${getBedStatusClass(beds.cohort.available, beds.cohort.total, isDark)}`}>
               {renderBedValue(beds.cohort.available, beds.cohort.total)}
             </div>
           </div>
           <div className="text-center">
             <div className={isDark ? 'text-gray-400' : 'text-gray-500'}>음압</div>
-            <div className={`font-semibold ${getBedStatusClass(beds.erNegative.available, beds.erNegative.total)}`}>
+            <div className={`font-semibold ${getBedStatusClass(beds.erNegative.available, beds.erNegative.total, isDark)}`}>
               {renderBedValue(beds.erNegative.available, beds.erNegative.total)}
             </div>
           </div>
           <div className="text-center">
             <div className={isDark ? 'text-gray-400' : 'text-gray-500'}>일반격리</div>
-            <div className={`font-semibold ${getBedStatusClass(beds.erGeneral.available, beds.erGeneral.total)}`}>
+            <div className={`font-semibold ${getBedStatusClass(beds.erGeneral.available, beds.erGeneral.total, isDark)}`}>
               {renderBedValue(beds.erGeneral.available, beds.erGeneral.total)}
             </div>
           </div>
           <div className="text-center">
             <div className={isDark ? 'text-gray-400' : 'text-gray-500'}>소아</div>
-            <div className={`font-semibold ${getBedStatusClass(beds.pediatric.available, beds.pediatric.total)}`}>
+            <div className={`font-semibold ${getBedStatusClass(beds.pediatric.available, beds.pediatric.total, isDark)}`}>
               {renderBedValue(beds.pediatric.available, beds.pediatric.total)}
             </div>
           </div>

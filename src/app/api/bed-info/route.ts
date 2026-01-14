@@ -19,6 +19,7 @@ import { parseXmlToJson, getItemText, getItemNumber } from '@/lib/utils/serverXm
 import { getHospitalOrgType, HospitalOrgType } from '@/lib/data/hospitalTypeMap';
 import { getBedStatus, BedStatus } from '@/lib/constants/dger';
 import { calculateOccupancyRate, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
+import { getCorsHeaders } from '@/lib/utils/cors';
 
 const logger = createLogger('api:bed-info');
 const API_NAME = 'bed-info';
@@ -200,6 +201,8 @@ function parseXmlToBedInfo(xml: string, usedSample: boolean): BedInfoResponse {
 export async function GET(request: NextRequest) {
   const startTime = performance.now();
   const clientIP = getClientIP(request);
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
 
   // Rate Limit 체크
   const rateLimitResult = checkRateLimit(clientIP, API_NAME);
@@ -212,7 +215,7 @@ export async function GET(request: NextRequest) {
       {
         status: 429,
         headers: {
-          'Access-Control-Allow-Origin': '*',
+          ...corsHeaders,
           ...rateLimitHeaders,
         },
       }
@@ -239,7 +242,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': 's-maxage=120, stale-while-revalidate=600',
         'X-Cache': 'HIT',
         'X-Response-Time': `${duration.toFixed(2)}ms`,
@@ -293,7 +296,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': cacheControl,
         'X-Cache': 'MISS',
         'X-Sample-Data': result.usedSample ? 'true' : 'false',
@@ -314,7 +317,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         // 에러/샘플 응답은 CDN 캐시하지 않음 - 장애 복구 후 즉시 정상 응답 제공
         'Cache-Control': 'no-store, must-revalidate',
         'X-Cache': 'ERROR',
@@ -327,13 +330,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+      ...corsHeaders,
     }
   });
 }

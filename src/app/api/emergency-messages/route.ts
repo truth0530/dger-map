@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requestErmctXml } from '@/lib/ermctClient';
 import { emergencyMessageCache } from '@/lib/cache/SimpleCache';
 import { SAMPLE_MESSAGE_DATA } from '@/lib/sampleData';
+import { getCorsHeaders } from '@/lib/utils/cors';
 
 // 빈 메시지 응답 (정상적으로 메시지가 없는 경우)
 const EMPTY_MESSAGE_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
@@ -27,6 +28,9 @@ const EMPTY_MESSAGE_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?>
 </response>`;
 
 export async function GET(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   const searchParams = request.nextUrl.searchParams;
   const hpid = searchParams.get('hpid') || '';
 
@@ -48,7 +52,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
         'X-Cache': 'HIT'
       }
@@ -78,7 +82,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
         'X-Cache': 'MISS',
         'X-Sample-Data': result.usedSample ? 'true' : 'false'
@@ -92,7 +96,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': 's-maxage=30, stale-while-revalidate=120',
         'X-Cache': 'ERROR',
         'X-Sample-Data': 'true',
@@ -102,13 +106,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+      ...corsHeaders,
     }
   });
 }

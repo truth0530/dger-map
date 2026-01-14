@@ -13,6 +13,7 @@ import { severeDiseasesCache } from '@/lib/cache/SimpleCache';
 import { SAMPLE_SEVERE_DATA } from '@/lib/sampleData';
 import { parseXmlToJson, getItemText, getItemNumber } from '@/lib/utils/serverXmlParser';
 import { SEVERE_TYPES } from '@/lib/constants/dger';
+import { getCorsHeaders } from '@/lib/utils/cors';
 
 // JSON 응답 타입
 export interface SevereDataItem {
@@ -90,6 +91,9 @@ function parseXmlToSevereData(xml: string, usedSample: boolean): SevereDataRespo
 }
 
 export async function GET(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   const searchParams = request.nextUrl.searchParams;
   const STAGE1 = searchParams.get('STAGE1') || searchParams.get('region') || '';
   const STAGE2 = searchParams.get('STAGE2') || '';
@@ -109,7 +113,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': 's-maxage=120, stale-while-revalidate=600',
         'X-Cache': 'HIT'
       }
@@ -161,7 +165,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': cacheControl,
         'X-Cache': 'MISS',
         'X-Sample-Data': result.usedSample ? 'true' : 'false'
@@ -178,7 +182,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         // 에러/샘플 응답은 CDN 캐시하지 않음 - 장애 복구 후 즉시 정상 응답 제공
         'Cache-Control': 'no-store, must-revalidate',
         'X-Cache': 'ERROR',
@@ -189,13 +193,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+      ...corsHeaders,
     }
   });
 }

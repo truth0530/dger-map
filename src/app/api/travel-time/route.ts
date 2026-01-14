@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getCorsHeaders } from '@/lib/utils/cors';
 
 // 카카오모빌리티 API 응답 타입
 interface KakaoRouteResult {
@@ -205,13 +206,14 @@ function chunkArray<T>(array: T[], size: number): T[][] {
   return chunks;
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+      ...corsHeaders,
     }
   });
 }
