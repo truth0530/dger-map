@@ -24,8 +24,8 @@ import MessageTooltip from '@/components/ui/MessageTooltip';
 import { calculateOccupancyRate, calculateTotalOccupancy, getBedValues } from '@/lib/utils/bedOccupancy';
 import { getBedStatusClass, renderBedValue } from '@/lib/utils/bedHelpers';
 import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
-import ComparisonModeSelector, { SelectionMode } from '@/components/ui/ComparisonModeSelector';
-import { Preset, RegionPreset } from '@/lib/utils/presetStorage';
+import ComparisonModeSelector, { SelectionMode, RegionSelection } from '@/components/ui/ComparisonModeSelector';
+import { RegionPreset } from '@/lib/utils/presetStorage';
 
 // 하이라이트된 메시지 렌더링 컴포넌트
 function HighlightedMessage({ message }: { message: string }) {
@@ -78,10 +78,11 @@ export default function HomePage() {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [showLocationNotice, setShowLocationNotice] = useState(false);
 
-  // 비교 모드 상태
+  // 통합 지역 선택 상태
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('single');
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<RegionPreset | null>(null);
+  // 드롭다운 표시용 value (지역명 또는 'preset:ID')
+  const [selectorValue, setSelectorValue] = useState('대구');
 
   // 테이블 칼럼 너비 상태
   const [columnWidths, setColumnWidths] = useState({
@@ -225,12 +226,11 @@ export default function HomePage() {
 
   // 비교 모드: 프리셋 기반 데이터 fetch
   useEffect(() => {
-    if (selectionMode === 'comparison' && selectedPreset && selectedPreset.type === 'region') {
-      const regionPreset = selectedPreset as RegionPreset;
-      fetchMultiRegions(regionPreset.regions);
-      // 중증질환 데이터는 첫 번째 지역 기준으로 fetch (UI에서는 사용하지 않을 수도 있음)
-      if (regionPreset.regions.length > 0) {
-        fetchSevereData(mapSidoName(regionPreset.regions[0]));
+    if (selectionMode === 'comparison' && selectedPreset) {
+      fetchMultiRegions(selectedPreset.regions);
+      // 중증질환 데이터는 첫 번째 지역 기준으로 fetch
+      if (selectedPreset.regions.length > 0) {
+        fetchSevereData(mapSidoName(selectedPreset.regions[0]));
       }
     }
   }, [selectionMode, selectedPreset, fetchMultiRegions, fetchSevereData]);
@@ -241,35 +241,32 @@ export default function HomePage() {
       if (selectionMode === 'single') {
         const mappedRegion = mapSidoName(selectedRegion);
         fetchBedData(mappedRegion, true);
-      } else if (selectedPreset && selectedPreset.type === 'region') {
-        const regionPreset = selectedPreset as RegionPreset;
-        fetchMultiRegions(regionPreset.regions, true);
+      } else if (selectedPreset) {
+        fetchMultiRegions(selectedPreset.regions, true);
       }
     }, 2 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [selectionMode, selectedRegion, fetchBedData, selectedPreset, fetchMultiRegions]);
 
-  const handleRegionChange = useCallback((region: string) => {
-    setSelectedRegion(region);
-    setStoredRegion(mapSidoName(region));
-    setRegionLocked(true);
-  }, []);
+  // 통합 지역 선택 핸들러
+  const handleRegionSelection = useCallback((selection: RegionSelection) => {
+    setSelectionMode(selection.mode);
+    setSelectedRegion(selection.region);
+    setSelectedPreset(selection.preset);
 
-  // 비교 모드 전환 핸들러
-  const handleModeChange = useCallback((mode: SelectionMode) => {
-    setSelectionMode(mode);
-    if (mode === 'single') {
-      // 단일 모드로 전환 시 프리셋 초기화
-      setSelectedPresetId(null);
-      setSelectedPreset(null);
+    // 드롭다운 value 업데이트
+    if (selection.preset) {
+      setSelectorValue(`preset:${selection.preset.id}`);
+    } else {
+      setSelectorValue(selection.region);
     }
-  }, []);
 
-  // 프리셋 선택 핸들러
-  const handlePresetChange = useCallback((presetId: string | null, preset: Preset | null) => {
-    setSelectedPresetId(presetId);
-    setSelectedPreset(preset);
+    // 단일 지역 선택 시 localStorage에 저장
+    if (selection.mode === 'single') {
+      setStoredRegion(mapSidoName(selection.region));
+      setRegionLocked(true);
+    }
   }, []);
 
   const filteredData = useMemo(() => {
@@ -374,15 +371,11 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* 지역 선택 / 비교 모드 */}
+          {/* 통합 지역 선택 (17개 시도 + 6개 광역 프리셋) */}
           <ComparisonModeSelector
             isDark={isDark}
-            mode={selectionMode}
-            onModeChange={handleModeChange}
-            selectedRegion={selectedRegion}
-            onRegionChange={handleRegionChange}
-            selectedPresetId={selectedPresetId}
-            onPresetChange={handlePresetChange}
+            value={selectorValue}
+            onChange={handleRegionSelection}
           />
 
           {/* 병원 유형 필터 - 체크박스 그룹 */}
