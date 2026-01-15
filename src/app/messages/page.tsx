@@ -15,6 +15,9 @@ import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery
 import { calculateOccupancyRate, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
 import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
 import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
+import ComparisonModeSelector, { SelectionMode, RegionSelection } from '@/components/ui/ComparisonModeSelector';
+import { RegionPreset } from '@/lib/utils/presetStorage';
+import { useFavoriteHospitals } from '@/lib/hooks/useFavoriteHospitals';
 
 // 질환 패턴 정의 (dger-api/public/js/diseasePatterns.js와 동일)
 const SYMPTOM_CODE_TO_DISEASE_MAP: Record<string, number> = {
@@ -255,6 +258,20 @@ export default function MessagesPage() {
   const [messageSearch, setMessageSearch] = useState('');
   const [selectedSevereType, setSelectedSevereType] = useState('');
   const [allMessages, setAllMessages] = useState<HospitalWithMessages[]>([]);
+
+  // 통합 지역 선택 상태
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('single');
+  const [selectedPreset, setSelectedPreset] = useState<RegionPreset | null>(null);
+  const [selectorValue, setSelectorValue] = useState('대구');
+
+  // 즐겨찾기 훅
+  const {
+    favoriteIds,
+    favoriteRegions,
+    isFavorite,
+    toggleFavorite,
+    count: favoriteCount
+  } = useFavoriteHospitals();
   const [loading, setLoading] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [allExpanded, setAllExpanded] = useState(true); // 기본: 전체 펼침
@@ -498,18 +515,46 @@ export default function MessagesPage() {
     return getShortOrgType(hpbd);
   }, [hospitalTypeMap]);
 
-  // 데이터 로딩
+  // 현재 모드에 따른 지역 목록 결정
+  const activeRegions = useMemo(() => {
+    if (selectionMode === 'single') {
+      return [selectedRegion];
+    } else if (selectionMode === 'comparison' && selectedPreset) {
+      return selectedPreset.regions.map(r => mapSidoShort(r));
+    } else if (selectionMode === 'favorites' && favoriteRegions.length > 0) {
+      return favoriteRegions.map(r => mapSidoShort(r));
+    }
+    return [selectedRegion];
+  }, [selectionMode, selectedRegion, selectedPreset, favoriteRegions]);
+
+  // 데이터 로딩 (다중 지역 지원)
   const loadAllHospitalData = useCallback(async () => {
     setLoading(true);
     try {
-      const hospitalList = await fetchHospitalsForRegion(selectedRegion);
+      // 모든 지역에서 병원 목록 병렬 fetch
+      const hospitalPromises = activeRegions.map(region => fetchHospitalsForRegion(region));
+      const hospitalLists = await Promise.all(hospitalPromises);
 
-      if (hospitalList.length === 0) {
+      // 병원 목록 병합 (중복 제거 - hpid 기준)
+      const hospitalMap = new Map<string, Hospital>();
+      hospitalLists.flat().forEach(hospital => {
+        if (!hospitalMap.has(hospital.id)) {
+          hospitalMap.set(hospital.id, hospital);
+        }
+      });
+      const hospitalList = Array.from(hospitalMap.values());
+
+      // 즐겨찾기 모드에서는 즐겨찾기 병원만 필터링
+      const filteredHospitalList = selectionMode === 'favorites'
+        ? hospitalList.filter(h => favoriteIds.includes(h.id))
+        : hospitalList;
+
+      if (filteredHospitalList.length === 0) {
         setAllMessages([]);
         return;
       }
 
-      const fetchPromises = hospitalList.map(async (hospital) => {
+      const fetchPromises = filteredHospitalList.map(async (hospital) => {
         try {
           const messages = await fetchMessages(hospital.id);
           const mappedHpbd = hospitalTypeMap[hospital.id];
@@ -529,14 +574,14 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedRegion, hospitalTypeMap, fetchHospitalsForRegion, fetchMessages, enrichMessage]);
+  }, [activeRegions, selectionMode, hospitalTypeMap, fetchHospitalsForRegion, fetchMessages, enrichMessage, favoriteIds]);
 
   // 초기 데이터 로드
   useEffect(() => {
     if (Object.keys(hospitalTypeMap).length > 0) {
       loadAllHospitalData();
     }
-  }, [selectedRegion, hospitalTypeMap, loadAllHospitalData]);
+  }, [hospitalTypeMap, loadAllHospitalData]);
 
   // 필터링된 메시지 - 개별 메시지 단위로 필터링
   const filteredMessages = useMemo(() => {
@@ -622,6 +667,29 @@ export default function MessagesPage() {
     }
   };
 
+  // 통합 지역 선택 핸들러
+  const handleRegionSelection = useCallback((selection: RegionSelection) => {
+    setSelectionMode(selection.mode);
+    setSelectedRegion(selection.region || '대구');
+    setSelectedPreset(selection.preset);
+
+    // 드롭다운 value 업데이트
+    if (selection.mode === 'favorites') {
+      setSelectorValue('favorites');
+    } else if (selection.preset) {
+      setSelectorValue(`preset:${selection.preset.id}`);
+    } else {
+      setSelectorValue(selection.region || '대구');
+    }
+
+    // 단일 지역 선택 시 localStorage에 저장
+    if (selection.mode === 'single' && selection.region) {
+      hasUserSelectedRegion.current = true;
+      setStoredRegion(mapSidoName(selection.region));
+      setRegionLocked(true);
+    }
+  }, []);
+
   // 로딩 표시
   if (loading) {
     return (
@@ -647,27 +715,14 @@ export default function MessagesPage() {
           className="flex flex-nowrap items-center gap-2 mb-2 py-1 px-2 overflow-x-auto whitespace-nowrap"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          {/* 지역 선택 */}
-          <select
-            className={`flex-shrink-0 px-2.5 border rounded-lg text-xs min-w-14 max-w-20 transition-colors ${
-              isDark
-                ? 'bg-[#1a2f2f] border-teal-700 text-teal-100'
-                : 'bg-white border-gray-300 text-gray-800'
-            }`}
-            style={{ height: '32px', lineHeight: '30px', paddingTop: '0', paddingBottom: '0' }}
-            value={selectedRegion}
-            onChange={(e) => {
-              hasUserSelectedRegion.current = true;
-              const nextRegion = e.target.value;
-              setSelectedRegion(nextRegion);
-              setStoredRegion(mapSidoName(nextRegion));
-              setRegionLocked(true);
-            }}
-          >
-            {REGION_OPTIONS.map((region) => (
-              <option key={region} value={region}>{region}</option>
-            ))}
-          </select>
+          {/* 통합 지역 선택 (즐겨찾기 + 17개 시도 + 6개 광역 프리셋) */}
+          <ComparisonModeSelector
+            isDark={isDark}
+            value={selectorValue}
+            onChange={handleRegionSelection}
+            favoriteCount={favoriteCount}
+            size="sm"
+          />
 
           {/* 기관분류 체크박스 */}
           <div className="flex-shrink-0 flex items-center gap-1">

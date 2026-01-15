@@ -6,7 +6,7 @@
  * 완전히 동일하게 구현
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { SEVERE_CONSTRAINTS } from '@/lib/constants/severeDefinitions';
 import { SYMPTOM_CODE_TO_DISEASE_MAP } from '@/lib/constants/diseasePatterns';
@@ -15,6 +15,9 @@ import { BedOccupancyInput, calculateTotalOccupancy, calculateOccupancyRate } fr
 import { OccupancyBattery } from '@/components/ui/OccupancyBattery';
 import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
 import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
+import ComparisonModeSelector, { SelectionMode, RegionSelection } from '@/components/ui/ComparisonModeSelector';
+import { RegionPreset } from '@/lib/utils/presetStorage';
+import { useFavoriteHospitals } from '@/lib/hooks/useFavoriteHospitals';
 
 // 중증질환 코드 목록 (dger-api와 동일)
 const SEVERE_CODES = [
@@ -134,6 +137,18 @@ export default function SeverePage() {
   const [hospitalMessages, setHospitalMessages] = useState<Record<string, MessageItem[]>>({});
   const [loadingMessages, setLoadingMessages] = useState<Record<string, boolean>>({});
 
+  // 통합 지역 선택 상태
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('single');
+  const [selectedPreset, setSelectedPreset] = useState<RegionPreset | null>(null);
+  const [selectorValue, setSelectorValue] = useState('대구');
+
+  // 즐겨찾기 훅
+  const {
+    favoriteIds,
+    favoriteRegions,
+    count: favoriteCount
+  } = useFavoriteHospitals();
+
   // 화면 크기 감지
   useEffect(() => {
     const handleResize = () => {
@@ -182,39 +197,67 @@ export default function SeverePage() {
     };
   }, []);
 
-  // 질환 데이터 로드
+  // 즐겨찾기가 비어있을 때 단일 모드로 전환
+  useEffect(() => {
+    if (selectionMode === 'favorites' && favoriteCount === 0) {
+      setSelectionMode('single');
+      setSelectedRegion('대구');
+      setSelectorValue('대구');
+    }
+  }, [selectionMode, favoriteCount]);
+
+  // 현재 모드에 따른 지역 목록 결정
+  const activeRegions = useMemo(() => {
+    if (selectionMode === 'single') {
+      return [selectedRegion === '대구' ? '대구광역시' : selectedRegion];
+    } else if (selectionMode === 'comparison' && selectedPreset) {
+      return selectedPreset.regions.map(r => mapSidoName(r));
+    } else if (selectionMode === 'favorites' && favoriteRegions.length > 0) {
+      return favoriteRegions.map(r => mapSidoName(r));
+    }
+    return [selectedRegion === '대구' ? '대구광역시' : selectedRegion];
+  }, [selectionMode, selectedRegion, selectedPreset, favoriteRegions]);
+
+  // 질환 데이터 로드 (다중 지역 지원)
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 시도명 매핑
-      const mappedRegion = selectedRegion === '대구' ? '대구광역시' : selectedRegion;
+      // 모든 지역에서 데이터 병렬 fetch
+      const regionPromises = activeRegions.map(async (mappedRegion) => {
+        const [severeResponse, bedResponse] = await Promise.all([
+          fetch(`/api/severe-diseases?STAGE1=${encodeURIComponent(mappedRegion)}&numOfRows=1000&pageNo=1`),
+          fetch(`/api/bed-info?region=${encodeURIComponent(mappedRegion)}`)
+        ]);
 
-      // 중증질환 API와 병상정보 API 병렬 호출
-      const [severeResponse, bedResponse] = await Promise.all([
-        fetch(`/api/severe-diseases?STAGE1=${encodeURIComponent(mappedRegion)}&numOfRows=1000&pageNo=1`),
-        fetch(`/api/bed-info?region=${encodeURIComponent(mappedRegion)}`)
-      ]);
+        if (!severeResponse.ok) return { severeItems: [], bedItems: [] };
 
-      if (!severeResponse.ok) throw new Error('중증질환 데이터 로드 실패');
+        const severeJson = await severeResponse.json();
+        const severeItems = severeJson?.success && severeJson.items ? severeJson.items : [];
 
-      const severeJson = await severeResponse.json();
-      if (!severeJson?.success || !severeJson.items) {
-        throw new Error('중증질환 데이터 파싱 실패');
-      }
-
-      const bedInfoMap = new Map<string, BedInfo>();
-      if (bedResponse.ok) {
-        const bedJson = await bedResponse.json();
-        if (bedJson?.success && bedJson.items) {
-          bedJson.items.forEach((item: BedInfo) => {
-            const hpid = item.hpid || '';
-            if (hpid) {
-              bedInfoMap.set(hpid, item);
-            }
-          });
+        let bedItems: BedInfo[] = [];
+        if (bedResponse.ok) {
+          const bedJson = await bedResponse.json();
+          bedItems = bedJson?.success && bedJson.items ? bedJson.items : [];
         }
-      }
 
+        return { severeItems, bedItems };
+      });
+
+      const regionResults = await Promise.all(regionPromises);
+
+      // 병상정보 맵 생성 (모든 지역 병합)
+      const bedInfoMap = new Map<string, BedInfo>();
+      regionResults.forEach(({ bedItems }) => {
+        bedItems.forEach((item: BedInfo) => {
+          const hpid = item.hpid || '';
+          if (hpid && !bedInfoMap.has(hpid)) {
+            bedInfoMap.set(hpid, item);
+          }
+        });
+      });
+
+      // 중증질환 데이터 병합 (중복 제거 - hpid 기준)
+      const processedHpids = new Set<string>();
       const data: Record<number, DiseaseData> = {};
 
       // 초기화
@@ -230,40 +273,48 @@ export default function SeverePage() {
         };
       });
 
-      // 데이터 수집
-      severeJson.items.forEach((item: { hpid: string; dutyName: string; dutyEmclsName: string; severeStatus: Record<string, string> }) => {
-        const hpid = item.hpid || '';
-        const dutyName = item.dutyName || '';
-        const dutyEmclsName = item.dutyEmclsName || '';
+      // 데이터 수집 (모든 지역)
+      regionResults.forEach(({ severeItems }) => {
+        severeItems.forEach((item: { hpid: string; dutyName: string; dutyEmclsName: string; severeStatus: Record<string, string> }) => {
+          const hpid = item.hpid || '';
+          if (!hpid || processedHpids.has(hpid)) return;
 
-        // 병상정보에서 재실인원과 포화도 가져오기
-        const bedInfo = bedInfoMap.get(hpid);
-        const occupancy = bedInfo ? calculateTotalOccupancy(bedInfo) : 0;
-        const occupancyRate = bedInfo ? calculateOccupancyRate(bedInfo) : 0;
+          // 즐겨찾기 모드에서는 즐겨찾기 병원만 처리
+          if (selectionMode === 'favorites' && !favoriteIds.includes(hpid)) return;
 
-        SEVERE_CODES.forEach(disease => {
-          const fieldValue = item.severeStatus?.[disease.field] || '';
-          const yn = fieldValue?.trim().toUpperCase();
+          processedHpids.add(hpid);
+          const dutyName = item.dutyName || '';
+          const dutyEmclsName = item.dutyEmclsName || '';
 
-          const hospitalInfo: HospitalInfo = {
-            name: bedInfo?.dutyName || dutyName,
-            hpid,
-            status: yn,
-            dutyEmclsName: bedInfo?.dutyEmclsName || dutyEmclsName,
-            occupancy,
-            occupancyRate
-          };
+          // 병상정보에서 재실인원과 포화도 가져오기
+          const bedInfo = bedInfoMap.get(hpid);
+          const occupancy = bedInfo ? calculateTotalOccupancy(bedInfo) : 0;
+          const occupancyRate = bedInfo ? calculateOccupancyRate(bedInfo) : 0;
 
-          if (yn === 'Y') {
-            data[disease.qn].available++;
-            data[disease.qn].availableHospitals.push(hospitalInfo);
-          } else if (yn === 'N' || yn === '불가능') {
-            data[disease.qn].unavailable++;
-            data[disease.qn].unavailableHospitals.push(hospitalInfo);
-          } else {
-            data[disease.qn].noInfo++;
-            data[disease.qn].noInfoHospitals.push(hospitalInfo);
-          }
+          SEVERE_CODES.forEach(disease => {
+            const fieldValue = item.severeStatus?.[disease.field] || '';
+            const yn = fieldValue?.trim().toUpperCase();
+
+            const hospitalInfo: HospitalInfo = {
+              name: bedInfo?.dutyName || dutyName,
+              hpid,
+              status: yn,
+              dutyEmclsName: bedInfo?.dutyEmclsName || dutyEmclsName,
+              occupancy,
+              occupancyRate
+            };
+
+            if (yn === 'Y') {
+              data[disease.qn].available++;
+              data[disease.qn].availableHospitals.push(hospitalInfo);
+            } else if (yn === 'N' || yn === '불가능') {
+              data[disease.qn].unavailable++;
+              data[disease.qn].unavailableHospitals.push(hospitalInfo);
+            } else {
+              data[disease.qn].noInfo++;
+              data[disease.qn].noInfoHospitals.push(hospitalInfo);
+            }
+          });
         });
       });
 
@@ -291,7 +342,7 @@ export default function SeverePage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedRegion]);
+  }, [activeRegions, selectionMode, favoriteIds]);
 
   useEffect(() => {
     loadData();
@@ -543,6 +594,29 @@ export default function SeverePage() {
     );
   };
 
+  // 통합 지역 선택 핸들러
+  const handleRegionSelection = useCallback((selection: RegionSelection) => {
+    setSelectionMode(selection.mode);
+    setSelectedRegion(selection.region || '대구');
+    setSelectedPreset(selection.preset);
+
+    // 드롭다운 value 업데이트
+    if (selection.mode === 'favorites') {
+      setSelectorValue('favorites');
+    } else if (selection.preset) {
+      setSelectorValue(`preset:${selection.preset.id}`);
+    } else {
+      setSelectorValue(selection.region || '대구');
+    }
+
+    // 단일 지역 선택 시 localStorage에 저장
+    if (selection.mode === 'single' && selection.region) {
+      hasUserSelectedRegion.current = true;
+      setStoredRegion(mapSidoName(selection.region));
+      setRegionLocked(true);
+    }
+  }, []);
+
   // 로딩 화면
   if (loading) {
     return (
@@ -564,26 +638,13 @@ export default function SeverePage() {
       <main className="p-2 sm:p-4 max-w-[1800px] mx-auto">
         {/* 컨트롤 섹션 - 좌측 정렬 */}
         <div className="flex items-center justify-start gap-2 mb-2 px-2 overflow-x-auto">
-          <select
-            className={`px-2 border rounded text-sm cursor-pointer transition-colors ${
-              isDark
-                ? 'bg-gray-800 border-gray-600 text-white hover:border-gray-500'
-                : 'bg-white border-gray-300 text-gray-900 hover:border-gray-400'
-            } focus:outline-none`}
-            style={{ height: '36px', width: '80px' }}
-            value={selectedRegion}
-            onChange={(e) => {
-              hasUserSelectedRegion.current = true;
-              const nextRegion = e.target.value;
-              setSelectedRegion(nextRegion);
-              setStoredRegion(mapSidoName(nextRegion));
-              setRegionLocked(true);
-            }}
-          >
-            {REGION_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          {/* 통합 지역 선택 (즐겨찾기 + 17개 시도 + 6개 광역 프리셋) */}
+          <ComparisonModeSelector
+            isDark={isDark}
+            value={selectorValue}
+            onChange={handleRegionSelection}
+            favoriteCount={favoriteCount}
+          />
 
           <button
             onClick={toggleAll}

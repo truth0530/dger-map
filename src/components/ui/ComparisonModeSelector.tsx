@@ -28,6 +28,10 @@ interface UnifiedRegionSelectorProps {
   onChange: (selection: RegionSelection) => void;
   // 즐겨찾기 개수
   favoriteCount?: number;
+  // 크기 옵션: 'xxs' | 'xs' | 'sm' | 'default'
+  size?: 'xxs' | 'xs' | 'sm' | 'default';
+  // 추가 클래스명
+  className?: string;
 }
 
 /**
@@ -40,7 +44,9 @@ export default function ComparisonModeSelector({
   isDark,
   value,
   onChange,
-  favoriteCount = 0
+  favoriteCount = 0,
+  size = 'default',
+  className = ''
 }: UnifiedRegionSelectorProps) {
   const handleChange = useCallback((selectedValue: string) => {
     if (selectedValue === 'favorites') {
@@ -71,16 +77,45 @@ export default function ComparisonModeSelector({
     }
   }, [onChange]);
 
+  // 사이즈별 스타일
+  const sizeStyles = {
+    xxs: 'px-0.5 py-0 text-[9px] leading-tight',
+    xs: 'px-1 py-0.5 text-[11px] h-6',
+    sm: 'px-1.5 py-1 text-xs h-7',
+    default: 'px-2 py-1.5 text-sm h-9'
+  };
+
+  const sizeMinWidth = {
+    xxs: '46px',
+    xs: '60px',
+    sm: '70px',
+    default: '90px'
+  };
+
+  const sizeHeight = {
+    xxs: '18px',
+    xs: '24px',
+    sm: '28px',
+    default: '36px'
+  };
+
   return (
     <select
       value={value}
       onChange={(e) => handleChange(e.target.value)}
-      className={`px-2 py-1.5 border rounded text-sm h-9 ${
+      className={`border rounded appearance-none cursor-pointer ${sizeStyles[size]} ${
         isDark
           ? 'bg-gray-800 border-gray-600 text-white'
           : 'bg-white border-gray-300 text-gray-900'
-      }`}
-      style={{ minWidth: '90px' }}
+      } ${className}`}
+      style={{
+        minWidth: sizeMinWidth[size],
+        height: sizeHeight[size],
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 2px center',
+        paddingRight: '14px'
+      }}
     >
       {/* 즐겨찾기 (최상단) */}
       {favoriteCount > 0 && (

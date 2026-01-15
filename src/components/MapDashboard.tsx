@@ -30,8 +30,13 @@ import { useBedData, HospitalBedData } from "@/lib/hooks/useBedData";
 import { useSevereData, HospitalSevereData } from "@/lib/hooks/useSevereData";
 import { useEmergencyMessages } from "@/lib/hooks/useEmergencyMessages";
 import { useTravelTime, HospitalTravelTime, HospitalCoordinate } from "@/lib/hooks/useTravelTime";
-import { mapSidoName } from "@/lib/utils/regionMapping";
+import { mapSidoName, mapSidoShort } from "@/lib/utils/regionMapping";
 import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from "@/lib/utils/locationRegion";
+import ComparisonModeSelector, { SelectionMode, RegionSelection } from "@/components/ui/ComparisonModeSelector";
+import { RegionPreset } from "@/lib/utils/presetStorage";
+import { useFavoriteHospitals } from "@/lib/hooks/useFavoriteHospitals";
+import { useMultiRegionBedData, HospitalBedDataWithRegion } from "@/lib/hooks/useMultiRegionBedData";
+import { useMultiRegionSevereData } from "@/lib/hooks/useMultiRegionSevereData";
 import { BedType, BED_TYPE_CONFIG } from "@/lib/constants/bedTypes";
 import { SEVERE_TYPES } from "@/lib/constants/dger";
 import { DISEASE_CATEGORIES, getCategoryByKey, getDiseaseNamesByCategory, getMatchedSevereKeys } from "@/lib/constants/diseaseCategories";
@@ -97,6 +102,31 @@ export function MapDashboard() {
   const [mobilePanel, setMobilePanel] = useState<MobilePanelType>(null);  // 모바일 패널 상태
   const [expandedHospitalCode, setExpandedHospitalCode] = useState<string | null>(null);  // 확장된 병원 코드
   const [sortMode, setSortMode] = useState<SortMode>("default");  // 정렬 모드
+
+  // 통합 지역 선택 상태
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('single');
+  const [selectedPreset, setSelectedPreset] = useState<RegionPreset | null>(null);
+  const [selectorValue, setSelectorValue] = useState('대구');
+
+  // 즐겨찾기 훅
+  const {
+    favoriteIds,
+    favoriteRegions,
+    count: favoriteCount
+  } = useFavoriteHospitals();
+
+  // 다중 지역 병상 데이터 훅
+  const {
+    loading: multiLoading,
+    data: multiData,
+    fetchMultiRegions
+  } = useMultiRegionBedData();
+
+  // 다중 지역 중증질환 데이터 훅
+  const {
+    data: multiSevereData,
+    fetchMultiRegions: fetchMultiSevereRegions
+  } = useMultiRegionSevereData();
 
   useEffect(() => {
     let isActive = true;
@@ -169,31 +199,44 @@ export function MapDashboard() {
     formatDuration,
   } = useTravelTime();
 
-  // 지역 변경 시 병상 및 중증질환 데이터 로드
+  // 지역 변경 시 병상 및 중증질환 데이터 로드 (단일 모드일 때만)
   useEffect(() => {
+    if (selectionMode !== 'single') return;
     const regionToFetch = selectedRegion === "all" ? "대구" : selectedRegion;
     const mappedRegion = mapSidoName(regionToFetch);
     fetchBedData(mappedRegion);
     fetchSevereData(mappedRegion);
-  }, [selectedRegion, fetchBedData, fetchSevereData]);
+  }, [selectedRegion, selectionMode, fetchBedData, fetchSevereData]);
 
-  // 병상 데이터를 병원 코드로 매핑
+  // 즐겨찾기가 비어있을 때 단일 모드로 전환
+  useEffect(() => {
+    if (selectionMode === 'favorites' && favoriteCount === 0) {
+      // 즐겨찾기 모드인데 즐겨찾기가 비어있으면 대구 단일 모드로 전환
+      setSelectionMode('single');
+      setSelectedRegion('대구광역시');
+      setSelectorValue('대구');
+    }
+  }, [selectionMode, favoriteCount]);
+
+  // 병상 데이터를 병원 코드로 매핑 (단일/비교/즐겨찾기 모드에 따라 다른 데이터 사용)
   const bedDataMap = useMemo(() => {
     const map = new Map<string, HospitalBedData>();
-    bedData.forEach((bed) => {
+    const dataSource = selectionMode === 'single' ? bedData : multiData;
+    dataSource.forEach((bed) => {
       map.set(bed.hpid, bed);
     });
     return map;
-  }, [bedData]);
+  }, [bedData, multiData, selectionMode]);
 
-  // 중증질환 데이터를 병원 코드로 매핑
+  // 중증질환 데이터를 병원 코드로 매핑 (단일/비교/즐겨찾기 모드에 따라 다른 데이터 사용)
   const severeDataMap = useMemo(() => {
     const map = new Map<string, HospitalSevereData>();
-    severeData.forEach((severe) => {
+    const dataSource = selectionMode === 'single' ? severeData : multiSevereData;
+    dataSource.forEach((severe) => {
       map.set(severe.hpid, severe);
     });
     return map;
-  }, [severeData]);
+  }, [severeData, multiSevereData, selectionMode]);
 
   // 선택된 소분류들의 통계 (OR 조건으로 집계)
   const stats = useMemo(() => {
@@ -212,22 +255,24 @@ export function MapDashboard() {
     return result;
   }, [allData, selectedDiseaseSubcategories, selectedDay]);
 
-  // 선택된 27개 중증질환 통계
+  // 선택된 27개 중증질환 통계 (모드에 따라 다른 데이터 사용)
   const severeStats = useMemo(() => {
     if (!selectedSevereType) return null;
     let available = 0;
     let unavailable = 0;
     let noInfo = 0;
 
-    severeData.forEach((hospital) => {
+    // 비교/즐겨찾기 모드에서는 multiSevereData 사용
+    const dataSource = selectionMode === 'single' ? severeData : multiSevereData;
+    dataSource.forEach((hospital) => {
       const status = (hospital.severeStatus[selectedSevereType] || '').trim().toUpperCase();
       if (status === 'Y') available++;
       else if (status === 'N' || status === '불가능') unavailable++;
       else noInfo++;
     });
 
-    return { available, unavailable, noInfo, total: severeData.length };
-  }, [severeData, selectedSevereType]);
+    return { available, unavailable, noInfo, total: dataSource.length };
+  }, [severeData, multiSevereData, selectionMode, selectedSevereType]);
 
   // 병상 상태 계산 헬퍼 함수
   const getBedStatusForHospital = useCallback((hospitalCode: string): BedStatus | null => {
@@ -265,14 +310,26 @@ export function MapDashboard() {
   // 분류 제외 기본 필터 (기관분류 카운트 계산용)
   // 모든 필터가 AND 조건으로 작동
   const baseFilteredHospitals = useMemo(() => {
-    // 전국 선택 시 대구 병원만 표시 (진료정보 있음), 그 외는 해당 지역 병원 전체
-    const targetRegion = selectedRegion === "all" ? "대구광역시" : selectedRegion;
-    const isDaeguRegion = selectedRegion === "all" || selectedRegion === "대구광역시";
+    // 비교/즐겨찾기 모드에서 허용할 지역 목록 계산
+    let targetRegions: string[] = [];
+    if (selectionMode === 'comparison' && selectedPreset) {
+      targetRegions = selectedPreset.regions.map(r => mapSidoName(r));
+    } else if (selectionMode === 'favorites' && favoriteRegions.length > 0) {
+      targetRegions = favoriteRegions.map(r => mapSidoName(r));
+    } else {
+      // 단일 모드 또는 기본
+      const targetRegion = selectedRegion === "all" ? "대구광역시" : selectedRegion;
+      targetRegions = [targetRegion];
+    }
+    // 42개 자원조사 필터 활성화 조건: 단일 모드 + 대구 지역만
+    const isDiseaseFilterEnabled = selectionMode === 'single' &&
+      (selectedRegion === "대구광역시" || selectedRegion === "all");
 
-    // 27개 중증질환이 'Y'인 병원 코드 Set 생성
+    // 27개 중증질환이 'Y'인 병원 코드 Set 생성 (모드에 따라 다른 데이터 사용)
     const severeAvailableHospitals = new Set<string>();
     if (selectedSevereType) {
-      severeData.forEach((severe) => {
+      const severeDataSource = selectionMode === 'single' ? severeData : multiSevereData;
+      severeDataSource.forEach((severe) => {
         const severeStatus = (severe.severeStatus[selectedSevereType] || '').trim().toUpperCase();
         if (severeStatus === 'Y') {
           severeAvailableHospitals.add(severe.hpid);
@@ -281,11 +338,18 @@ export function MapDashboard() {
     }
 
     return hospitals.filter((hospital) => {
-      // 1. 지역 필터
-      if (hospital.region !== targetRegion) return false;
+      // 0. 즐겨찾기 모드에서는 즐겨찾기된 병원만 표시
+      if (selectionMode === 'favorites') {
+        if (!favoriteIds.includes(hospital.code)) return false;
+      }
 
-      // 2. 대구 지역은 진료정보 있는 병원만
-      if (isDaeguRegion && !hospital.hasDiseaseData) return false;
+      // 1. 지역 필터 (비교 모드에서는 여러 지역 허용)
+      const hospitalRegion = hospital.region || "";
+      if (!targetRegions.includes(hospitalRegion)) return false;
+
+      // 2. 대구 지역 병원은 진료정보 있는 병원만 (다른 지역 병원은 무조건 표시)
+      const isHospitalInDaegu = hospitalRegion === "대구광역시";
+      if (isHospitalInDaegu && !hospital.hasDiseaseData) return false;
 
       // 3. 병상 유형 필터 - 선택된 병상 유형을 운영하는 병원만
       if (!hasAnySelectedBedType(hospital.code)) {
@@ -307,8 +371,9 @@ export function MapDashboard() {
         }
       }
 
-      // 6. 42개 자원조사 필터 (소분류끼리는 OR 조건, 다른 필터와는 AND)
-      if (isDaeguRegion && selectedDiseaseSubcategories.size > 0) {
+      // 6. 42개 자원조사 필터 (단일 모드 + 대구 지역일 때만 활성화)
+      // 비교/즐겨찾기 모드 또는 대구 외 지역에서는 이 필터 무시
+      if (isDiseaseFilterEnabled && isHospitalInDaegu && selectedDiseaseSubcategories.size > 0) {
         // 소분류 중 하나라도 가용성 조건 만족하면 통과 (OR)
         let hasMatchingDisease = false;
         for (const diseaseName of selectedDiseaseSubcategories) {
@@ -328,7 +393,7 @@ export function MapDashboard() {
 
       return true;
     });
-  }, [hospitals, allData, selectedRegion, selectedDiseaseSubcategories, selectedDay, selectedStatus, selectedSevereType, severeData, selectedBedStatus, getBedStatusForHospital, hasAnySelectedBedType]);
+  }, [hospitals, allData, selectedRegion, selectionMode, selectedPreset, favoriteIds, favoriteRegions, selectedDiseaseSubcategories, selectedDay, selectedStatus, selectedSevereType, severeData, multiSevereData, selectedBedStatus, getBedStatusForHospital, hasAnySelectedBedType]);
 
   // 기관분류 필터 적용 (사이드바 리스트용)
   const filteredHospitals = useMemo(() => {
@@ -362,6 +427,11 @@ export function MapDashboard() {
   const isCenterLevel = (classification: string | undefined): boolean => {
     return classification === "권역응급의료센터" || classification === "지역응급의료센터";
   };
+
+  // 42개 자원조사 필터 활성화 여부 (UI 표시용)
+  // 단일 모드 + 대구 지역일 때만 활성화
+  const isDiseaseFilterEnabled = selectionMode === 'single' &&
+    (selectedRegion === "대구광역시" || selectedRegion === "all");
 
   // 검색어로 필터링 및 정렬된 병원 목록
   const searchedHospitals = useMemo(() => {
@@ -576,7 +646,7 @@ export function MapDashboard() {
     }
   };
 
-  // 사이드바 지역 Select 변경 핸들러
+  // 사이드바 지역 Select 변경 핸들러 (기존 호환용)
   const handleSidebarRegionChange = (region: string) => {
     hasUserSelectedRegion.current = true;
     setSelectedRegion(region);
@@ -587,6 +657,49 @@ export function MapDashboard() {
       setRegionLocked(true);
     }
   };
+
+  // 통합 지역 선택 핸들러
+  const handleRegionSelection = useCallback((selection: RegionSelection) => {
+    setSelectionMode(selection.mode);
+    // 지도 페이지에서는 전체 시도명 사용 (예: '대구' -> '대구광역시')
+    const fullRegion = selection.region ? mapSidoName(selection.region) : '대구광역시';
+    setSelectedRegion(fullRegion);
+    setSelectedPreset(selection.preset);
+
+    // 드롭다운 value 업데이트
+    if (selection.mode === 'favorites') {
+      setSelectorValue('favorites');
+    } else if (selection.preset) {
+      setSelectorValue(`preset:${selection.preset.id}`);
+    } else {
+      setSelectorValue(selection.region || '대구');
+    }
+
+    // 단일 지역 선택 시 localStorage에 저장
+    if (selection.mode === 'single' && selection.region) {
+      hasUserSelectedRegion.current = true;
+      setStoredRegion(fullRegion);
+      setRegionLocked(true);
+    }
+
+    // 42개 자원조사 필터는 대구 단일 모드에서만 사용 가능
+    // 비대구 지역이나 비교/즐겨찾기 모드로 전환 시 필터 초기화
+    const willBeDiseaseFilterEnabled = selection.mode === 'single' &&
+      (fullRegion === "대구광역시");
+    if (!willBeDiseaseFilterEnabled) {
+      setSelectedDiseaseCategory(null);
+      setSelectedDiseaseSubcategories(new Set());
+    }
+
+    // 비교 모드/즐겨찾기 모드에서 다중 지역 데이터 fetch (병상 + 중증질환)
+    if (selection.mode === 'comparison' && selection.preset) {
+      fetchMultiRegions(selection.preset.regions);
+      fetchMultiSevereRegions(selection.preset.regions);
+    } else if (selection.mode === 'favorites' && favoriteRegions.length > 0) {
+      fetchMultiRegions(favoriteRegions);
+      fetchMultiSevereRegions(favoriteRegions);
+    }
+  }, [fetchMultiRegions, fetchMultiSevereRegions, favoriteRegions]);
 
   // 내 위치 기반 소요시간 조회
   const handleLocationRequest = useCallback(async () => {
@@ -637,13 +750,16 @@ export function MapDashboard() {
       }
     }
 
-    // 2. 지역
-    if (selectedRegion === "all") {
-      const countText = !selectedDiseaseCategory && typeof count === 'number' ? `(${count})` : '';
+    // 2. 지역 (비교 모드일 때는 프리셋 이름 표시)
+    const countText = !selectedDiseaseCategory && typeof count === 'number' ? `(${count})` : '';
+    if (selectionMode === 'comparison' && selectedPreset) {
+      parts.push(`${selectedPreset.name}${countText}`);
+    } else if (selectionMode === 'favorites') {
+      parts.push(`즐겨찾기${countText}`);
+    } else if (selectedRegion === "all") {
       parts.push(`대구${countText}`);
     } else {
       const region = REGIONS.find((r) => r.value === selectedRegion);
-      const countText = !selectedDiseaseCategory && typeof count === 'number' ? `(${count})` : '';
       parts.push(`${region?.label || selectedRegion}${countText}`);
     }
 
@@ -740,66 +856,63 @@ export function MapDashboard() {
         {/* 좌측 필터 사이드바 */}
         <aside className={`hidden md:flex w-48 flex-col border-r min-h-0 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-[#E8E2D8] border-[#d4cdc4]'}`}>
           <div className={`flex-1 overflow-y-auto min-h-0 ${isDark ? '' : 'bg-[#E8E2D8]'}`}>
-          {/* 지역 + 기관분류 */}
+          {/* 지역 선택 */}
           <div className={`px-2 py-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#E8E2D8]'}`}>
-            <div className="flex items-end gap-1.5">
-              <div className="w-12 shrink-0 flex flex-col gap-0.5">
-                <label className={`text-[10px] block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
-                <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
-                  <SelectTrigger size="xs" className={`[&_svg]:size-2 ${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}>
-                    {REGIONS.map((r) => (
-                      <SelectItem key={r.value} value={r.value} className={`text-[11px] py-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        {r.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                <label className={`text-[10px] block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
-                <div className="flex flex-wrap gap-0.5">
-                  <button
-                    onClick={() => toggleClassification("권역응급의료센터")}
-                    className={`h-6 text-[9px] px-0.5 rounded transition-colors whitespace-nowrap ${
-                      selectedClassifications.includes("권역응급의료센터")
-                        ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
-                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    권역({classificationCounts.권역})
-                  </button>
-                  <button
-                    onClick={() => toggleClassification("지역응급의료센터")}
-                    className={`h-6 text-[9px] px-0.5 rounded transition-colors whitespace-nowrap ${
-                      selectedClassifications.includes("지역응급의료센터")
-                        ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
-                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    센터({classificationCounts.센터})
-                  </button>
-                  <button
-                    onClick={() => toggleClassification("지역응급의료기관")}
-                    className={`h-6 text-[9px] px-0.5 rounded transition-colors whitespace-nowrap ${
-                      selectedClassifications.includes("지역응급의료기관")
-                        ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
-                        : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    기관({classificationCounts.기관})
-                  </button>
-                </div>
-              </div>
+            <ComparisonModeSelector
+              isDark={isDark}
+              value={selectorValue}
+              onChange={handleRegionSelection}
+              favoriteCount={favoriteCount}
+              size="xs"
+              className="w-full"
+            />
+          </div>
+
+          {/* 기관분류 */}
+          <div className={`px-2 py-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#E8E2D8]'}`}>
+            <div className="flex gap-1">
+              <button
+                onClick={() => toggleClassification("권역응급의료센터")}
+                className={`flex-1 h-6 text-[10px] px-1 rounded transition-colors whitespace-nowrap ${
+                  selectedClassifications.includes("권역응급의료센터")
+                    ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                    : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                권역({classificationCounts.권역})
+              </button>
+              <button
+                onClick={() => toggleClassification("지역응급의료센터")}
+                className={`flex-1 h-6 text-[10px] px-1 rounded transition-colors whitespace-nowrap ${
+                  selectedClassifications.includes("지역응급의료센터")
+                    ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                    : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                센터({classificationCounts.센터})
+              </button>
+              <button
+                onClick={() => toggleClassification("지역응급의료기관")}
+                className={`flex-1 h-6 text-[10px] px-1 rounded transition-colors whitespace-nowrap ${
+                  selectedClassifications.includes("지역응급의료기관")
+                    ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                    : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                기관({classificationCounts.기관})
+              </button>
             </div>
           </div>
 
           {/* 질환 선택 */}
-          <div className={`px-2 py-2 border-b space-y-1.5 ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#E8E2D8]'}`}>
-            {/* 42개 자원조사 */}
-            <div>
+          <div className={`px-2 py-2 border-b space-y-1.5 ${isDark ? 'border-gray-800' : 'border-[#d4cdc4] bg-[#E8E2D8]'} ${!isDiseaseFilterEnabled ? 'opacity-50' : ''}`}>
+            {/* 42개 자원조사 - 대구 단일 모드에서만 활성화 */}
+            <div className={!isDiseaseFilterEnabled ? 'pointer-events-none' : ''}>
+              {!isDiseaseFilterEnabled && (
+                <div className={`text-[9px] mb-1 ${isDark ? 'text-yellow-500' : 'text-amber-600'}`}>
+                  ※ 대구 지역에서만 사용 가능
+                </div>
+              )}
               <Combobox
                 options={[
                   { value: "", label: "중증자원조사 42개 선택" },
@@ -1459,69 +1572,63 @@ export function MapDashboard() {
             </button>
           </div>
           <div className="overflow-y-auto h-[calc(100%-48px)]">
-            {/* 지역/요일 선택 */}
-            {/* 지역 + 기관분류 */}
-            <div className={`px-3 py-3 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className={`text-[10px] mb-1 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>지역</label>
-                  <Select value={selectedRegion} onValueChange={handleSidebarRegionChange}>
-                    <SelectTrigger size="xs" className={`${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className={isDark ? 'bg-gray-800 border-gray-700' : 'bg-[#FAF7F2] border-[#d4cdc4]'}>
-                      {REGIONS.map((r) => (
-                        <SelectItem key={r.value} value={r.value} className={isDark ? 'text-white' : 'text-gray-900'}>
-                          {r.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className={`text-[10px] mb-1 block ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>기관</label>
-                  <div className="flex flex-wrap gap-1 items-center">
-                    <button
-                      onClick={() => toggleClassification("권역응급의료센터")}
-                      className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
-                        selectedClassifications.includes("권역응급의료센터")
-                          ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
-                          : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      권역({classificationCounts.권역})
-                    </button>
-                    <button
-                      onClick={() => toggleClassification("지역응급의료센터")}
-                      className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
-                        selectedClassifications.includes("지역응급의료센터")
-                          ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
-                          : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      센터({classificationCounts.센터})
-                    </button>
-                    <button
-                      onClick={() => toggleClassification("지역응급의료기관")}
-                      className={`text-[10px] px-1 py-0.5 rounded transition-colors ${
-                        selectedClassifications.includes("지역응급의료기관")
-                          ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
-                          : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      기관({classificationCounts.기관})
-                    </button>
-                  </div>
-                </div>
+            {/* 지역 선택 */}
+            <div className={`px-3 py-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
+              <ComparisonModeSelector
+                isDark={isDark}
+                value={selectorValue}
+                onChange={handleRegionSelection}
+                favoriteCount={favoriteCount}
+                size="xs"
+                className="w-full"
+              />
+            </div>
+
+            {/* 기관분류 */}
+            <div className={`px-3 py-2 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => toggleClassification("권역응급의료센터")}
+                  className={`flex-1 text-[10px] px-1 py-1 rounded transition-colors ${
+                    selectedClassifications.includes("권역응급의료센터")
+                      ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  권역({classificationCounts.권역})
+                </button>
+                <button
+                  onClick={() => toggleClassification("지역응급의료센터")}
+                  className={`flex-1 text-[10px] px-1 py-1 rounded transition-colors ${
+                    selectedClassifications.includes("지역응급의료센터")
+                      ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  센터({classificationCounts.센터})
+                </button>
+                <button
+                  onClick={() => toggleClassification("지역응급의료기관")}
+                  className={`flex-1 text-[10px] px-1 py-1 rounded transition-colors ${
+                    selectedClassifications.includes("지역응급의료기관")
+                      ? isDark ? "bg-cyan-500/20 text-white" : "bg-[#4A5D5D] text-white"
+                      : isDark ? "text-gray-500 hover:text-gray-400" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  기관({classificationCounts.기관})
+                </button>
               </div>
             </div>
 
-            {/* 질환 선택 */}
-            <div className={`px-3 py-3 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'}`}>
-              <div className="space-y-2">
+            {/* 질환 선택 - 대구 단일 모드에서만 활성화 */}
+            <div className={`px-3 py-3 border-b ${isDark ? 'border-gray-800' : 'border-[#d4cdc4]'} ${!isDiseaseFilterEnabled ? 'opacity-50' : ''}`}>
+              <div className={`space-y-2 ${!isDiseaseFilterEnabled ? 'pointer-events-none' : ''}`}>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>중증자원조사 42개</label>
+                    <label className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
+                      중증자원조사 42개
+                      {!isDiseaseFilterEnabled && <span className={`ml-1 ${isDark ? 'text-yellow-500' : 'text-amber-600'}`}>(대구만)</span>}
+                    </label>
                     <Select value={selectedDay} onValueChange={(v) => setSelectedDay(v as DayOfWeek)}>
                       <SelectTrigger size="xs" className={`w-[68px] [&_svg]:size-2 [&_svg]:ml-0 ${isDark ? 'bg-transparent border-gray-700 text-white' : 'bg-transparent border border-[#d4cdc4] text-gray-900'}`}>
                         <SelectValue />
