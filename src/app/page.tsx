@@ -26,6 +26,7 @@ import { getBedStatusClass, renderBedValue } from '@/lib/utils/bedHelpers';
 import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
 import ComparisonModeSelector, { SelectionMode, RegionSelection } from '@/components/ui/ComparisonModeSelector';
 import { RegionPreset } from '@/lib/utils/presetStorage';
+import { useFavoriteHospitals } from '@/lib/hooks/useFavoriteHospitals';
 
 // 하이라이트된 메시지 렌더링 컴포넌트
 function HighlightedMessage({ message }: { message: string }) {
@@ -77,6 +78,7 @@ export default function HomePage() {
   const [selectedDisease, setSelectedDisease] = useState('');
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [showLocationNotice, setShowLocationNotice] = useState(false);
+  const [showShareCopied, setShowShareCopied] = useState(false);
 
   // 통합 지역 선택 상태
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('single');
@@ -151,11 +153,49 @@ export default function HomePage() {
     clearCache: clearMultiCache
   } = useMultiRegionBedData();
 
+  // 즐겨찾기 훅 (useMemo보다 먼저 선언해야 함)
+  const {
+    favorites,
+    favoriteIds,
+    favoriteRegions,
+    isFavorite,
+    toggleFavorite,
+    toShareString,
+    getRegionsFromShareString,
+    getIdsFromShareString,
+    count: favoriteCount
+  } = useFavoriteHospitals();
+
+  // URL 공유된 즐겨찾기 상태
+  const [sharedFavIds, setSharedFavIds] = useState<string[]>([]);
+  const [sharedFavRegions, setSharedFavRegions] = useState<string[]>([]);
+
   // 현재 모드에 따른 데이터 선택
   const loading = selectionMode === 'single' ? singleLoading : multiLoading;
   const error = selectionMode === 'single' ? singleError : multiError;
-  const data: (HospitalBedData | HospitalBedDataWithRegion)[] = selectionMode === 'single' ? singleData : multiData;
   const lastUpdate = selectionMode === 'single' ? singleLastUpdate : multiLastUpdate;
+
+  // 즐겨찾기 모드에서 사용할 ID/지역 목록 (내 즐겨찾기 또는 공유 URL 기준)
+  // useMemo로 메모이제이션하여 불필요한 리렌더 방지
+  const activeFavIds = useMemo(() => {
+    return sharedFavIds.length > 0 ? sharedFavIds : favoriteIds;
+  }, [sharedFavIds, favoriteIds]);
+
+  const activeFavRegions = useMemo(() => {
+    return sharedFavIds.length > 0 ? sharedFavRegions : favoriteRegions;
+  }, [sharedFavIds, sharedFavRegions, favoriteRegions]);
+
+  // 즐겨찾기 모드에서는 multiData를 activeFavIds로 필터링
+  const data: (HospitalBedData | HospitalBedDataWithRegion)[] = useMemo(() => {
+    if (selectionMode === 'single') {
+      return singleData;
+    } else if (selectionMode === 'favorites') {
+      // 즐겨찾기 모드: multiData에서 activeFavIds만 필터링
+      return multiData.filter(h => activeFavIds.includes(h.hpid));
+    } else {
+      return multiData;
+    }
+  }, [selectionMode, singleData, multiData, activeFavIds]);
 
   const { data: severeData, fetchSevereData } = useSevereData();
   const { messages: emergencyMessages, loading: messageLoading, fetchMessages } = useEmergencyMessages();
@@ -215,6 +255,28 @@ export default function HomePage() {
     };
   }, []);
 
+  // URL 파라미터에서 공유된 즐겨찾기 파싱
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const favParam = params.get('fav');
+
+    if (favParam) {
+      const regions = getRegionsFromShareString(favParam);
+      const ids = getIdsFromShareString(favParam);
+
+      if (regions.length > 0 && ids.length > 0) {
+        // 공유된 즐겨찾기 설정
+        setSharedFavIds(ids);
+        setSharedFavRegions(regions);
+        // 즐겨찾기 모드로 전환
+        setSelectionMode('favorites');
+        setSelectorValue('favorites');
+      }
+    }
+  }, [getRegionsFromShareString, getIdsFromShareString]);
+
   // 단일 모드: 지역 데이터 fetch
   useEffect(() => {
     if (selectionMode === 'single' && hospitalTypeMapReady) {
@@ -235,19 +297,31 @@ export default function HomePage() {
     }
   }, [selectionMode, selectedPreset, fetchMultiRegions, fetchSevereData]);
 
+  // 즐겨찾기 모드: 즐겨찾기 병원들의 지역 기반 데이터 fetch
+  // activeFavRegions는 공유 URL 기준 또는 내 즐겨찾기 기준
+  useEffect(() => {
+    if (selectionMode === 'favorites' && activeFavRegions.length > 0) {
+      fetchMultiRegions(activeFavRegions);
+      // 중증질환 데이터는 첫 번째 지역 기준으로 fetch
+      fetchSevereData(mapSidoName(activeFavRegions[0]));
+    }
+  }, [selectionMode, activeFavRegions, fetchMultiRegions, fetchSevereData]);
+
   // 자동 새로고침 (2분마다)
   useEffect(() => {
     const interval = setInterval(() => {
       if (selectionMode === 'single') {
         const mappedRegion = mapSidoName(selectedRegion);
         fetchBedData(mappedRegion, true);
-      } else if (selectedPreset) {
+      } else if (selectionMode === 'comparison' && selectedPreset) {
         fetchMultiRegions(selectedPreset.regions, true);
+      } else if (selectionMode === 'favorites' && activeFavRegions.length > 0) {
+        fetchMultiRegions(activeFavRegions, true);
       }
     }, 2 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [selectionMode, selectedRegion, fetchBedData, selectedPreset, fetchMultiRegions]);
+  }, [selectionMode, selectedRegion, fetchBedData, selectedPreset, fetchMultiRegions, activeFavRegions]);
 
   // 통합 지역 선택 핸들러
   const handleRegionSelection = useCallback((selection: RegionSelection) => {
@@ -256,7 +330,9 @@ export default function HomePage() {
     setSelectedPreset(selection.preset);
 
     // 드롭다운 value 업데이트
-    if (selection.preset) {
+    if (selection.mode === 'favorites') {
+      setSelectorValue('favorites');
+    } else if (selection.preset) {
       setSelectorValue(`preset:${selection.preset.id}`);
     } else {
       setSelectorValue(selection.region);
@@ -267,7 +343,28 @@ export default function HomePage() {
       setStoredRegion(mapSidoName(selection.region));
       setRegionLocked(true);
     }
+
+    // 즐겨찾기 모드가 아닌 모드로 전환 시 공유 즐겨찾기 초기화
+    if (selection.mode !== 'favorites') {
+      setSharedFavIds([]);
+      setSharedFavRegions([]);
+    }
   }, []);
+
+  // 즐겨찾기 공유 URL 복사
+  const handleShareFavorites = useCallback(() => {
+    if (favoriteCount === 0) return;
+
+    const shareString = toShareString();
+    const url = `${window.location.origin}${window.location.pathname}?fav=${encodeURIComponent(shareString)}`;
+
+    navigator.clipboard.writeText(url).then(() => {
+      setShowShareCopied(true);
+      setTimeout(() => setShowShareCopied(false), 2000);
+    }).catch(err => {
+      console.error('클립보드 복사 실패:', err);
+    });
+  }, [favoriteCount, toShareString]);
 
   const filteredData = useMemo(() => {
     let filtered = data;
@@ -371,12 +468,37 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* 통합 지역 선택 (17개 시도 + 6개 광역 프리셋) */}
-          <ComparisonModeSelector
-            isDark={isDark}
-            value={selectorValue}
-            onChange={handleRegionSelection}
-          />
+          {/* 통합 지역 선택 (즐겨찾기 + 17개 시도 + 6개 광역 프리셋) */}
+          <div className="flex items-center gap-1">
+            <ComparisonModeSelector
+              isDark={isDark}
+              value={selectorValue}
+              onChange={handleRegionSelection}
+              favoriteCount={favoriteCount}
+            />
+            {/* 즐겨찾기 공유 버튼 */}
+            {selectionMode === 'favorites' && favoriteCount > 0 && !sharedFavIds.length && (
+              <button
+                onClick={handleShareFavorites}
+                className={`px-2 py-1.5 text-sm rounded border h-9 transition-colors ${
+                  isDark
+                    ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600'
+                    : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
+                }`}
+                title="즐겨찾기 URL 복사"
+              >
+                {showShareCopied ? '복사됨!' : '공유'}
+              </button>
+            )}
+            {/* 공유된 즐겨찾기 표시 */}
+            {sharedFavIds.length > 0 && (
+              <span className={`px-2 py-1.5 text-xs rounded ${
+                isDark ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+              }`}>
+                공유됨 ({sharedFavIds.length})
+              </span>
+            )}
+          </div>
 
           {/* 병원 유형 필터 - 체크박스 그룹 */}
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -596,20 +718,30 @@ export default function HomePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map((hospital, index) => (
-                    <HospitalRow
-                      key={hospital.hpid}
-                      hospital={hospital}
-                      isDark={isDark}
-                      showGroupDivider={firstNonCenterIndex !== -1 && index === firstNonCenterIndex}
-                      isExpanded={expandedMessages.has(hospital.hpid)}
-                      onToggle={() => toggleMessage(hospital.hpid)}
-                      messages={emergencyMessages.get(hospital.hpid)}
-                      messageLoading={messageLoading.get(hospital.hpid)}
-                      onFetchMessages={fetchMessages}
-                      columnWidths={columnWidths}
-                    />
-                  ))}
+                  {filteredData.map((hospital, index) => {
+                    const hospitalRegion = (hospital as HospitalBedDataWithRegion).region || selectedRegion;
+                    return (
+                      <HospitalRow
+                        key={hospital.hpid}
+                        hospital={hospital}
+                        isDark={isDark}
+                        showGroupDivider={firstNonCenterIndex !== -1 && index === firstNonCenterIndex}
+                        isExpanded={expandedMessages.has(hospital.hpid)}
+                        onToggle={() => toggleMessage(hospital.hpid)}
+                        messages={emergencyMessages.get(hospital.hpid)}
+                        messageLoading={messageLoading.get(hospital.hpid)}
+                        onFetchMessages={fetchMessages}
+                        columnWidths={columnWidths}
+                        isFavorite={isFavorite(hospital.hpid)}
+                        onToggleFavorite={() => toggleFavorite({
+                          hpid: hospital.hpid,
+                          dutyName: hospital.dutyName,
+                          region: hospitalRegion
+                        })}
+                        region={hospitalRegion}
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -619,19 +751,28 @@ export default function HomePage() {
         {/* 카드 뷰 */}
         {viewMode === 'cards' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredData.map((hospital, index) => (
-              <HospitalCard
-                key={hospital.hpid}
-                hospital={hospital}
-                isDark={isDark}
-                showGroupDivider={firstNonCenterIndex !== -1 && index === firstNonCenterIndex}
-                isExpanded={expandedMessages.has(hospital.hpid)}
-                onToggle={() => toggleMessage(hospital.hpid)}
-                messages={emergencyMessages.get(hospital.hpid)}
-                messageLoading={messageLoading.get(hospital.hpid)}
-                onFetchMessages={fetchMessages}
-              />
-            ))}
+            {filteredData.map((hospital, index) => {
+              const hospitalRegion = (hospital as HospitalBedDataWithRegion).region || selectedRegion;
+              return (
+                <HospitalCard
+                  key={hospital.hpid}
+                  hospital={hospital}
+                  isDark={isDark}
+                  showGroupDivider={firstNonCenterIndex !== -1 && index === firstNonCenterIndex}
+                  isExpanded={expandedMessages.has(hospital.hpid)}
+                  onToggle={() => toggleMessage(hospital.hpid)}
+                  messages={emergencyMessages.get(hospital.hpid)}
+                  messageLoading={messageLoading.get(hospital.hpid)}
+                  onFetchMessages={fetchMessages}
+                  isFavorite={isFavorite(hospital.hpid)}
+                  onToggleFavorite={() => toggleFavorite({
+                    hpid: hospital.hpid,
+                    dutyName: hospital.dutyName,
+                    region: hospitalRegion
+                  })}
+                />
+              );
+            })}
           </div>
         )}
 
@@ -671,9 +812,13 @@ interface HospitalRowProps {
   messageLoading?: boolean;
   onFetchMessages?: (hpid: string) => void;
   columnWidths?: ColumnWidths;
+  // 즐겨찾기 관련
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  region: string;
 }
 
-function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, onToggle, messages, messageLoading, onFetchMessages, columnWidths }: HospitalRowProps) {
+function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, onToggle, messages, messageLoading, onFetchMessages, columnWidths, isFavorite, onToggleFavorite, region }: HospitalRowProps) {
   const isCenter = isCenterHospital({ hpbd: hospital.hpbd, dutyEmclsName: hospital.dutyEmclsName });
   const beds = getBedValues(hospital);
   const orgType = getHospitalOrgType(hospital);
@@ -708,9 +853,20 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
           } : {})
         }}
       >
-        {/* 병원명 + 펼치기/접기 버튼 - 좌측 정렬 */}
+        {/* 병원명 + 즐겨찾기 + 펼치기/접기 버튼 - 좌측 정렬 */}
         <td className={`px-1 sm:px-2 py-1.5 text-sm text-left ${isDark ? 'text-white' : 'text-gray-900'}`}>
           <div className="flex items-center gap-1">
+            <button
+              onClick={onToggleFavorite}
+              className={`text-xs flex-shrink-0 transition-colors ${
+                isFavorite
+                  ? 'text-yellow-500 hover:text-yellow-400'
+                  : isDark ? 'text-gray-500 hover:text-yellow-500' : 'text-gray-300 hover:text-yellow-500'
+              }`}
+              title={isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+            >
+              {isFavorite ? '★' : '☆'}
+            </button>
             <button
               onClick={onToggle}
               className={`px-0.5 text-xs flex-shrink-0 ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
@@ -848,9 +1004,12 @@ interface HospitalCardProps {
   messages?: ClassifiedMessages | null;
   messageLoading?: boolean;
   onFetchMessages?: (hpid: string) => void;
+  // 즐겨찾기 관련
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
 }
 
-function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, onToggle, messages, messageLoading, onFetchMessages }: HospitalCardProps) {
+function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, onToggle, messages, messageLoading, onFetchMessages, isFavorite, onToggleFavorite }: HospitalCardProps) {
   const isCenter = isCenterHospital({ hpbd: hospital.hpbd, dutyEmclsName: hospital.dutyEmclsName });
   const beds = getBedValues(hospital);
   const totalOccupancy = calculateTotalOccupancy(hospital);
@@ -888,6 +1047,17 @@ function HospitalCard({ hospital, isDark, showGroupDivider = false, isExpanded, 
       <div className={`px-4 py-3 ${isDark ? 'border-gray-700' : 'border-gray-200'} border-b`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <button
+              onClick={onToggleFavorite}
+              className={`text-sm transition-colors ${
+                isFavorite
+                  ? 'text-yellow-500 hover:text-yellow-400'
+                  : isDark ? 'text-gray-500 hover:text-yellow-500' : 'text-gray-300 hover:text-yellow-500'
+              }`}
+              title={isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+            >
+              {isFavorite ? '★' : '☆'}
+            </button>
             <button
               onClick={onToggle}
               className={`text-xs ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
