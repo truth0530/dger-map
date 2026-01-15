@@ -1,6 +1,15 @@
 /**
  * 27개 중증질환 정규식 패턴 및 표시 형식 정의
  * 원본: dger-api/public/js/diseasePatterns.js
+ *
+ * 중요: 두 API 간 필드 매핑 관계
+ * - 수용가능 API (getSrsillDissAceptncPosblInfoInqire): MKioskTy1~27 필드 사용
+ * - 응급메시지 API (getEmrrmSrsillDissMsgInqire): symTypCod 필드 사용 (Y0010, Y0020 등)
+ *
+ * 매핑 관계: MKioskTy{N} ↔ qn (질환번호 1~27) ↔ symTypCod
+ * 예: MKioskTy1 ↔ qn=1 ↔ Y0010 (심근경색)
+ *
+ * 상세 문서: docs/SEVERE_DISEASE_API_MAPPING.md
  */
 
 export interface DiseasePattern {
@@ -10,7 +19,24 @@ export interface DiseasePattern {
   category: string;       // 카테고리
 }
 
-// symTypCod를 질환 번호로 매핑
+/**
+ * symTypCod를 질환 번호(qn)로 매핑
+ *
+ * 용도: 응급메시지 API 응답에서 특정 질환의 메시지만 필터링할 때 사용
+ *
+ * 사용 예시:
+ * ```typescript
+ * const symTypCod = 'Y0010';  // API 응답에서 추출
+ * const qn = SYMPTOM_CODE_TO_DISEASE_MAP[symTypCod];  // 결과: 1 (심근경색)
+ *
+ * // 메시지 필터링
+ * const filtered = messages.filter(msg =>
+ *   SYMPTOM_CODE_TO_DISEASE_MAP[msg.symTypCod] === qn
+ * );
+ * ```
+ *
+ * 주의: Y000은 응급실 일반 메시지로, 특정 질환과 연결되지 않음
+ */
 export const SYMPTOM_CODE_TO_DISEASE_MAP: Record<string, number> = {
   'Y0010': 1,   // [재관류중재술] 심근경색
   'Y0020': 2,   // [재관류중재술] 뇌경색
