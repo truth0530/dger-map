@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { SEVERE_CONSTRAINTS } from '@/lib/constants/severeDefinitions';
+import { SYMPTOM_CODE_TO_DISEASE_MAP } from '@/lib/constants/diseasePatterns';
 import { shortenHospitalName } from '@/lib/utils/hospitalUtils';
 import { BedOccupancyInput, calculateTotalOccupancy, calculateOccupancyRate } from '@/lib/utils/bedOccupancy';
 import { OccupancyBattery } from '@/components/ui/OccupancyBattery';
@@ -90,7 +91,8 @@ interface HospitalInfo {
 // 메시지 인터페이스
 interface MessageItem {
   msg: string;
-  symBpmgGubun: string;  // 질환 구분
+  symTypCod: string;     // 질환 코드 (Y0010, Y0081 등)
+  symTypCodMag: string;  // 질환명 텍스트 (장중첩/폐색(유아) 등)
   symBlkSttDtm: string;
   symBlkEndDtm: string;
 }
@@ -315,11 +317,12 @@ export default function SeverePage() {
       const messages: MessageItem[] = [];
       items.forEach(item => {
         const msg = item.querySelector('symBlkMsg')?.textContent || '';
-        const symBpmgGubun = item.querySelector('symBpmgGubun')?.textContent || '';
+        const symTypCod = item.querySelector('symTypCod')?.textContent || '';
+        const symTypCodMag = item.querySelector('symTypCodMag')?.textContent || '';
         const symBlkSttDtm = item.querySelector('symBlkSttDtm')?.textContent || '';
         const symBlkEndDtm = item.querySelector('symBlkEndDtm')?.textContent || '';
         if (msg) {
-          messages.push({ msg, symBpmgGubun, symBlkSttDtm, symBlkEndDtm });
+          messages.push({ msg, symTypCod, symTypCodMag, symBlkSttDtm, symBlkEndDtm });
         }
       });
 
@@ -332,14 +335,15 @@ export default function SeverePage() {
     }
   }, [hospitalMessages, loadingMessages]);
 
-  // 불가 병원 행 펼치기 토글
-  const toggleHospitalRow = useCallback((hpid: string) => {
+  // 불가 병원 행 펼치기 토글 (qn + hpid 조합으로 독립적 관리)
+  const toggleHospitalRow = useCallback((qn: number, hpid: string) => {
+    const key = `${qn}-${hpid}`;
     setExpandedHospitalRows(prev => {
-      const isExpanding = !prev[hpid];
+      const isExpanding = !prev[key];
       if (isExpanding) {
         loadHospitalMessages(hpid);
       }
-      return { ...prev, [hpid]: isExpanding };
+      return { ...prev, [key]: isExpanding };
     });
   }, [loadHospitalMessages]);
 
@@ -374,43 +378,31 @@ export default function SeverePage() {
     loadData();
   };
 
-  // qn과 symBpmgGubun 숫자를 직접 비교하여 메시지 필터링
+  // symTypCod를 qn으로 변환하여 메시지 필터링
   const filterMessagesByDisease = (messages: MessageItem[], qn: number): MessageItem[] => {
     return messages.filter(msg => {
-      const gubunNumber = parseInt(msg.symBpmgGubun, 10);
-      return gubunNumber === qn;
+      // symTypCod (예: Y0010, Y0081)를 qn으로 변환
+      const mappedQn = SYMPTOM_CODE_TO_DISEASE_MAP[msg.symTypCod];
+      return mappedQn === qn;
     });
   };
 
-  // 불가 병원 행 렌더링 (아코디언 기능 임시 비활성화 - TODO: 나중에 다시 활성화)
+  // 불가 병원 행 렌더링 (아코디언 포함, qn별 독립 관리)
   const renderUnavailableHospitalRow = (h: HospitalInfo, keyPrefix: string, qn: number) => {
-    // 아코디언 관련 변수 (나중에 다시 사용)
-    // const isExpanded = expandedHospitalRows[h.hpid];
-    // const allMessages = hospitalMessages[h.hpid] || [];
-    // const filteredMessages = filterMessagesByDisease(allMessages, qn);
-    // const isLoadingMsg = loadingMessages[h.hpid];
+    const rowKey = `${qn}-${h.hpid}`;
+    const isExpanded = expandedHospitalRows[rowKey];
+    const allMessages = hospitalMessages[h.hpid] || [];
+    const filteredMessages = filterMessagesByDisease(allMessages, qn);
+    const isLoadingMsg = loadingMessages[h.hpid];
 
-    // 단순 행으로 렌더링 (아코디언 없이)
-    return (
-      <div key={`${keyPrefix}-${h.hpid}`} className={`flex justify-between items-center px-4 py-1.5 text-xs border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
-        <span className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-          {isMobile ? shortenHospitalName(h.name) : h.name}
-          <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
-          <OccupancyBattery rate={h.occupancyRate} isDark={isDark} size="small" />
-        </span>
-        <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-700'}`}>불가</span>
-      </div>
-    );
-
-    /* 아코디언 버전 (나중에 다시 활성화할 때 사용)
     return (
       <div key={`${keyPrefix}-${h.hpid}`}>
         <div
-          className={`flex justify-between items-center px-4 py-1.5 text-xs border-b cursor-pointer hover:${isDark ? 'bg-gray-800' : 'bg-gray-50'} ${isDark ? 'border-gray-700' : 'border-gray-100'}`}
-          onClick={() => toggleHospitalRow(h.hpid)}
+          className={`flex justify-between items-center px-4 py-1.5 text-xs border-b cursor-pointer ${isDark ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-100 hover:bg-gray-50'}`}
+          onClick={() => toggleHospitalRow(qn, h.hpid)}
         >
           <span className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-            <span className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+            <span className={`transition-transform text-[10px] ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
             {isMobile ? shortenHospitalName(h.name) : h.name}
             <span className={`font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{h.occupancy}명</span>
             <OccupancyBattery rate={h.occupancyRate} isDark={isDark} size="small" />
@@ -425,18 +417,24 @@ export default function SeverePage() {
               <div className="space-y-1">
                 {filteredMessages.map((msg, idx) => (
                   <div key={idx} className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    • {msg.msg}
+                    {msg.symTypCodMag && (
+                      <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        [{msg.symTypCodMag}]{' '}
+                      </span>
+                    )}
+                    {msg.msg}
                   </div>
                 ))}
               </div>
             ) : (
-              <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>해당 질환의 메시지가 없습니다.</span>
+              <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
+                병원에서 등록한 불가 메시지가 없습니다.
+              </span>
             )}
           </div>
         )}
       </div>
     );
-    */
   };
 
   // 병원 리스트 렌더링
