@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useBedData, HospitalBedData } from '@/lib/hooks/useBedData';
+import { useMultiRegionBedData, HospitalBedDataWithRegion } from '@/lib/hooks/useMultiRegionBedData';
 import { useSevereData } from '@/lib/hooks/useSevereData';
 import { REGIONS, SEVERE_TYPES } from '@/lib/constants/dger';
 import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
@@ -23,6 +24,8 @@ import MessageTooltip from '@/components/ui/MessageTooltip';
 import { calculateOccupancyRate, calculateTotalOccupancy, getBedValues } from '@/lib/utils/bedOccupancy';
 import { getBedStatusClass, renderBedValue } from '@/lib/utils/bedHelpers';
 import { OccupancyBattery, OrgTypeBadge } from '@/components/ui/OccupancyBattery';
+import ComparisonModeSelector, { SelectionMode } from '@/components/ui/ComparisonModeSelector';
+import { Preset, RegionPreset } from '@/lib/utils/presetStorage';
 
 // 하이라이트된 메시지 렌더링 컴포넌트
 function HighlightedMessage({ message }: { message: string }) {
@@ -75,6 +78,11 @@ export default function HomePage() {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [showLocationNotice, setShowLocationNotice] = useState(false);
 
+  // 비교 모드 상태
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('single');
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
+
   // 테이블 칼럼 너비 상태
   const [columnWidths, setColumnWidths] = useState({
     hospital: 200,
@@ -120,7 +128,34 @@ export default function HomePage() {
     document.addEventListener('mouseup', handleMouseUp);
   }, [columnWidths]);
 
-  const { loading, error, data, lastUpdate, fetchBedData, clearCache, hospitalTypeMapReady } = useBedData();
+  // 단일 지역 모드용 훅
+  const {
+    loading: singleLoading,
+    error: singleError,
+    data: singleData,
+    lastUpdate: singleLastUpdate,
+    fetchBedData,
+    clearCache,
+    hospitalTypeMapReady
+  } = useBedData();
+
+  // 비교 모드용 훅
+  const {
+    loading: multiLoading,
+    error: multiError,
+    data: multiData,
+    lastUpdate: multiLastUpdate,
+    loadedRegions,
+    fetchMultiRegions,
+    clearCache: clearMultiCache
+  } = useMultiRegionBedData();
+
+  // 현재 모드에 따른 데이터 선택
+  const loading = selectionMode === 'single' ? singleLoading : multiLoading;
+  const error = selectionMode === 'single' ? singleError : multiError;
+  const data: (HospitalBedData | HospitalBedDataWithRegion)[] = selectionMode === 'single' ? singleData : multiData;
+  const lastUpdate = selectionMode === 'single' ? singleLastUpdate : multiLastUpdate;
+
   const { data: severeData, fetchSevereData } = useSevereData();
   const { messages: emergencyMessages, loading: messageLoading, fetchMessages } = useEmergencyMessages();
 
@@ -179,29 +214,62 @@ export default function HomePage() {
     };
   }, []);
 
+  // 단일 모드: 지역 데이터 fetch
   useEffect(() => {
-    // hospitalTypeMapReady가 true가 되면 데이터를 다시 가져옴
-    if (hospitalTypeMapReady) {
+    if (selectionMode === 'single' && hospitalTypeMapReady) {
       const mappedRegion = mapSidoName(selectedRegion);
       fetchBedData(mappedRegion);
       fetchSevereData(mappedRegion);
     }
-  }, [selectedRegion, fetchBedData, fetchSevereData, hospitalTypeMapReady]);
+  }, [selectionMode, selectedRegion, fetchBedData, fetchSevereData, hospitalTypeMapReady]);
+
+  // 비교 모드: 프리셋 기반 데이터 fetch
+  useEffect(() => {
+    if (selectionMode === 'comparison' && selectedPreset && selectedPreset.type === 'region') {
+      const regionPreset = selectedPreset as RegionPreset;
+      fetchMultiRegions(regionPreset.regions);
+      // 중증질환 데이터는 첫 번째 지역 기준으로 fetch (UI에서는 사용하지 않을 수도 있음)
+      if (regionPreset.regions.length > 0) {
+        fetchSevereData(mapSidoName(regionPreset.regions[0]));
+      }
+    }
+  }, [selectionMode, selectedPreset, fetchMultiRegions, fetchSevereData]);
 
   // 자동 새로고침 (2분마다)
   useEffect(() => {
     const interval = setInterval(() => {
-      const mappedRegion = mapSidoName(selectedRegion);
-      fetchBedData(mappedRegion, true);
+      if (selectionMode === 'single') {
+        const mappedRegion = mapSidoName(selectedRegion);
+        fetchBedData(mappedRegion, true);
+      } else if (selectedPreset && selectedPreset.type === 'region') {
+        const regionPreset = selectedPreset as RegionPreset;
+        fetchMultiRegions(regionPreset.regions, true);
+      }
     }, 2 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [selectedRegion, fetchBedData]);
+  }, [selectionMode, selectedRegion, fetchBedData, selectedPreset, fetchMultiRegions]);
 
   const handleRegionChange = useCallback((region: string) => {
     setSelectedRegion(region);
     setStoredRegion(mapSidoName(region));
     setRegionLocked(true);
+  }, []);
+
+  // 비교 모드 전환 핸들러
+  const handleModeChange = useCallback((mode: SelectionMode) => {
+    setSelectionMode(mode);
+    if (mode === 'single') {
+      // 단일 모드로 전환 시 프리셋 초기화
+      setSelectedPresetId(null);
+      setSelectedPreset(null);
+    }
+  }, []);
+
+  // 프리셋 선택 핸들러
+  const handlePresetChange = useCallback((presetId: string | null, preset: Preset | null) => {
+    setSelectedPresetId(presetId);
+    setSelectedPreset(preset);
   }, []);
 
   const filteredData = useMemo(() => {
@@ -306,23 +374,16 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* 지역 선택 */}
-          <select
-            value={selectedRegion}
-            onChange={(e) => handleRegionChange(e.target.value)}
-            className={`px-1 sm:px-2 py-1.5 border rounded text-sm h-9 flex-shrink-0 ${
-              isDark
-                ? 'bg-gray-800 border-gray-600 text-white'
-                : 'bg-white border-gray-300 text-gray-900'
-            }`}
-            style={{ width: 'auto', minWidth: '52px', maxWidth: '104px' }}
-          >
-            {REGIONS.map(region => (
-              <option key={region.value} value={region.value}>
-                {region.value}
-              </option>
-            ))}
-          </select>
+          {/* 지역 선택 / 비교 모드 */}
+          <ComparisonModeSelector
+            isDark={isDark}
+            mode={selectionMode}
+            onModeChange={handleModeChange}
+            selectedRegion={selectedRegion}
+            onRegionChange={handleRegionChange}
+            selectedPresetId={selectedPresetId}
+            onPresetChange={handlePresetChange}
+          />
 
           {/* 병원 유형 필터 - 체크박스 그룹 */}
           <div className="flex items-center gap-1 flex-shrink-0">
