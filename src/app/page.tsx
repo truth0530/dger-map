@@ -48,6 +48,18 @@ function HighlightedMessage({ message }: { message: string }) {
 // 뷰 모드 타입
 type ViewMode = 'table' | 'cards';
 
+// 정렬 가능한 칼럼 타입
+type SortColumn = 'name' | 'occupancy' | 'count' | 'general' | 'cohort' | 'negative' | 'isolation' | 'pediatric' | 'pedNegative' | 'pedIsolation' | 'traumaResus' | 'traumaArea' | 'update';
+type SortDirection = 'asc' | 'desc';
+
+// 정렬 인디케이터 컴포넌트
+function SortIndicator({ column, currentColumn, direction }: { column: SortColumn; currentColumn: SortColumn | null; direction: SortDirection }) {
+  if (column !== currentColumn) {
+    return <span className="ml-0.5 text-white/30">⇅</span>;
+  }
+  return <span className="ml-0.5">{direction === 'asc' ? '▲' : '▼'}</span>;
+}
+
 // 병원 유형 필터
 interface OrgTypes {
   권역: boolean;
@@ -79,6 +91,10 @@ export default function HomePage() {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [showLocationNotice, setShowLocationNotice] = useState(false);
   const [showShareCopied, setShowShareCopied] = useState(false);
+
+  // 정렬 상태
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // 통합 지역 선택 상태
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('single');
@@ -366,6 +382,18 @@ export default function HomePage() {
     });
   }, [favoriteCount, toShareString]);
 
+  // 정렬 핸들러
+  const handleSort = useCallback((column: SortColumn) => {
+    if (sortColumn === column) {
+      // 같은 칼럼 클릭 시 방향 토글
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      // 다른 칼럼 클릭 시 해당 칼럼으로 내림차순 정렬
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  }, [sortColumn]);
+
   const filteredData = useMemo(() => {
     let filtered = data;
 
@@ -399,8 +427,82 @@ export default function HomePage() {
       }
     }
 
-    // 정렬: 센터급 우선 → 재실인원 내림차순 → 포화도 내림차순
+    // 정렬 로직
     return [...filtered].sort((a, b) => {
+      // 사용자가 정렬 칼럼을 선택한 경우
+      if (sortColumn) {
+        const aBeds = getBedValues(a);
+        const bBeds = getBedValues(b);
+        let aValue: number | string = 0;
+        let bValue: number | string = 0;
+
+        switch (sortColumn) {
+          case 'name':
+            aValue = shortenHospitalName(a.dutyName);
+            bValue = shortenHospitalName(b.dutyName);
+            break;
+          case 'occupancy':
+            aValue = calculateOccupancyRate(a);
+            bValue = calculateOccupancyRate(b);
+            break;
+          case 'count':
+            aValue = calculateTotalOccupancy(a);
+            bValue = calculateTotalOccupancy(b);
+            break;
+          case 'general':
+            aValue = aBeds.general.available;
+            bValue = bBeds.general.available;
+            break;
+          case 'cohort':
+            aValue = aBeds.cohort.available;
+            bValue = bBeds.cohort.available;
+            break;
+          case 'negative':
+            aValue = aBeds.erNegative.available;
+            bValue = bBeds.erNegative.available;
+            break;
+          case 'isolation':
+            aValue = aBeds.erGeneral.available;
+            bValue = bBeds.erGeneral.available;
+            break;
+          case 'pediatric':
+            aValue = aBeds.pediatric.available;
+            bValue = bBeds.pediatric.available;
+            break;
+          case 'pedNegative':
+            aValue = aBeds.pediatricNegative.available;
+            bValue = bBeds.pediatricNegative.available;
+            break;
+          case 'pedIsolation':
+            aValue = aBeds.pediatricGeneral.available;
+            bValue = bBeds.pediatricGeneral.available;
+            break;
+          case 'traumaResus':
+            aValue = aBeds.traumaResus.available;
+            bValue = bBeds.traumaResus.available;
+            break;
+          case 'traumaArea':
+            aValue = aBeds.traumaArea.available;
+            bValue = bBeds.traumaArea.available;
+            break;
+          case 'update':
+            aValue = a.hvidate || '';
+            bValue = b.hvidate || '';
+            break;
+        }
+
+        // 문자열 비교
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          const cmp = aValue.localeCompare(bValue, 'ko');
+          return sortDirection === 'asc' ? cmp : -cmp;
+        }
+
+        // 숫자 비교
+        const diff = (aValue as number) - (bValue as number);
+        return sortDirection === 'asc' ? diff : -diff;
+      }
+
+      // 기본 정렬: 센터급 우선 → 재실인원 내림차순 → 포화도 내림차순
       const aIsCenter = isCenterHospital({ hpbd: a.hpbd, dutyEmclsName: a.dutyEmclsName });
       const bIsCenter = isCenterHospital({ hpbd: b.hpbd, dutyEmclsName: b.dutyEmclsName });
 
@@ -412,7 +514,7 @@ export default function HomePage() {
 
       return calculateOccupancyRate(b) - calculateOccupancyRate(a);
     });
-  }, [data, searchTerm, orgTypes, selectedDisease, severeData]);
+  }, [data, searchTerm, orgTypes, selectedDisease, severeData, sortColumn, sortDirection]);
 
   const firstNonCenterIndex = useMemo(
     () => filteredData.findIndex(h => !isCenterHospital({ hpbd: h.hpbd, dutyEmclsName: h.dutyEmclsName })),
@@ -429,7 +531,7 @@ export default function HomePage() {
       )}
       <div className="max-w-full mx-auto px-2 py-2">
         {/* 컨트롤 섹션 - dger-api와 동일 */}
-        <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-1 flex-nowrap">
+        <div className="flex items-center gap-1 sm:gap-2 mb-2 flex-nowrap overflow-x-hidden sm:overflow-x-auto pb-1">
           {/* 테이블/카드 보기 탭 - 모바일에서 숨김, 데스크탑에서만 표시 */}
           <div className="hidden sm:flex items-center flex-shrink-0">
             <button
@@ -501,13 +603,13 @@ export default function HomePage() {
           </div>
 
           {/* 병원 유형 필터 - 체크박스 그룹 */}
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
             {(Object.keys(orgTypes) as (keyof OrgTypes)[]).map((key) => {
               const shortLabel = key === '권역' ? '권' : key === '센터' ? '센' : '기';
               return (
                 <label
                   key={key}
-                  className="px-2.5 py-1.5 text-xs font-medium rounded border-2 cursor-pointer transition-colors flex items-center whitespace-nowrap"
+                  className="px-2 sm:px-2.5 py-1.5 text-xs font-medium rounded border-2 cursor-pointer transition-colors flex items-center whitespace-nowrap"
                   style={{
                     height: '32px',
                     backgroundColor: orgTypes[key]
@@ -540,15 +642,14 @@ export default function HomePage() {
           {/* 검색 - 모바일 */}
           <input
             type="text"
-            placeholder="병원명"
+            placeholder="검색"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={`sm:hidden px-2 py-1.5 border rounded text-sm h-9 flex-shrink-0 ${
+            className={`sm:hidden px-1.5 py-1.5 border rounded text-xs h-9 flex-1 min-w-[50px] max-w-[70px] ${
               isDark
                 ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
                 : 'bg-white border-gray-300 text-gray-900'
             }`}
-            style={{ width: '70px' }}
           />
           {/* 검색 - PC */}
           <input
@@ -568,13 +669,13 @@ export default function HomePage() {
           <select
             value={selectedDisease}
             onChange={(e) => setSelectedDisease(e.target.value)}
-            className={`sm:hidden px-1 py-1.5 border rounded text-sm h-9 w-20 flex-shrink-0 ${
+            className={`sm:hidden px-1 py-1.5 border rounded text-xs h-9 flex-1 min-w-[55px] max-w-[80px] ${
               isDark
                 ? 'bg-gray-800 border-gray-600 text-white'
                 : 'bg-white border-gray-300 text-gray-900'
             }`}
           >
-            <option value="">가능질환</option>
+            <option value="">질환</option>
             {SEVERE_TYPES.map(disease => (
               <option key={disease.qn} value={disease.qn}>
                 {disease.qn}. {disease.label}
@@ -601,7 +702,7 @@ export default function HomePage() {
           {/* 메시지 모두 펼치기/접기 버튼 */}
           <button
             onClick={toggleAllMessages}
-            className={`px-2 py-1.5 text-sm rounded border h-9 transition-colors whitespace-nowrap flex-shrink-0 ${
+            className={`px-1.5 sm:px-2 py-1.5 text-xs sm:text-sm rounded border h-9 transition-colors whitespace-nowrap flex-shrink-0 ${
               isDark
                 ? 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700'
                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
@@ -614,7 +715,7 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <span className="sm:hidden">펼치기</span>
+                <span className="sm:hidden">펼침</span>
                 <span className="hidden sm:inline">메시지 펼치기</span>
               </>
             )}
@@ -639,7 +740,7 @@ export default function HomePage() {
         {/* 테이블 뷰 */}
         {viewMode === 'table' && (
           <div className={`border rounded-lg overflow-hidden shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-            <div className="sm:overflow-x-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+            <div className="overflow-y-auto sm:overflow-x-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
               <table className="w-full border-collapse">
                 {/* 칼럼 너비 정의: 병원명 넓게, 코호트 좁게, 업데이트 유지 */}
                 <colgroup>
@@ -659,71 +760,123 @@ export default function HomePage() {
                 </colgroup>
                 <thead className={`sticky top-0 z-20 ${isDark ? 'bg-[#111827]' : 'bg-[#4A5D5D]'}`}>
                   <tr>
-                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('name')}
+                    >
                       <span className="lg:hidden">병원</span>
                       <span className="hidden lg:inline">병원명</span>
+                      <SortIndicator column="name" currentColumn={sortColumn} direction={sortDirection} />
                       {selectedDisease && (
                         <span className="ml-2 font-normal text-xs text-orange-300 hidden lg:inline">
                           ({SEVERE_TYPES.find(d => d.qn === selectedDisease)?.label})
                         </span>
                       )}
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => startResize('hospital', e)} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => { e.stopPropagation(); startResize('hospital', e); }} />
                     </th>
-                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
-                      <span className="lg:hidden">포화도</span>
-                      <span className="hidden lg:inline">병상포화도</span>
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => startResize('occupancy', e)} />
+                    <th
+                      className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('occupancy')}
+                    >
+                      <span className="lg:hidden">포화</span>
+                      <span className="hidden lg:inline">포화도</span>
+                      <SortIndicator column="occupancy" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => { e.stopPropagation(); startResize('occupancy', e); }} />
                     </th>
-                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('count')}
+                    >
                       <span className="lg:hidden">재실</span>
                       <span className="hidden lg:inline">재실인원</span>
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => startResize('count', e)} />
+                      <SortIndicator column="count" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => { e.stopPropagation(); startResize('count', e); }} />
                     </th>
-                    <th className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="px-1 sm:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('general')}
+                    >
                       <span className="lg:hidden">일반</span>
                       <span className="hidden lg:inline">일반병상</span>
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => startResize('general', e)} />
+                      <SortIndicator column="general" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30 hidden sm:block" onMouseDown={(e) => { e.stopPropagation(); startResize('general', e); }} />
                     </th>
-                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('cohort')}
+                    >
                       <span className="lg:hidden">코</span>
                       <span className="hidden lg:inline">코호트</span>
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('cohort', e)} />
+                      <SortIndicator column="cohort" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => { e.stopPropagation(); startResize('cohort', e); }} />
                     </th>
-                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('negative')}
+                    >
                       <span className="lg:hidden">음압</span>
                       <span className="hidden lg:inline">음압격리</span>
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('negative', e)} />
+                      <SortIndicator column="negative" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => { e.stopPropagation(); startResize('negative', e); }} />
                     </th>
-                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('isolation')}
+                    >
                       <span className="lg:hidden">일격</span>
                       <span className="hidden lg:inline">일반격리</span>
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('isolation', e)} />
+                      <SortIndicator column="isolation" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => { e.stopPropagation(); startResize('isolation', e); }} />
                     </th>
-                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('pediatric')}
+                    >
                       소아
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('pediatric', e)} />
+                      <SortIndicator column="pediatric" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => { e.stopPropagation(); startResize('pediatric', e); }} />
                     </th>
-                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('pedNegative')}
+                    >
                       <span className="lg:hidden">소음</span>
                       <span className="hidden lg:inline">소아음압</span>
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('pedNegative', e)} />
+                      <SortIndicator column="pedNegative" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => { e.stopPropagation(); startResize('pedNegative', e); }} />
                     </th>
-                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('pedIsolation')}
+                    >
                       <span className="lg:hidden">소일</span>
                       <span className="hidden lg:inline">소아일반</span>
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('pedIsolation', e)} />
+                      <SortIndicator column="pedIsolation" currentColumn={sortColumn} direction={sortDirection} />
+                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => { e.stopPropagation(); startResize('pedIsolation', e); }} />
                     </th>
-                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('traumaResus')}
+                    >
                       <span className="lg:hidden">외소</span>
                       <span className="hidden lg:inline">외상소생</span>
+                      <SortIndicator column="traumaResus" currentColumn={sortColumn} direction={sortDirection} />
                     </th>
-                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                    <th
+                      className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('traumaArea')}
+                    >
                       <span className="lg:hidden">외진</span>
                       <span className="hidden lg:inline">외상진료</span>
+                      <SortIndicator column="traumaArea" currentColumn={sortColumn} direction={sortDirection} />
                     </th>
-                    <th className="px-1 sm:px-2 pr-4 sm:pr-5 py-1 text-center text-white font-semibold text-xs whitespace-nowrap">
+                    <th
+                      className="px-1 sm:px-2 pr-4 sm:pr-5 py-1 text-center text-white font-semibold text-xs whitespace-nowrap cursor-pointer hover:bg-white/10 select-none"
+                      onClick={() => handleSort('update')}
+                    >
                       <span className="lg:hidden">갱신</span>
                       <span className="hidden lg:inline">업데이트</span>
+                      <SortIndicator column="update" currentColumn={sortColumn} direction={sortDirection} />
                     </th>
                   </tr>
                 </thead>

@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
+import HospitalNamesContent from '@/components/HospitalNamesContent';
 
 // 릴리즈 노트 타입
 interface ReleaseNote {
@@ -35,10 +36,24 @@ interface FeedbackPost {
   replyPublic?: boolean; // 답변공개여부 - true면 답변 공개
 }
 
+/**
+ * ========================================
+ * 📊 COMMIT COUNT - 릴리즈 노트 업데이트 시 함께 갱신 필요!
+ * ========================================
+ * 계산법: DGER_API_COMMITS (고정) + DGER_MAP_COMMITS (갱신)
+ *
+ * dger-map 커밋 수 확인: git rev-list --count HEAD
+ * ========================================
+ */
+const DGER_API_COMMITS = 334;  // 고정값 (2026.01.20 기준, 더 이상 증가하지 않음)
+const DGER_MAP_COMMITS = 117;  // 🔄 릴리즈 노트 추가 시 업데이트 필요!
+const TOTAL_COMMITS = DGER_API_COMMITS + DGER_MAP_COMMITS;  // 현재: 451
+
 // 릴리즈 노트 데이터
 const RELEASE_NOTES: ReleaseNote[] = [
   // DGER 3.0 - React 프레임워크 기반
-  { date: '2026.01.15', content: '기존 17개 시도 단위에서 광역 단위 추가, ☆ 버튼으로 자주 확인하는 병원 저장 (최대 20개), 즐겨찾기 공유: URL 복사로 모니터링 병원 목록 즉시 공유', type: 'minor' },
+  { date: '2026.01.20', content: '테이블 정렬 기능 추가, 병상 목록 스크롤 버그 수정, 전국 416개 병원 약어 목록 적용, 외상진료구역 및 외상소생실 추가(요청기능 반영)', type: 'minor' },
+  { date: '2026.01.15', content: '17개 시도 단위에서 광역 단위와 즐겨찾기 추가(병원명 ☆ 버튼으로 즐겨찾기 자동생성), 즐겨찾기 공유 기능 신설: URL 복사 버튼으로 원하는 병원 목록 링크로 공유 가능', type: 'minor' },
   { date: '2026.01.14', content: '업데이트 30분 초과기관 주황표시, 응급메시지 AND 조건 검색 구현 (예: 소아 장중첩 → 공백으로 여러 단어 조합 검색)', type: 'minor' },
   { date: '2026.01.03', content: '응급메시지 가독성 정책 고도화(이송 전 확인/참고바람/불가 통일) 및 하이라이트 색상 규칙 정비, 원문 툴팁 표시 강화\n중증질환 [███가능███|█불가█|░미참여░] 스택 바 차트로 가독성 개선', type: 'minor' },
   { date: '2025.12.31', content: '지도 마커 크기를 재실인원 기준으로 자동 조절하고, 포화도에 따라 색상/투명도 그라데이션을 적용', type: 'minor' },
@@ -164,7 +179,7 @@ export default function FeedbackPage() {
   const { isDark } = useTheme();
 
   // 탭 상태
-  const [activeTab, setActiveTab] = useState<'release' | 'board' | 'stats'>('release');
+  const [activeTab, setActiveTab] = useState<'release' | 'board' | 'stats' | 'abbrev'>('release');
   const sortedReleaseNotes = useMemo(() => {
     const typeOrder: Record<ReleaseNoteType, number> = {
       init: 0,
@@ -533,12 +548,12 @@ export default function FeedbackPage() {
   return (
     <div className={`min-h-screen ${isDark ? 'bg-gradient-to-b from-gray-900 to-gray-950' : 'bg-gradient-to-b from-[#F5F0E8] to-[#EDE7DD]'}`}>
 
-      <main className="max-w-[900px] mx-auto px-6 py-8">
+      <main className="max-w-[900px] mx-auto px-6 py-4">
         {/* 탭 네비게이션 */}
-        <div className={`inline-flex p-1 rounded-xl ${isDark ? 'bg-gray-800/80' : 'bg-gray-100'} mb-8`}>
+        <div className={`inline-flex p-1 rounded-xl ${isDark ? 'bg-gray-800/80' : 'bg-gray-100'} mb-4`}>
           <button
             onClick={() => setActiveTab('release')}
-            className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+            className={`px-2 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
               activeTab === 'release'
                 ? isDark
                   ? 'bg-gray-700 text-white shadow-lg'
@@ -548,11 +563,11 @@ export default function FeedbackPage() {
                   : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            릴리즈 노트
+            릴리즈노트
           </button>
           <button
             onClick={() => setActiveTab('board')}
-            className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+            className={`px-2 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
               activeTab === 'board'
                 ? isDark
                   ? 'bg-gray-700 text-white shadow-lg'
@@ -562,11 +577,11 @@ export default function FeedbackPage() {
                   : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            피드백 게시판
+            피드백
           </button>
           <button
             onClick={() => setActiveTab('stats')}
-            className={`px-5 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+            className={`px-2 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
               activeTab === 'stats'
                 ? isDark
                   ? 'bg-gray-700 text-white shadow-lg'
@@ -576,7 +591,21 @@ export default function FeedbackPage() {
                   : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            방문자 통계
+            방문자통계
+          </button>
+          <button
+            onClick={() => setActiveTab('abbrev')}
+            className={`px-2 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
+              activeTab === 'abbrev'
+                ? isDark
+                  ? 'bg-gray-700 text-white shadow-lg'
+                  : 'bg-white text-gray-900 shadow-md'
+                : isDark
+                  ? 'text-gray-400 hover:text-gray-200'
+                  : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            병원명 약어
           </button>
         </div>
 
@@ -610,7 +639,7 @@ export default function FeedbackPage() {
                   Release Timeline
                 </h3>
                 <span className={`text-xs px-3 py-1 rounded-full ${isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
-                  329+ commits
+                  {TOTAL_COMMITS}+ commits
                 </span>
               </div>
 
@@ -1629,6 +1658,11 @@ export default function FeedbackPage() {
               </>
             )}
           </div>
+        )}
+
+        {/* 병원명 약어 탭 */}
+        {activeTab === 'abbrev' && (
+          <HospitalNamesContent embedded />
         )}
 
       </main>

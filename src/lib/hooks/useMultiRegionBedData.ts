@@ -40,6 +40,10 @@ interface BedInfoApiResponse {
     hvs48: number;
     hv16: number;
     hvs49: number;
+    hv60: number;
+    hvs60: number;
+    hv61: number;
+    hvs61: number;
     hvidate: string;
     occupancy: number;
     occupancyRate: number;
@@ -128,6 +132,10 @@ export function useMultiRegionBedData() {
       HVS48: item.hvs48,
       hv16: item.hv16,
       HVS49: item.hvs49,
+      hv60: item.hv60,
+      HVS60: item.hvs60,
+      hv61: item.hv61,
+      HVS61: item.hvs61,
       hvidate: item.hvidate,
       occupancy: item.occupancy,
       occupancyRate: item.occupancyRate,

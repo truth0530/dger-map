@@ -94,9 +94,12 @@ export const calculateTotalOccupancy = (data: BedOccupancyInput): number => {
   const pediatricOccupied = Math.max(0, beds.pediatric.total - beds.pediatric.available);
   const pediatricNegativeOccupied = Math.max(0, beds.pediatricNegative.total - beds.pediatricNegative.available);
   const pediatricGeneralOccupied = Math.max(0, beds.pediatricGeneral.total - beds.pediatricGeneral.available);
+  const traumaResusOccupied = Math.max(0, beds.traumaResus.total - beds.traumaResus.available);
+  const traumaAreaOccupied = Math.max(0, beds.traumaArea.total - beds.traumaArea.available);
 
   return generalOccupied + cohortOccupied + erNegativeOccupied + erGeneralOccupied +
-    pediatricOccupied + pediatricNegativeOccupied + pediatricGeneralOccupied;
+    pediatricOccupied + pediatricNegativeOccupied + pediatricGeneralOccupied +
+    traumaResusOccupied + traumaAreaOccupied;
 };
 
 export const calculateOccupancyRate = (data: BedOccupancyInput): number => {
@@ -104,7 +107,7 @@ export const calculateOccupancyRate = (data: BedOccupancyInput): number => {
 
   const totalBeds = beds.general.total + beds.cohort.total + beds.erNegative.total +
     beds.erGeneral.total + beds.pediatric.total + beds.pediatricNegative.total +
-    beds.pediatricGeneral.total;
+    beds.pediatricGeneral.total + beds.traumaResus.total + beds.traumaArea.total;
 
   if (totalBeds === 0) return 0;
 

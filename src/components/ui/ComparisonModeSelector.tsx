@@ -82,14 +82,14 @@ export default function ComparisonModeSelector({
     xxs: 'px-0.5 py-0 text-[9px] leading-tight',
     xs: 'px-1 py-0.5 text-[11px] h-6',
     sm: 'px-1.5 py-1 text-xs h-7',
-    default: 'px-2 py-1.5 text-sm h-9'
+    default: 'px-1 py-1.5 text-xs h-9'  // 모바일용 간결한 패딩
   };
 
   const sizeMinWidth = {
     xxs: '46px',
     xs: '60px',
     sm: '70px',
-    default: '90px'
+    default: '80px'  // 모바일 최적화
   };
 
   const sizeHeight = {
@@ -114,7 +114,7 @@ export default function ComparisonModeSelector({
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'right 2px center',
-        paddingRight: '14px'
+        paddingRight: '12px'
       }}
     >
       {/* 즐겨찾기 (최상단) */}

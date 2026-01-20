@@ -75,26 +75,32 @@ interface OrgTypeBadgeProps {
 }
 
 export function OrgTypeBadge({ type, isDark = false, label, className }: OrgTypeBadgeProps) {
-  const badgeConfig: Record<string, { bg: string; text: string }> = {
+  const badgeConfig: Record<string, { bg: string; text: string; short: string }> = {
     '권역': {
       bg: isDark ? 'bg-amber-600/30' : 'bg-amber-100',
-      text: isDark ? 'text-amber-300' : 'text-amber-700'
+      text: isDark ? 'text-amber-300' : 'text-amber-700',
+      short: '권'
     },
     '센터': {
       bg: isDark ? 'bg-blue-600/30' : 'bg-blue-100',
-      text: isDark ? 'text-blue-300' : 'text-blue-700'
+      text: isDark ? 'text-blue-300' : 'text-blue-700',
+      short: '센'
     },
     '기관': {
       bg: isDark ? 'bg-gray-600/30' : 'bg-gray-200',
-      text: isDark ? 'text-gray-300' : 'text-gray-600'
+      text: isDark ? 'text-gray-300' : 'text-gray-600',
+      short: '기'
     },
   };
 
   const config = badgeConfig[type] || badgeConfig['기관'];
+  const displayLabel = label ?? type;
+  const shortLabel = label ?? config.short;
 
   return (
     <span className={`inline-flex items-center px-1 py-1 rounded text-[10px] font-medium whitespace-nowrap flex-shrink-0 ${config.bg} ${config.text} ${className || ''}`}>
-      {label ?? type}
+      <span className="sm:hidden">{shortLabel}</span>
+      <span className="hidden sm:inline">{displayLabel}</span>
     </span>
   );
 }
