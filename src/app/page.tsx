@@ -17,7 +17,7 @@ import { REGIONS, SEVERE_TYPES } from '@/lib/constants/dger';
 import { mapSidoName, mapSidoShort } from '@/lib/utils/regionMapping';
 import { detectRegionFromLocation, getStoredRegion, isRegionLocked, setRegionLocked, setStoredRegion } from '@/lib/utils/locationRegion';
 import { isCenterHospital, shortenHospitalName } from '@/lib/utils/hospitalUtils';
-import { formatDateWithDay, isUpdateStale } from '@/lib/utils/dateUtils';
+import { formatDateWithDay, formatTimeOnly, isUpdateStale } from '@/lib/utils/dateUtils';
 import { useEmergencyMessages } from '@/lib/hooks/useEmergencyMessages';
 import { ClassifiedMessages, parseMessageWithHighlights, getHighlightClass, HighlightedSegment, normalizeMessageForDisplay } from '@/lib/utils/messageClassifier';
 import MessageTooltip from '@/components/ui/MessageTooltip';
@@ -643,9 +643,9 @@ export default function HomePage() {
               <table className="w-full border-collapse">
                 {/* 칼럼 너비 정의: 병원명 넓게, 코호트 좁게, 업데이트 유지 */}
                 <colgroup>
-                  <col className="w-[100px] sm:w-[180px] lg:w-[220px] min-w-[100px]" />
+                  <col className="w-[130px] sm:w-[180px] lg:w-[220px] min-w-[100px]" />
                   <col className="w-[60px] sm:w-[80px]" />
-                  <col className="w-[50px] sm:w-[70px]" />
+                  <col className="w-[40px] sm:w-[70px]" />
                   <col className="w-[50px] sm:w-[70px]" />
                   <col className="hidden sm:table-column w-[50px] lg:w-[60px]" />
                   <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
@@ -653,7 +653,9 @@ export default function HomePage() {
                   <col className="hidden sm:table-column w-[45px] lg:w-[55px]" />
                   <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
                   <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
-                  <col className="w-[85px] sm:w-[100px] lg:w-[115px]" />
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
+                  <col className="hidden sm:table-column w-[60px] lg:w-[70px]" />
+                  <col className="w-[50px] sm:w-[100px] lg:w-[115px]" />
                 </colgroup>
                 <thead className={`sticky top-0 z-20 ${isDark ? 'bg-[#111827]' : 'bg-[#4A5D5D]'}`}>
                   <tr>
@@ -710,6 +712,14 @@ export default function HomePage() {
                       <span className="lg:hidden">소일</span>
                       <span className="hidden lg:inline">소아일반</span>
                       <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/30" onMouseDown={(e) => startResize('pedIsolation', e)} />
+                    </th>
+                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">외소</span>
+                      <span className="hidden lg:inline">외상소생</span>
+                    </th>
+                    <th className="hidden sm:table-cell px-1 lg:px-2 py-1 text-center text-white font-semibold text-xs whitespace-nowrap relative">
+                      <span className="lg:hidden">외진</span>
+                      <span className="hidden lg:inline">외상진료</span>
                     </th>
                     <th className="px-1 sm:px-2 pr-4 sm:pr-5 py-1 text-center text-white font-semibold text-xs whitespace-nowrap">
                       <span className="lg:hidden">갱신</span>
@@ -879,8 +889,8 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
               isDark={isDark}
               className="leading-none"
             />
-            {/* lg 이하에서 약어 표시, lg 이상에서 전체 이름 */}
-            <span className="font-medium whitespace-nowrap lg:hidden" title={hospital.dutyName}>{shortenHospitalName(hospital.dutyName)}</span>
+            {/* lg 이하에서 약어 표시 (2줄 허용), lg 이상에서 전체 이름 */}
+            <span className="font-medium lg:hidden line-clamp-2 leading-tight" title={hospital.dutyName}>{shortenHospitalName(hospital.dutyName)}</span>
             <span className="font-medium whitespace-nowrap hidden lg:inline" title={hospital.dutyName}>{hospital.dutyName}</span>
           </div>
         </td>
@@ -930,19 +940,30 @@ function HospitalRow({ hospital, isDark, showGroupDivider = false, isExpanded, o
           {renderBedValue(beds.pediatricGeneral.available, beds.pediatricGeneral.total)}
         </td>
 
-        {/* 업데이트 시간 - 너비 유지, 30분 초과시 강조 */}
-        <td className={`px-1 sm:px-2 pr-4 sm:pr-5 py-1.5 text-center text-[10px] whitespace-nowrap ${
+        {/* 외상소생실 - 모바일 숨김 */}
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.traumaResus.available, beds.traumaResus.total, isDark)}`}>
+          {renderBedValue(beds.traumaResus.available, beds.traumaResus.total)}
+        </td>
+
+        {/* 외상환자진료구역 - 모바일 숨김 */}
+        <td className={`hidden sm:table-cell px-1 lg:px-2 py-1.5 text-center text-sm whitespace-nowrap font-medium ${getBedStatusClass(beds.traumaArea.available, beds.traumaArea.total, isDark)}`}>
+          {renderBedValue(beds.traumaArea.available, beds.traumaArea.total)}
+        </td>
+
+        {/* 업데이트 시간 - 모바일: HH:mm, 데스크톱: MM/DD(요일) HH:mm */}
+        <td className={`px-1 sm:px-2 pr-2 sm:pr-5 py-1.5 text-center text-[10px] whitespace-nowrap ${
           hospital.hvidate && isUpdateStale(hospital.hvidate)
             ? 'text-orange-500 font-medium'
             : isDark ? 'text-gray-400' : 'text-gray-500'
         }`}>
-          {hospital.hvidate ? formatDateWithDay(hospital.hvidate) : '-'}
+          <span className="sm:hidden">{hospital.hvidate ? formatTimeOnly(hospital.hvidate) : '-'}</span>
+          <span className="hidden sm:inline">{hospital.hvidate ? formatDateWithDay(hospital.hvidate) : '-'}</span>
         </td>
       </tr>
       {/* 메시지 행 */}
       {isExpanded && (
         <tr className={isDark ? 'bg-gray-900' : 'bg-gray-100'}>
-          <td colSpan={11} className={`px-4 py-2 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+          <td colSpan={13} className={`px-4 py-2 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
             <div className="space-y-1">
               {/* 메시지 로딩 */}
               {messageLoading && (

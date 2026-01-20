@@ -25,6 +25,12 @@ export interface BedOccupancyInput {
   hv16?: number;
   HVS49?: number;
   hvs49?: number;
+  hv60?: number;   // 외상소생실 가용
+  HVS60?: number;  // 외상소생실 총
+  hvs60?: number;
+  hv61?: number;   // 외상환자진료구역 가용
+  HVS61?: number;  // 외상환자진료구역 총
+  hvs61?: number;
 }
 
 const readNumber = (data: BedOccupancyInput, keys: Array<keyof BedOccupancyInput>) => {
@@ -66,6 +72,14 @@ export const getBedValues = (data: BedOccupancyInput) => {
     pediatricGeneral: {
       available: readNumber(data, ['hv16']),
       total: readNumber(data, ['HVS49', 'hvs49'])
+    },
+    traumaResus: {
+      available: readNumber(data, ['hv60']),
+      total: readNumber(data, ['HVS60', 'hvs60'])
+    },
+    traumaArea: {
+      available: readNumber(data, ['hv61']),
+      total: readNumber(data, ['HVS61', 'hvs61'])
     }
   };
 };

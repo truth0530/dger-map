@@ -93,7 +93,7 @@ export function OrgTypeBadge({ type, isDark = false, label, className }: OrgType
   const config = badgeConfig[type] || badgeConfig['기관'];
 
   return (
-    <span className={`inline-flex items-center px-1 py-1 rounded text-[10px] font-medium ${config.bg} ${config.text} ${className || ''}`}>
+    <span className={`inline-flex items-center px-1 py-1 rounded text-[10px] font-medium whitespace-nowrap flex-shrink-0 ${config.bg} ${config.text} ${className || ''}`}>
       {label ?? type}
     </span>
   );

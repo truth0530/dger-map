@@ -50,6 +50,10 @@ export interface BedInfoItem {
   hvs48: number;
   hv16: number;
   hvs49: number;
+  hv60: number;   // 외상소생실 가용
+  hvs60: number;  // 외상소생실 총
+  hv61: number;   // 외상환자진료구역 가용
+  hvs61: number;  // 외상환자진료구역 총
   hvidate: string;
   occupancy: number;
   occupancyRate: number;
@@ -102,6 +106,10 @@ function parseXmlToBedInfo(xml: string, usedSample: boolean): BedInfoResponse {
     const hvs48 = getItemNumber(item, 'hvs48');
     const hv16 = getItemNumber(item, 'hv16');
     const hvs49 = getItemNumber(item, 'hvs49');
+    const hv60 = getItemNumber(item, 'hv60');
+    const hvs60 = getItemNumber(item, 'hvs60');
+    const hv61 = getItemNumber(item, 'hv61');
+    const hvs61 = getItemNumber(item, 'hvs61');
 
     // 재실인원 및 점유율 계산
     const occupancy = calculateTotalOccupancy({
@@ -170,6 +178,10 @@ function parseXmlToBedInfo(xml: string, usedSample: boolean): BedInfoResponse {
       hvs48,
       hv16,
       hvs49,
+      hv60,
+      hvs60,
+      hv61,
+      hvs61,
       hvidate: getItemText(item, 'hvidate'),
       occupancy,
       occupancyRate,

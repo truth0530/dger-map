@@ -60,11 +60,66 @@ export const HOSPITAL_NAME_MAPPING: Record<string, string> = {
 };
 
 /**
+ * 규칙 기반 병원명 자동 단축
+ * 1. 공통 접두어 제거 (의료법인, 재단법인, 학교법인 등)
+ * 2. 대학명 축약 (○○대학교 → ○○대)
+ * 3. 불필요한 패턴 제거
+ */
+function autoShortenHospitalName(name: string): string {
+  let result = name;
+
+  // 1. 접두어 제거 (순서 중요: 긴 것부터, 괄호 포함 패턴도 처리)
+  const prefixPatterns = [
+    /^사회복지법인\s*/,
+    /^의료법인\s*/,
+    /^재단법인\s*/,
+    /^학교법인\)?/,  // "학교법인)" 패턴 처리
+    /^사단법인\s*/,
+    /^\(재\)\s*/,
+    /^\(의\)\s*/,
+    /^\(사\)\s*/,
+    /^\(학\)\s*/,
+    /^한국보훈복지의료공단\s*/,  // 보훈병원 접두어
+  ];
+  for (const pattern of prefixPatterns) {
+    result = result.replace(pattern, '').trim();
+  }
+
+  // 2. 중간에 있는 패턴 제거
+  const middlePatterns = [
+    /의료재단/g,
+    /재단/g,
+  ];
+  for (const pattern of middlePatterns) {
+    result = result.replace(pattern, '').trim();
+  }
+
+  // 3. 대학명 축약: "○○대학교병원" → "○○대병원", "○○대학교 ○○병원" → "○○대 ○○병원"
+  result = result
+    .replace(/대학교병원$/, '대병원')
+    .replace(/대학교(\s*)/, '대$1');
+
+  // 4. 연속 공백 제거
+  result = result.replace(/\s+/g, ' ').trim();
+
+  return result;
+}
+
+/**
  * 병원명을 약어로 변환
+ * 1. 먼저 하드코딩된 매핑 확인
+ * 2. 없으면 규칙 기반 자동 단축 적용
  */
 export function shortenHospitalName(name: string): string {
   if (!name) return '-';
-  return HOSPITAL_NAME_MAPPING[name] || name;
+
+  // 하드코딩된 매핑 우선
+  if (HOSPITAL_NAME_MAPPING[name]) {
+    return HOSPITAL_NAME_MAPPING[name];
+  }
+
+  // 규칙 기반 자동 단축
+  return autoShortenHospitalName(name);
 }
 
 // ===== 기관 종별 구분 (HPBD 코드 기반) =====
