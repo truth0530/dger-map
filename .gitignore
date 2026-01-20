@@ -55,3 +55,6 @@ nul
 
 # Ignore all JSON files (local only)
 *.json
+
+# MCP configuration
+.mcp.json
