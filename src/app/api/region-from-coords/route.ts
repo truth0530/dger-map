@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     const url = `${KAKAO_REGION_API_URL}?x=${encodeURIComponent(lng)}&y=${encodeURIComponent(lat)}`;
     const response = await fetch(url, {
+      cache: 'no-store', // 외부 API 응답은 캐싱하지 않음
       headers: {
         Authorization: `KakaoAK ${apiKey}`
       }

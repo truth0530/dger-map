@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const response = await fetch(KAKAO_API_URL, {
+          cache: 'no-store', // 외부 API 응답은 캐싱하지 않음
           method: 'POST',
           headers: {
             'Authorization': `KakaoAK ${apiKey}`,
