@@ -20,6 +20,7 @@ import { getHospitalOrgType, HospitalOrgType } from '@/lib/data/hospitalTypeMap'
 import { getBedStatus, BedStatus } from '@/lib/constants/dger';
 import { calculateOccupancyRate, calculateTotalOccupancy } from '@/lib/utils/bedOccupancy';
 import { getCorsHeaders } from '@/lib/utils/cors';
+import { slackNotifier } from '@/lib/slack/SlackNotifier';
 
 const logger = createLogger('api:bed-info');
 const API_NAME = 'bed-info';
@@ -290,6 +291,27 @@ export async function GET(request: NextRequest) {
     const jsonResponse = parseXmlToBedInfo(result.xml, result.usedSample);
     const jsonString = JSON.stringify(jsonResponse);
 
+    // Slack 알림: 장애/복구 감지 (샘플 데이터가 아닌 실제 API 응답 기준)
+    if (!result.usedSample) {
+      if (jsonResponse.items.length === 0) {
+        // 데이터가 비어있으면 장애로 판단
+        slackNotifier.notifyFailure({
+          apiName: '공공데이터 포털 (병상정보)',
+          errorMessage: 'API가 빈 데이터를 반환함 (totalCount: 0)',
+          region: region || '전체',
+          timestamp: new Date()
+        }).catch(err => logger.error('Slack 알림 실패', err));
+      } else {
+        // 데이터가 있으면 복구 알림 (이전에 장애였다면)
+        slackNotifier.notifyRecovery({
+          apiName: '공공데이터 포털 (병상정보)',
+          itemCount: jsonResponse.items.length,
+          region: region || '전체',
+          timestamp: new Date()
+        }).catch(err => logger.error('Slack 복구 알림 실패', err));
+      }
+    }
+
     // 캐시에 저장 (샘플 데이터가 아닌 경우만)
     if (!result.usedSample) {
       bedInfoCache.set(cacheKey, jsonString);
@@ -320,6 +342,14 @@ export async function GET(request: NextRequest) {
     const duration = performance.now() - startTime;
     logger.error('API call failed', error instanceof Error ? error : undefined, { region, hospId });
     logger.logApiResponse('GET', '/api/bed-info', 500, duration);
+
+    // Slack 알림: API 오류
+    slackNotifier.notifyFailure({
+      apiName: '공공데이터 포털 (병상정보)',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      region: region || '전체',
+      timestamp: new Date()
+    }).catch(err => logger.error('Slack 알림 실패', err));
 
     // 에러 시 샘플 데이터로 JSON 반환
     const jsonResponse = parseXmlToBedInfo(SAMPLE_BED_DATA, true);
